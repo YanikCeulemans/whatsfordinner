@@ -5,6 +5,7 @@ package:
     - debug
     - effect
     - flame
+    - formatters
     - lists
     - prelude
     - spec

@@ -23,3 +23,6 @@ toList date (MkMealSchedule { startDate, schedule })
       where
       Days days = Date.diff date startDate
       wholeDays = (Int.ceil days) + 1
+
+asList :: MealSchedule -> List PlannedMeal
+asList (MkMealSchedule { schedule }) = RingList.asList schedule

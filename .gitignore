@@ -10,3 +10,6 @@ generated-docs/
 .purs*
 .psa*
 .spago
+dist/
+.parcel-cache/
+index.js
