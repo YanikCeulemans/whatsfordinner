@@ -9,11 +9,15 @@ import Data.DateTime (DateTime(..))
 import Data.Enum (toEnum)
 import Data.Foldable (intercalate)
 import Data.Formatter.DateTime as Format
+import Data.Int as Int
 import Data.List (List(..))
 import Data.List as List
+import Data.Maybe (Maybe(..))
 import Data.Maybe as Maybe
 import Data.Time.Duration (Days(..))
 import Data.Tuple (Tuple(..))
+import Data.Tuple.Nested ((/\))
+import Data.Unfoldable (unfoldr)
 import Domain.Meal (Meal(..))
 import Domain.MealSchedule (Id(..), MealSchedule(..))
 import Domain.MealSchedule as MealSchedule
@@ -209,43 +213,71 @@ instance Show (Range String) where
   show (MkRange { start, end }) = intercalate " "
     [ "start: ", start, " , end: ", end ]
 
+unsafeAdjustDate :: Days -> Date -> Date
+unsafeAdjustDate d =
+  Maybe.fromMaybe' (\_ -> unsafeCrashWith "invalid days amount")
+    <<< Date.adjust d
+
 weekRange :: Date -> Range Date
 weekRange d = MkRange { start, end }
   where
   start = startOfWeek d
   end = endOfWeek d
 
-viewScheduleEntry :: PlannedMeal -> Html Message
-viewScheduleEntry plannedMeal =
-  HE.div [ HA.class' "border padded flex column" ]
-    [ case plannedMeal of
-        NoMealPlanned -> HE.text "No meal planned"
-        PlannedMeal meal -> HE.text $ show meal
+weekArray :: Range Date -> Array Date
+weekArray (MkRange { start, end }) =
+  unfoldr go start
+  where
+  go date
+    | date > end = Nothing
+    | otherwise =
+        Just (date /\ unsafeAdjustDate (Days 1.0) date)
+
+viewScheduleEntry :: Date -> Tuple Date PlannedMeal -> Html Message
+viewScheduleEntry date (mealDate /\ plannedMeal) =
+  HE.div
+    [ HA.class'
+        [ "border padded flex column"
+        , if date == mealDate then "highlight" else ""
+        ]
+    ]
+    [ HE.span_ [ HE.text $ show $ Date.weekday mealDate ]
+    , HE.span_
+        [ case plannedMeal of
+            NoMealPlanned -> HE.text "No meal planned"
+            PlannedMeal meal -> HE.text $ show meal
+        ]
     ]
 
 view :: Model -> Html Message
 view model =
-  HE.main [ HA.class' "flex column spaced" ]
-    [ HE.h1_ [ HE.text "yolo" ]
-    , HE.span_ [ HE.text $ displayDate model.targetDate ]
-    , HE.span_ [ HE.text $ displayDate $ startOfWeek model.targetDate ]
-    , HE.span_
-        [ HE.text "current week: "
-        , HE.text $ show $ map displayDate $ weekRange model.targetDate
-        ]
-    , case
-        MealSchedule.toList (endOfWeek model.targetDate) model.mealSchedule
-        of
-        Nil -> HE.text ""
-        entries ->
-          HE.div [ HA.class' "flex column spaced" ] $ map viewScheduleEntry $
-            Array.fromFoldable entries
-    , case MealSchedule.asList model.mealSchedule of
-        Nil -> HE.text ""
-        entries ->
-          HE.div [ HA.class' "flex column spaced" ] $ map viewScheduleEntry $
-            Array.fromFoldable entries
-    ]
+  let
+    week = weekArray $ weekRange model.targetDate
+    weekMeals =
+      Array.fromFoldable $ MealSchedule.toList (endOfWeek model.targetDate)
+        model.mealSchedule
+    zipped = Array.zip week weekMeals
+  in
+    HE.main [ HA.class' "flex column spaced" ]
+      [ HE.h1_ [ HE.text "yolo" ]
+      , HE.span_ [ HE.text $ displayDate model.targetDate ]
+      , HE.span_ [ HE.text $ displayDate $ startOfWeek model.targetDate ]
+      , HE.span_
+          [ HE.text "current week: "
+          , HE.text $ show $ map displayDate $ weekRange model.targetDate
+          ]
+      , case zipped of
+          [] -> HE.text ""
+          entries ->
+            HE.div [ HA.class' "flex column spaced" ]
+              $ map (viewScheduleEntry model.targetDate) entries
+      , HE.h1_ [ HE.text "Entire schedule" ]
+      -- , case MealSchedule.asList model.mealSchedule of
+      --     Nil -> HE.text ""
+      --     entries ->
+      --       HE.div [ HA.class' "flex column spaced" ] $ map viewScheduleEntry $
+      --         Array.fromFoldable entries
+      ]
 
 app :: Date -> Application Model Message
 app targetDate =
