@@ -8,6 +8,8 @@ import Data.Int as Int
 import Data.List (List(..))
 import Data.Time.Duration (Days(..))
 import Domain.PlannedMeal (PlannedMeal)
+import Domain.Range (Range)
+import Domain.Range as Range
 import Domain.RingList (RingList)
 import Domain.RingList as RingList
 
@@ -16,13 +18,22 @@ newtype Id = MkId Int
 newtype MealSchedule = MkMealSchedule
   { id :: Id, startDate :: Date, schedule :: RingList PlannedMeal }
 
-toList :: Date -> MealSchedule -> List PlannedMeal
-toList date (MkMealSchedule { startDate, schedule })
-  | date < startDate = Nil
-  | otherwise = RingList.toListWithRange wholeDays schedule
+toList :: Range Date -> MealSchedule -> List PlannedMeal
+toList dateRange (MkMealSchedule { startDate, schedule })
+  | Range.start dateRange < startDate = Nil
+  -- TODO: This needs to account for an offset
+  | otherwise = RingList.toList range schedule
       where
-      Days days = Date.diff date startDate
-      wholeDays = (Int.ceil days) + 1
+      rangeStart = Range.start dateRange
+      rangeEnd = Range.end dateRange
+      Days rangeDiff = Date.diff rangeEnd rangeStart
+      Days indexStart = Date.diff rangeStart startDate
+      range = Range.create (Int.round indexStart) $
+        (Int.round $ indexStart + rangeDiff)
+
+-- where
+-- Days days = Date.diff date startDate
+-- wholeDays = (Int.ceil days) + 1
 
 asList :: MealSchedule -> List PlannedMeal
 asList (MkMealSchedule { schedule }) = RingList.asList schedule

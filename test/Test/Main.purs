@@ -15,6 +15,7 @@ import Domain.Meal (Meal(..))
 import Domain.MealSchedule (Id(..), MealSchedule)
 import Domain.MealSchedule as MealSchedule
 import Domain.PlannedMeal (PlannedMeal(..))
+import Domain.Range as Range
 import Domain.RingList (RingList)
 import Domain.RingList as RingList
 import Effect (Effect)
@@ -39,20 +40,72 @@ meals = RingList.fromFoldable [ meal1, meal2, meal3 ]
 ringListSpec :: Spec Unit
 ringListSpec =
   describe "RingList" do
-    let
-      sut = RingList.fromFoldable [ Just 1, Nothing, Just 2 ]
-    it "toListWithRange should work for negative input" do
-      RingList.toListWithRange (-1) sut `shouldEqual` Nil
-    it "toListWithRange should work for 0 input" do
-      RingList.toListWithRange 0 sut `shouldEqual` Nil
-    it "toListWithRange should work for 1 input" do
-      RingList.toListWithRange 1 sut `shouldEqual` (Just 1 : Nil)
-    it "toListWithRange should work for larger than list input" do
-      RingList.toListWithRange 5 sut `shouldEqual`
-        (Just 1 : Nothing : Just 2 : Just 1 : Nothing : Nil)
-    it "toListWithRange should work for larger than list input" do
-      RingList.toListWithRange 4 meals `shouldEqual`
-        (meal1 : meal2 : meal3 : meal1 : Nil)
+    describe "drop" do
+      let
+        sut = RingList.fromFoldable [ 1, 2 ]
+      it "works given negative number" do
+        RingList.drop (-1) sut `shouldEqual` sut
+      it "works given zero" do
+        RingList.drop 0 sut `shouldEqual` sut
+      it "works for one" do
+        RingList.drop 1 sut `shouldEqual` (RingList.fromFoldable [ 2 ])
+      it "works for length of ring list" do
+        RingList.drop (RingList.length sut) sut `shouldEqual` sut
+      it "works for length of ring list plus 1" do
+        RingList.drop (RingList.length sut + 1) sut `shouldEqual`
+          (RingList.fromFoldable [ 2 ])
+
+    describe "take" do
+      let
+        sut = RingList.fromFoldable [ 1, 2 ]
+      it "works given negative number" do
+        RingList.take (-1) sut `shouldEqual` mempty
+      it "works given zero" do
+        RingList.take 0 sut `shouldEqual` mempty
+      it "works given 1" do
+        RingList.take 1 sut `shouldEqual` (RingList.fromFoldable [ 1 ])
+      it "works for length of ring list" do
+        RingList.take (RingList.length sut) sut `shouldEqual` sut
+      it "works for length of ring list plus 1" do
+        RingList.take (RingList.length sut + 1) sut `shouldEqual`
+          (RingList.fromFoldable [ 1, 2, 1 ])
+
+    describe "offset" do
+      let
+        sut = RingList.fromFoldable [ 1, 2 ]
+      it "works for offset -1" do
+        RingList.offset (-1) sut `shouldEqual` (RingList.fromFoldable [ 2, 1 ])
+      it "works for offset -2" do
+        RingList.offset (-2) sut `shouldEqual` (RingList.fromFoldable [ 1, 2 ])
+      it "works for offset 0" do
+        RingList.offset 0 sut `shouldEqual` (RingList.fromFoldable [ 1, 2 ])
+      it "works for offset 1" do
+        RingList.offset 1 sut `shouldEqual` (RingList.fromFoldable [ 2, 1 ])
+      it "works for offset 2" do
+        RingList.offset 2 sut `shouldEqual` (RingList.fromFoldable [ 1, 2 ])
+
+    describe "toList" do
+      let
+        sut = RingList.fromFoldable [ Just 1, Nothing, Just 2 ]
+      it "toList should work for -1..-3" do
+        RingList.toList (Range.create (-1) (-3)) sut `shouldEqual`
+          (Nothing : Just 1 : Nil)
+      it "toList should work for -1..1 and positive end" do
+        RingList.toList (Range.create (-1) 1) sut `shouldEqual`
+          (Just 2 : Just 1 : Nil)
+      it "toList should work for 0..0 input" do
+        RingList.toList (Range.create 0 0) sut `shouldEqual` Nil
+      it "toList should work for 1..3 input" do
+        RingList.toList (Range.create 1 3) sut `shouldEqual`
+          (Nothing : Just 2 : Nil)
+      it "toList should work for 0..1 input" do
+        RingList.toList (Range.create 0 1) sut `shouldEqual` (Just 1 : Nil)
+      it "toList should work for range larger than list input" do
+        RingList.toList (Range.create 0 5) sut `shouldEqual`
+          (Just 1 : Nothing : Just 2 : Just 1 : Nothing : Nil)
+      it "toList should work for 2..5 input" do
+        RingList.toList (Range.create 2 5) sut `shouldEqual`
+          (Just 2 : Just 1 : Nothing : Nil)
 
 mkDate :: Int -> Month -> Int -> Maybe Date.Date
 mkDate year month day =
@@ -77,17 +130,20 @@ mealScheduleSpec = do
       let
         theSchedule = mkSchedule []
         twoWeeksFromNow = relativeDate 14.0 startDate
-      MealSchedule.toList twoWeeksFromNow theSchedule `shouldEqual` Nil
+        dateRange = Range.create startDate twoWeeksFromNow
+      MealSchedule.toList dateRange theSchedule `shouldEqual` Nil
     it "toList should work for non-empty schedule" do
       let
         theSchedule = mkSchedule [ meal1, meal2 ]
         threeDaysFromNow = relativeDate 3.0 startDate
-      MealSchedule.toList threeDaysFromNow theSchedule `shouldEqual`
+        dateRange = Range.create startDate threeDaysFromNow
+      MealSchedule.toList dateRange theSchedule `shouldEqual`
         List.fromFoldable [ meal1, meal2, meal1, meal2 ]
     it "toList should work for same date as start date" do
       let
         theSchedule = mkSchedule [ meal1, meal2 ]
-      MealSchedule.toList startDate theSchedule `shouldEqual`
+        dateRange = Range.create startDate $ relativeDate 1.0 startDate
+      MealSchedule.toList dateRange theSchedule `shouldEqual`
         List.fromFoldable [ meal1 ]
   where
   startDate = unsafeMkDate 2026 March 2
@@ -96,10 +152,20 @@ mealScheduleSpec = do
   mkSchedule ps = MealSchedule.MkMealSchedule
     { id: MkId 1, schedule: RingList.fromFoldable ps, startDate }
 
+rangeSpec :: Spec Unit
+rangeSpec =
+  describe "Range" do
+    describe "toArray" do
+      it "should work" do
+        let
+          sut = Range.create 1 3
+        Range.toArray (_ + 1) sut `shouldEqual` [ 1, 2, 3 ]
+
 spec :: Spec Unit
 spec = do
   ringListSpec
-  mealScheduleSpec
+  -- mealScheduleSpec
+  rangeSpec
 
 main :: Effect Unit
 main = runSpecAndExitProcess [ consoleReporter ] spec

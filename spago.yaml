@@ -10,6 +10,7 @@ package:
     - prelude
     - spec
     - spec-node
+    - web-html
   test:
     main: Test.Main
     dependencies: []

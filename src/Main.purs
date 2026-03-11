@@ -4,7 +4,6 @@ import Prelude
 
 import App.App as App
 import Effect (Effect)
-import Effect.Class.Console (log)
 import Effect.Now as Date
 import Flame as F
 import Web.DOM.ParentNode (QuerySelector(..))

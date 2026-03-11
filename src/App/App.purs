@@ -7,26 +7,36 @@ import Data.Date (Date, Month(..), Weekday(..))
 import Data.Date as Date
 import Data.DateTime (DateTime(..))
 import Data.Enum (toEnum)
-import Data.Foldable (intercalate)
+import Data.Foldable (fold)
 import Data.Formatter.DateTime as Format
 import Data.Int as Int
-import Data.List (List(..))
 import Data.List as List
 import Data.Maybe (Maybe(..))
 import Data.Maybe as Maybe
 import Data.Time.Duration (Days(..))
-import Data.Tuple (Tuple(..))
+import Data.Tuple (Tuple)
 import Data.Tuple.Nested ((/\))
 import Data.Unfoldable (unfoldr)
 import Domain.Meal (Meal(..))
 import Domain.MealSchedule (Id(..), MealSchedule(..))
 import Domain.MealSchedule as MealSchedule
 import Domain.PlannedMeal (PlannedMeal(..))
+import Domain.Range (Range)
+import Domain.Range as Range
 import Domain.RingList as RingList
+import Effect.Class (liftEffect)
+import Effect.Now (nowDate)
+import FFI.FFIDoc as FFIDoc
 import Flame (Application, Html, Update)
+import Flame.Application as F
 import Flame.Html.Attribute as HA
 import Flame.Html.Element as HE
+import Flame.Subscription as FS
 import Partial.Unsafe (unsafeCrashWith)
+import Web.Event.Event (EventType(..))
+import Web.HTML (window)
+import Web.HTML.HTMLDocument.VisibilityState (VisibilityState(..))
+import Web.HTML.Window (document)
 
 type Model =
   { mealSchedule :: MealSchedule
@@ -166,10 +176,23 @@ init targetDate =
           ]
       }
 
-data Message = NoOp
+data Message
+  = DocumentVisibilityChanged
+  | TargetDateUpdated Date
 
 update :: Update Model Message
-update model msg = Tuple model []
+update model = case _ of
+  DocumentVisibilityChanged ->
+    model /\
+      [ do
+          vs <- liftEffect $ FFIDoc.visibilityState =<< document =<< window
+          case vs of
+            Visible -> Just <<< TargetDateUpdated <$> liftEffect nowDate
+            _ -> pure Nothing
+      ]
+
+  TargetDateUpdated newDate ->
+    F.noMessages $ model { targetDate = newDate }
 
 displayDateTime :: DateTime -> String
 displayDateTime =
@@ -204,84 +227,71 @@ endOfWeek d
       $ Maybe.fromMaybe' (\_ -> unsafeCrashWith "invalid days amount")
       $ Date.adjust (Days 1.0) d
 
-newtype Range a = MkRange { start :: a, end :: a }
-
-instance Functor Range where
-  map f (MkRange { start, end }) = MkRange { start: f start, end: f end }
-
-instance Show (Range String) where
-  show (MkRange { start, end }) = intercalate " "
-    [ "start: ", start, " , end: ", end ]
-
 unsafeAdjustDate :: Days -> Date -> Date
 unsafeAdjustDate d =
   Maybe.fromMaybe' (\_ -> unsafeCrashWith "invalid days amount")
     <<< Date.adjust d
 
 weekRange :: Date -> Range Date
-weekRange d = MkRange { start, end }
+weekRange d = Range.create start end
   where
   start = startOfWeek d
   end = endOfWeek d
 
-weekArray :: Range Date -> Array Date
-weekArray (MkRange { start, end }) =
-  unfoldr go start
-  where
-  go date
-    | date > end = Nothing
-    | otherwise =
-        Just (date /\ unsafeAdjustDate (Days 1.0) date)
+nextDays :: Int -> Date -> Array Date
+nextDays n date
+  | n < 1 = []
+  | otherwise =
+      unfoldr go n
+      where
+      go n'
+        | n' < 1 = Nothing
+        | otherwise = Just $
+            unsafeAdjustDate (Days $ Int.toNumber $ n - n') date /\ (n' - 1)
 
 viewScheduleEntry :: Date -> Tuple Date PlannedMeal -> Html Message
 viewScheduleEntry date (mealDate /\ plannedMeal) =
-  HE.div
-    [ HA.class'
-        [ "border padded flex column"
-        , if date == mealDate then "highlight" else ""
+  HE.article_
+    [ HE.header_
+        [ HE.text $ fold
+            [ show $ Date.weekday mealDate
+            , ": "
+            , displayDate mealDate
+            , if date == mealDate then " (Today)" else ""
+            ]
         ]
-    ]
-    [ HE.span_ [ HE.text $ show $ Date.weekday mealDate ]
-    , HE.span_
-        [ case plannedMeal of
-            NoMealPlanned -> HE.text "No meal planned"
-            PlannedMeal meal -> HE.text $ show meal
-        ]
+    , case plannedMeal of
+        NoMealPlanned -> HE.text "No meal planned"
+        PlannedMeal meal -> HE.span [] [ HE.text $ show meal ]
     ]
 
 view :: Model -> Html Message
 view model =
   let
-    week = weekArray $ weekRange model.targetDate
+    weekDays = nextDays 7 model.targetDate
+    nextWeekDate = unsafeAdjustDate (Days 7.0) model.targetDate
+    dateRange = Range.create model.targetDate nextWeekDate
     weekMeals =
-      Array.fromFoldable $ MealSchedule.toList (endOfWeek model.targetDate)
+      Array.fromFoldable $ MealSchedule.toList
+        dateRange
         model.mealSchedule
-    zipped = Array.zip week weekMeals
+    zipped = Array.zip weekDays weekMeals
   in
-    HE.main [ HA.class' "flex column spaced" ]
-      [ HE.h1_ [ HE.text "yolo" ]
-      , HE.span_ [ HE.text $ displayDate model.targetDate ]
-      , HE.span_ [ HE.text $ displayDate $ startOfWeek model.targetDate ]
-      , HE.span_
-          [ HE.text "current week: "
-          , HE.text $ show $ map displayDate $ weekRange model.targetDate
-          ]
-      , case zipped of
+    HE.main [ HA.class' "flex column spaced container" ]
+      [ case zipped of
           [] -> HE.text ""
           entries ->
             HE.div [ HA.class' "flex column spaced" ]
               $ map (viewScheduleEntry model.targetDate) entries
       , HE.h1_ [ HE.text "Entire schedule" ]
-      -- , case MealSchedule.asList model.mealSchedule of
-      --     Nil -> HE.text ""
-      --     entries ->
-      --       HE.div [ HA.class' "flex column spaced" ] $ map viewScheduleEntry $
-      --         Array.fromFoldable entries
       ]
 
 app :: Date -> Application Model Message
 app targetDate =
-  { subscribe: []
+  { subscribe:
+      [ FS.onCustomEvent' (EventType "visibilitychange")
+          DocumentVisibilityChanged
+      ]
   , view
   , model: init targetDate
   , update

@@ -13,3 +13,4 @@ generated-docs/
 dist/
 .parcel-cache/
 index.js
+.spec-results
