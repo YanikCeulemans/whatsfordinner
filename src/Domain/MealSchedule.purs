@@ -19,21 +19,15 @@ newtype MealSchedule = MkMealSchedule
   { id :: Id, startDate :: Date, schedule :: RingList PlannedMeal }
 
 toList :: Range Date -> MealSchedule -> List PlannedMeal
-toList dateRange (MkMealSchedule { startDate, schedule })
-  | Range.start dateRange < startDate = Nil
-  -- TODO: This needs to account for an offset
-  | otherwise = RingList.toList range schedule
-      where
-      rangeStart = Range.start dateRange
-      rangeEnd = Range.end dateRange
-      Days rangeDiff = Date.diff rangeEnd rangeStart
-      Days indexStart = Date.diff rangeStart startDate
-      range = Range.create (Int.round indexStart) $
-        (Int.round $ indexStart + rangeDiff)
-
--- where
--- Days days = Date.diff date startDate
--- wholeDays = (Int.ceil days) + 1
+toList dateRange (MkMealSchedule { startDate, schedule }) =
+  RingList.toList range schedule
+  where
+  rangeStart = Range.start dateRange
+  rangeEnd = Range.end dateRange
+  Days rangeDiff = Date.diff rangeEnd rangeStart
+  Days indexStart = Date.diff rangeStart startDate
+  range = Range.create (Int.round indexStart) $
+    (Int.round $ indexStart + rangeDiff)
 
 asList :: MealSchedule -> List PlannedMeal
 asList (MkMealSchedule { schedule }) = RingList.asList schedule

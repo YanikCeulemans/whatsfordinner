@@ -138,7 +138,7 @@ mealScheduleSpec = do
         threeDaysFromNow = relativeDate 3.0 startDate
         dateRange = Range.create startDate threeDaysFromNow
       MealSchedule.toList dateRange theSchedule `shouldEqual`
-        List.fromFoldable [ meal1, meal2, meal1, meal2 ]
+        List.fromFoldable [ meal1, meal2, meal1 ]
     it "toList should work for same date as start date" do
       let
         theSchedule = mkSchedule [ meal1, meal2 ]
@@ -164,7 +164,7 @@ rangeSpec =
 spec :: Spec Unit
 spec = do
   ringListSpec
-  -- mealScheduleSpec
+  mealScheduleSpec
   rangeSpec
 
 main :: Effect Unit
