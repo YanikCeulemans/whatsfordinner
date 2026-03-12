@@ -277,13 +277,13 @@ view model =
         model.mealSchedule
     zipped = Array.zip weekDays weekMeals
   in
-    HE.main [ HA.class' "flex column spaced container" ]
-      [ case zipped of
+    HE.main [ HA.class' "flex column container" ]
+      [ HE.h1_ [ HE.text "The next 7 days" ]
+      , case zipped of
           [] -> HE.text ""
           entries ->
             HE.div [ HA.class' "flex column spaced" ]
               $ map (viewScheduleEntry model.targetDate) entries
-      , HE.h1_ [ HE.text "Entire schedule" ]
       ]
 
 app :: Date -> Application Model Message
