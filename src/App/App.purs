@@ -17,6 +17,7 @@ import Data.Time.Duration (Days(..))
 import Data.Tuple (Tuple)
 import Data.Tuple.Nested ((/\))
 import Data.Unfoldable (unfoldr)
+import Debug as Debug
 import Domain.Meal (Meal(..))
 import Domain.MealSchedule (Id(..), MealSchedule(..))
 import Domain.MealSchedule as MealSchedule
@@ -33,7 +34,8 @@ import Flame.Html.Attribute as HA
 import Flame.Html.Element as HE
 import Flame.Subscription as FS
 import Partial.Unsafe (unsafeCrashWith)
-import Web.Event.Event (EventType(..))
+import Web.Event.Event (Event, EventType(..))
+import Web.Event.Event as Event
 import Web.HTML (window)
 import Web.HTML.HTMLDocument.VisibilityState (VisibilityState(..))
 import Web.HTML.Window (document)
@@ -176,9 +178,15 @@ init targetDate =
           ]
       }
 
+data Route
+  = Home
+  | Groceries
+
 data Message
   = DocumentVisibilityChanged
   | TargetDateUpdated Date
+  | NavClicked Route Event
+  | NavigationRaised String
 
 update :: Update Model Message
 update model = case _ of
@@ -193,6 +201,18 @@ update model = case _ of
 
   TargetDateUpdated newDate ->
     F.noMessages $ model { targetDate = newDate }
+
+  NavClicked route evt ->
+    let
+      _ = Debug.spy "route" route
+    in
+      model /\ [ Nothing <$ (liftEffect $ Event.preventDefault evt) ]
+
+  NavigationRaised destination ->
+    let
+      _ = Debug.spy "destination" destination
+    in
+      model /\ []
 
 displayDateTime :: DateTime -> String
 displayDateTime =
@@ -277,13 +297,29 @@ view model =
         model.mealSchedule
     zipped = Array.zip weekDays weekMeals
   in
-    HE.main [ HA.class' "flex column container" ]
-      [ HE.h1_ [ HE.text "The next 7 days" ]
-      , case zipped of
-          [] -> HE.text ""
-          entries ->
-            HE.div [ HA.class' "flex column spaced" ]
-              $ map (viewScheduleEntry model.targetDate) entries
+    HE.fragment
+      [ HE.main [ HA.class' "flex column container" ]
+          [ HE.h1_ [ HE.text "The next 7 days" ]
+          , case zipped of
+              [] -> HE.text ""
+              entries ->
+                HE.div [ HA.class' "flex column spaced" ]
+                  $ map (viewScheduleEntry model.targetDate) entries
+          ]
+      , HE.footer [ HA.class' "container" ]
+          [ HE.nav [ HA.class' "flex spaced justify-center" ]
+              [ HE.a
+                  [ HA.href "/"
+                  -- , HA.onClick' $ NavClicked Home
+                  ]
+                  [ HE.text "Next days" ]
+              , HE.a
+                  [ HA.href "/groceries"
+                  -- , HA.onClick' $ NavClicked Groceries
+                  ]
+                  [ HE.text "Groceries" ]
+              ]
+          ]
       ]
 
 app :: Date -> Application Model Message

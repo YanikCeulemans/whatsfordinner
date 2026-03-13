@@ -1,6 +1,7 @@
 package:
   name: lekker
   dependencies:
+    - aff-promise
     - console
     - debug
     - effect
