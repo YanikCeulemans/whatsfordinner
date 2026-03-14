@@ -1,16 +1,30 @@
 module App.Data where
 
-import Data.Date (Date)
+import Prelude
+
+import Data.Date (Date, Month(..))
+import Data.Date as Date
+import Data.Enum (toEnum)
+import Data.Maybe as Maybe
 import Domain.Meal (Meal(..))
 import Domain.MealSchedule (Id(..), MealSchedule(..))
 import Domain.PlannedMeal (PlannedMeal(..))
 import Domain.RingList as RingList
+import Partial.Unsafe (unsafeCrashWith)
 
-mealSchedule :: Date -> MealSchedule
-mealSchedule startDate =
+theDate :: Date
+theDate =
+  Maybe.fromMaybe' (\_ -> unsafeCrashWith "invalid date literal")
+    $ Date.canonicalDate
+        <$> toEnum 2026
+        <*> pure March
+        <*> toEnum 2
+
+mealSchedule :: MealSchedule
+mealSchedule =
   MkMealSchedule
     { id: MkId 1
-    , startDate
+    , startDate: theDate
     , schedule: RingList.fromFoldable
         [ PlannedMeal
             ( MkMeal

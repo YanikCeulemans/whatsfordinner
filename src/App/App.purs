@@ -59,18 +59,10 @@ type Model =
   , targetDate :: Date
   }
 
-theDate :: Date
-theDate =
-  Maybe.fromMaybe' (\_ -> unsafeCrashWith "invalid date literal") $
-    Date.canonicalDate
-      <$> toEnum 2026
-      <*> pure March
-      <*> toEnum 2
-
 init :: Date -> Model
 init targetDate =
   { route: HomeM
-      { mealSchedule: AData.mealSchedule targetDate
+      { mealSchedule: AData.mealSchedule
       }
   , targetDate
   }
@@ -120,7 +112,7 @@ update model message = case model.route /\ message of
     updatedModel = case parsedRoute of
       Just Groceries -> model { route = GroceriesM unit }
       _ -> model
-        { route = HomeM { mealSchedule: AData.mealSchedule model.targetDate } }
+        { route = HomeM { mealSchedule: AData.mealSchedule } }
 
   _ -> F.noMessages model
 
