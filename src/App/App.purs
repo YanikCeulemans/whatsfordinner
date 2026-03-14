@@ -2,13 +2,16 @@ module App.App where
 
 import Prelude
 
+import App.Data as AData
 import Data.Array as Array
 import Data.Date (Date, Month(..), Weekday(..))
 import Data.Date as Date
 import Data.DateTime (DateTime(..))
+import Data.Either as Either
 import Data.Enum (toEnum)
 import Data.Foldable (fold)
 import Data.Formatter.DateTime as Format
+import Data.Generic.Rep (class Generic)
 import Data.Int as Int
 import Data.List as List
 import Data.Maybe (Maybe(..))
@@ -18,30 +21,41 @@ import Data.Tuple (Tuple)
 import Data.Tuple.Nested ((/\))
 import Data.Unfoldable (unfoldr)
 import Debug as Debug
-import Domain.Meal (Meal(..))
-import Domain.MealSchedule (Id(..), MealSchedule(..))
+import Domain.MealSchedule (MealSchedule)
 import Domain.MealSchedule as MealSchedule
 import Domain.PlannedMeal (PlannedMeal(..))
 import Domain.Range (Range)
 import Domain.Range as Range
-import Domain.RingList as RingList
 import Effect.Class (liftEffect)
 import Effect.Now (nowDate)
-import FFI.FFIDoc as FFIDoc
+import FFI.Doc as FFIDoc
+import FFI.URL as FFIURL
 import Flame (Application, Html, Update)
 import Flame.Application as F
 import Flame.Html.Attribute as HA
 import Flame.Html.Element as HE
 import Flame.Subscription as FS
 import Partial.Unsafe (unsafeCrashWith)
-import Web.Event.Event (Event, EventType(..))
-import Web.Event.Event as Event
+import Routing.Duplex (RouteDuplex')
+import Routing.Duplex as D
+import Routing.Duplex.Generic as G
+import Web.Event.Event (EventType(..))
 import Web.HTML (window)
 import Web.HTML.HTMLDocument.VisibilityState (VisibilityState(..))
 import Web.HTML.Window (document)
 
-type Model =
+type HomeModel =
   { mealSchedule :: MealSchedule
+  }
+
+type GroceriesModel = Unit
+
+data RouteModel
+  = HomeM HomeModel
+  | GroceriesM GroceriesModel
+
+type Model =
+  { route :: RouteModel
   , targetDate :: Date
   }
 
@@ -55,142 +69,35 @@ theDate =
 
 init :: Date -> Model
 init targetDate =
-  { mealSchedule
+  { route: HomeM
+      { mealSchedule: AData.mealSchedule targetDate
+      }
   , targetDate
   }
-  where
-  mealSchedule =
-    MkMealSchedule
-      { id: MkId 1
-      , startDate: theDate
-      , schedule: RingList.fromFoldable
-          [ PlannedMeal
-              ( MkMeal
-                  { name: "Brussels sprouts with bacon and mashed potatoes" }
-              )
-          , PlannedMeal
-              ( MkMeal
-                  { name: "Mac & Cheese" }
-              )
-          , PlannedMeal
-              ( MkMeal
-                  { name: "Chili sin carne" }
-              )
-          , PlannedMeal
-              ( MkMeal
-                  { name: "Chicken wok with noodles" }
-              )
-          , PlannedMeal
-              ( MkMeal
-                  { name: "Vol au vent" }
-              )
-          , PlannedMeal
-              ( MkMeal
-                  { name: "Leek, mashed potatoes and minced meat casserole" }
-              )
-          , PlannedMeal
-              ( MkMeal
-                  { name: "Fishsticks with broccoli and baby potatoes" }
-              )
-          , PlannedMeal
-              ( MkMeal
-                  { name: "Scampi diabolique with bread" }
-              )
-          , PlannedMeal
-              ( MkMeal
-                  { name: "Cordon blue with carrots and potatoes" }
-              )
-          , PlannedMeal
-              ( MkMeal
-                  { name:
-                      "Veggie Snitzel with bell peppers, zucchini and baby potatoes"
-                  }
-              )
-          , PlannedMeal
-              ( MkMeal
-                  { name: "Chicken with curry and pineapple" }
-              )
-          , PlannedMeal
-              ( MkMeal
-                  { name: "Pita" }
-              )
-          , PlannedMeal
-              ( MkMeal
-                  { name: "Chicory ham rolls with mashed potatoes" }
-              )
-          , PlannedMeal
-              ( MkMeal
-                  { name: "Pasta bolognese" }
-              )
-          , PlannedMeal
-              ( MkMeal
-                  { name: "Sausage with carrot mash" }
-              )
-          , PlannedMeal
-              ( MkMeal
-                  { name: "Pasta with broccoli, leek and herbcheese" }
-              )
-          , PlannedMeal
-              ( MkMeal
-                  { name: "Veggie Snitzel with beans and potatoes" }
-              )
-          , PlannedMeal
-              ( MkMeal
-                  { name: "Chicken wrap" }
-              )
-          , PlannedMeal
-              ( MkMeal
-                  { name: "Lasagne" }
-              )
-          , NoMealPlanned
-          , PlannedMeal
-              ( MkMeal
-                  { name: "Codloin with basilicum mash and vine tomatoes" }
-              )
-          , PlannedMeal
-              ( MkMeal
-                  { name: "Orzo with olives and feta" }
-              )
-          , PlannedMeal
-              ( MkMeal
-                  { name: "Pasta with mushroom cream sauce" }
-              )
-          , PlannedMeal
-              ( MkMeal
-                  { name: "Chicken, apple mash and fried potatoes" }
-              )
-          , PlannedMeal
-              ( MkMeal
-                  { name: "Veggie burger with spinach mash" }
-              )
-          , PlannedMeal
-              ( MkMeal
-                  { name: "Sandwiches" }
-              )
-          , PlannedMeal
-              ( MkMeal
-                  { name: "Zucchini, minced meat and potato slices casserole" }
-              )
-          , PlannedMeal
-              ( MkMeal
-                  { name: "Salmon with pesto crust, greens and baby potatoes" }
-              )
-          ]
-      }
 
 data Route
   = Home
   | Groceries
 
+derive instance Generic Route _
+
+route :: RouteDuplex' Route
+route = D.root $ G.sum
+  { "Home": G.noArgs
+  , "Groceries": D.path "groceries" G.noArgs
+  }
+
+parseRoute :: String -> Maybe Route
+parseRoute = D.parse route >>> Either.hush
+
 data Message
   = DocumentVisibilityChanged
   | TargetDateUpdated Date
-  | NavClicked Route Event
-  | NavigationRaised String
+  | NavigationOccurred String
 
 update :: Update Model Message
-update model = case _ of
-  DocumentVisibilityChanged ->
+update model message = case model.route /\ message of
+  _ /\ DocumentVisibilityChanged ->
     model /\
       [ do
           vs <- liftEffect $ FFIDoc.visibilityState =<< document =<< window
@@ -199,20 +106,23 @@ update model = case _ of
             _ -> pure Nothing
       ]
 
-  TargetDateUpdated newDate ->
+  HomeM _ /\ TargetDateUpdated newDate ->
     F.noMessages $ model { targetDate = newDate }
 
-  NavClicked route evt ->
-    let
-      _ = Debug.spy "route" route
-    in
-      model /\ [ Nothing <$ (liftEffect $ Event.preventDefault evt) ]
+  _ /\ NavigationOccurred destinationUrlText ->
+    updatedModel /\ []
+    where
+    parsedRoute = do
+      url <- Either.hush $ FFIURL.mk destinationUrlText
+      let
+        pathAndQuery = fold [ FFIURL.pathname url, FFIURL.search url ]
+      parseRoute pathAndQuery
+    updatedModel = case parsedRoute of
+      Just Groceries -> model { route = GroceriesM unit }
+      _ -> model
+        { route = HomeM { mealSchedule: AData.mealSchedule model.targetDate } }
 
-  NavigationRaised destination ->
-    let
-      _ = Debug.spy "destination" destination
-    in
-      model /\ []
+  _ -> F.noMessages model
 
 displayDateTime :: DateTime -> String
 displayDateTime =
@@ -285,12 +195,12 @@ viewScheduleEntry date (mealDate /\ plannedMeal) =
         PlannedMeal meal -> HE.span [] [ HE.text $ show meal ]
     ]
 
-view :: Model -> Html Message
-view model =
+homeView :: Date -> HomeModel -> Html Message
+homeView targetDate model =
   let
-    weekDays = nextDays 7 model.targetDate
-    nextWeekDate = unsafeAdjustDate (Days 7.0) model.targetDate
-    dateRange = Range.create model.targetDate nextWeekDate
+    weekDays = nextDays 7 targetDate
+    nextWeekDate = unsafeAdjustDate (Days 7.0) targetDate
+    dateRange = Range.create targetDate nextWeekDate
     weekMeals =
       Array.fromFoldable $ MealSchedule.toList
         dateRange
@@ -304,23 +214,42 @@ view model =
               [] -> HE.text ""
               entries ->
                 HE.div [ HA.class' "flex column spaced" ]
-                  $ map (viewScheduleEntry model.targetDate) entries
+                  $ map (viewScheduleEntry targetDate) entries
           ]
       , HE.footer [ HA.class' "container" ]
           [ HE.nav [ HA.class' "flex spaced justify-center" ]
               [ HE.a
-                  [ HA.href "/"
-                  -- , HA.onClick' $ NavClicked Home
-                  ]
+                  [ HA.href "/" ]
                   [ HE.text "Next days" ]
               , HE.a
-                  [ HA.href "/groceries"
-                  -- , HA.onClick' $ NavClicked Groceries
-                  ]
+                  [ HA.href "/groceries" ]
                   [ HE.text "Groceries" ]
               ]
           ]
       ]
+
+groceriesView :: GroceriesModel -> Html Message
+groceriesView model =
+  HE.fragment
+    [ HE.main [ HA.class' "flex column container" ]
+        [ HE.h1_ [ HE.text "Groceries" ]
+        ]
+    , HE.footer [ HA.class' "container" ]
+        [ HE.nav [ HA.class' "flex spaced justify-center" ]
+            [ HE.a
+                [ HA.href "/" ]
+                [ HE.text "Next days" ]
+            , HE.a
+                [ HA.href "/groceries" ]
+                [ HE.text "Groceries" ]
+            ]
+        ]
+    ]
+
+view :: Model -> Html Message
+view model = case model.route of
+  HomeM homeM -> homeView model.targetDate homeM
+  GroceriesM groceriesM -> groceriesView groceriesM
 
 app :: Date -> Application Model Message
 app targetDate =

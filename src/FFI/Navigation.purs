@@ -1,4 +1,4 @@
-module FFI.FFINavigation where
+module FFI.Navigation where
 
 import Prelude
 

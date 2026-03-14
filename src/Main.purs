@@ -6,7 +6,7 @@ import App.App as App
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import Effect.Now as Date
-import FFI.FFINavigation as FFINav
+import FFI.Navigation as FFINav
 import Flame as F
 import Flame.Subscription as FS
 import Web.DOM.ParentNode (QuerySelector(..))
@@ -20,7 +20,8 @@ handleOnNavigate appId evt =
   navEvt = FFINav.fromEvent evt
   opts =
     { handler: do
-        liftEffect $ FS.send appId $ App.NavigationRaised navEvt.destination.url
+        liftEffect $ FS.send appId $ App.NavigationOccurred
+          navEvt.destination.url
     }
 
 main :: Effect Unit

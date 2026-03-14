@@ -9,6 +9,7 @@ package:
     - formatters
     - lists
     - prelude
+    - routing-duplex
     - spec
     - spec-node
     - web-html

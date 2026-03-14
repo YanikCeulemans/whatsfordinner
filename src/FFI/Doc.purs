@@ -1,4 +1,4 @@
-module FFI.FFIDoc where
+module FFI.Doc where
 
 import Data.Maybe as Maybe
 import Effect (Effect)
