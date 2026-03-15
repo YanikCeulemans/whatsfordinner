@@ -3,15 +3,15 @@ module App.App where
 import Prelude
 
 import App.Data as AData
+import App.Groceries as Groceries
+import App.Route (Route(..))
+import App.Route as Route
 import Data.Array as Array
-import Data.Date (Date, Month(..), Weekday(..))
+import Data.Date (Date, Weekday(..))
 import Data.Date as Date
 import Data.DateTime (DateTime(..))
-import Data.Either as Either
-import Data.Enum (toEnum)
 import Data.Foldable (fold)
 import Data.Formatter.DateTime as Format
-import Data.Generic.Rep (class Generic)
 import Data.Int as Int
 import Data.List as List
 import Data.Maybe (Maybe(..))
@@ -20,7 +20,6 @@ import Data.Time.Duration (Days(..))
 import Data.Tuple (Tuple)
 import Data.Tuple.Nested ((/\))
 import Data.Unfoldable (unfoldr)
-import Debug as Debug
 import Domain.MealSchedule (MealSchedule)
 import Domain.MealSchedule as MealSchedule
 import Domain.PlannedMeal (PlannedMeal(..))
@@ -29,16 +28,12 @@ import Domain.Range as Range
 import Effect.Class (liftEffect)
 import Effect.Now (nowDate)
 import FFI.Doc as FFIDoc
-import FFI.URL as FFIURL
 import Flame (Application, Html, Update)
 import Flame.Application as F
 import Flame.Html.Attribute as HA
 import Flame.Html.Element as HE
 import Flame.Subscription as FS
 import Partial.Unsafe (unsafeCrashWith)
-import Routing.Duplex (RouteDuplex')
-import Routing.Duplex as D
-import Routing.Duplex.Generic as G
 import Web.Event.Event (EventType(..))
 import Web.HTML (window)
 import Web.HTML.HTMLDocument.VisibilityState (VisibilityState(..))
@@ -50,42 +45,40 @@ type HomeModel =
 
 type GroceriesModel = Unit
 
+type GroceriesGenerateModel =
+  { startDate :: Maybe Date
+  , endDate :: Maybe Date
+  }
+
 data RouteModel
   = HomeM HomeModel
   | GroceriesM GroceriesModel
+  | GroceriesGenerateM GroceriesGenerateModel
 
 type Model =
   { route :: RouteModel
   , targetDate :: Date
   }
 
-init :: Date -> Model
-init targetDate =
-  { route: HomeM
-      { mealSchedule: AData.mealSchedule
-      }
-  , targetDate
-  }
+routeToModel :: Model -> Maybe Route -> Model
+routeToModel model = case _ of
+  Just Groceries -> model { route = GroceriesM unit }
+  Just GroceriesGenerate -> model
+    { route = GroceriesGenerateM { startDate: Nothing, endDate: Nothing } }
+  _ -> model
+    { route = HomeM { mealSchedule: AData.mealSchedule } }
 
-data Route
-  = Home
-  | Groceries
-
-derive instance Generic Route _
-
-route :: RouteDuplex' Route
-route = D.root $ G.sum
-  { "Home": G.noArgs
-  , "Groceries": D.path "groceries" G.noArgs
-  }
-
-parseRoute :: String -> Maybe Route
-parseRoute = D.parse route >>> Either.hush
+init :: Date -> String -> Model
+init targetDate startUrlText =
+  routeToModel initModel $ Route.parse startUrlText
+  where
+  initModel = { route: HomeM { mealSchedule: AData.mealSchedule }, targetDate }
 
 data Message
   = DocumentVisibilityChanged
   | TargetDateUpdated Date
   | NavigationOccurred String
+  | GroceriesMessage Groceries.Message
 
 update :: Update Model Message
 update model message = case model.route /\ message of
@@ -104,15 +97,7 @@ update model message = case model.route /\ message of
   _ /\ NavigationOccurred destinationUrlText ->
     updatedModel /\ []
     where
-    parsedRoute = do
-      url <- Either.hush $ FFIURL.mk destinationUrlText
-      let
-        pathAndQuery = fold [ FFIURL.pathname url, FFIURL.search url ]
-      parseRoute pathAndQuery
-    updatedModel = case parsedRoute of
-      Just Groceries -> model { route = GroceriesM unit }
-      _ -> model
-        { route = HomeM { mealSchedule: AData.mealSchedule } }
+    updatedModel = routeToModel model $ Route.parse destinationUrlText
 
   _ -> F.noMessages model
 
@@ -221,10 +206,25 @@ homeView targetDate model =
       ]
 
 groceriesView :: GroceriesModel -> Html Message
-groceriesView model =
+groceriesView _model =
   HE.fragment
     [ HE.main [ HA.class' "flex column container" ]
         [ HE.h1_ [ HE.text "Groceries" ]
+        , HE.form_
+            [ HE.fieldset_
+                [ HE.label_
+                    [ HE.text "Start date"
+                    , HE.input
+                        [ HA.name "start_date", HA.type' "date" ]
+                    ]
+                , HE.label_
+                    [ HE.text "End date"
+                    , HE.input
+                        [ HA.name "end_date", HA.type' "date" ]
+                    ]
+                ]
+            , HE.input [ HA.type' "submit", HA.value "Generatee" ]
+            ]
         ]
     , HE.footer [ HA.class' "container" ]
         [ HE.nav [ HA.class' "flex spaced justify-center" ]
@@ -241,16 +241,17 @@ groceriesView model =
 view :: Model -> Html Message
 view model = case model.route of
   HomeM homeM -> homeView model.targetDate homeM
-  GroceriesM groceriesM -> groceriesView groceriesM
+  GroceriesM groceriesM -> GroceriesMessage <$> Groceries.view groceriesM
+  GroceriesGenerateM _groceriesGenerateM -> HE.text "TODO"
 
-app :: Date -> Application Model Message
-app targetDate =
+app :: Date -> String -> Application Model Message
+app targetDate documentUrlText =
   { subscribe:
       [ FS.onCustomEvent' (EventType "visibilitychange")
           DocumentVisibilityChanged
       ]
   , view
-  , model: init targetDate
+  , model: init targetDate documentUrlText
   , update
   }
 
