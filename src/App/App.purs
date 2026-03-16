@@ -26,6 +26,7 @@ import Domain.PlannedMeal (PlannedMeal(..))
 import Domain.Range (Range)
 import Domain.Range as Range
 import Effect.Class (liftEffect)
+import Effect.Class.Console as Console
 import Effect.Now (nowDate)
 import FFI.Doc as FFIDoc
 import Flame (Application, Html, Update)
@@ -43,8 +44,6 @@ type HomeModel =
   { mealSchedule :: MealSchedule
   }
 
-type GroceriesModel = Unit
-
 type GroceriesGenerateModel =
   { startDate :: Maybe Date
   , endDate :: Maybe Date
@@ -52,7 +51,7 @@ type GroceriesGenerateModel =
 
 data RouteModel
   = HomeM HomeModel
-  | GroceriesM GroceriesModel
+  | GroceriesM Groceries.Model
   | GroceriesGenerateM GroceriesGenerateModel
 
 type Model =
@@ -62,7 +61,7 @@ type Model =
 
 routeToModel :: Model -> Maybe Route -> Model
 routeToModel model = case _ of
-  Just Groceries -> model { route = GroceriesM unit }
+  Just Groceries -> model { route = GroceriesM $ Groceries.init }
   Just GroceriesGenerate -> model
     { route = GroceriesGenerateM { startDate: Nothing, endDate: Nothing } }
   _ -> model
@@ -91,7 +90,7 @@ update model message = case model.route /\ message of
             _ -> pure Nothing
       ]
 
-  HomeM _ /\ TargetDateUpdated newDate ->
+  _ /\ TargetDateUpdated newDate ->
     F.noMessages $ model { targetDate = newDate }
 
   _ /\ NavigationOccurred destinationUrlText ->
@@ -99,7 +98,21 @@ update model message = case model.route /\ message of
     where
     updatedModel = routeToModel model $ Route.parse destinationUrlText
 
-  _ -> F.noMessages model
+  GroceriesM groceriesM /\ GroceriesMessage groceriesMessage ->
+    updatedModel /\ effs
+    where
+    updatedGroceriesM /\ groceriesEffs = Groceries.update groceriesM
+      groceriesMessage
+    updatedModel = model
+      { route = GroceriesM updatedGroceriesM }
+    effs = (map <<< map <<< map) GroceriesMessage groceriesEffs
+
+  _ /\ GroceriesMessage _ ->
+    model /\
+      [ do
+          Console.warn "received groceries message when not on groceries view"
+          pure Nothing
+      ]
 
 displayDateTime :: DateTime -> String
 displayDateTime =
@@ -205,7 +218,7 @@ homeView targetDate model =
           ]
       ]
 
-groceriesView :: GroceriesModel -> Html Message
+groceriesView :: Groceries.Model -> Html Message
 groceriesView _model =
   HE.fragment
     [ HE.main [ HA.class' "flex column container" ]
