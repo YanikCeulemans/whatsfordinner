@@ -20,10 +20,13 @@ import Data.Array.NonEmpty as NEA
 import Data.Maybe (Maybe(..))
 import Data.Maybe as Maybe
 import Data.Tuple.Nested ((/\))
+import Effect.Class (liftEffect)
 import Flame as F
 import Flame.Html.Attribute as HA
 import Flame.Html.Element as HE
 import Flame.Types as FT
+import Web.Event.Event (Event)
+import Web.Event.Event as WE
 
 newtype Amount = MkAmount
   { value :: Number
@@ -88,7 +91,7 @@ init =
 
 data Message
   = UpdateAmount GroceryId Number
-  | CheckedToggled GroceryId
+  | CheckboxClicked GroceryId Event
 
 update :: F.Update Model Message
 update model =
@@ -96,28 +99,29 @@ update model =
     UpdateAmount id delta ->
       F.noMessages $ updateGroceryAmount id delta model
 
-    CheckedToggled id ->
-      F.noMessages $ toggleGroceryChecked id model
-
-checkbox :: forall m. Array (FT.NodeData m) -> Array (FT.Html m) -> FT.Html m
-checkbox = HE.createElement "sl-checkbox"
-
-onChange :: forall m. m -> FT.NodeData m
-onChange = HA.createEvent "sl-change"
+    CheckboxClicked id event ->
+      toggleGroceryChecked id model /\
+        [ Nothing <$ (liftEffect $ WE.preventDefault event) ]
 
 groceryView :: Grocery -> F.Html Message
 groceryView grocery =
   HE.li [ HA.class' "no-list-style" ]
     [ HE.article [ HA.class' "flex spaced items-center justify-space-between" ]
-        [ checkbox
-            [ HA.class' "grocery-description"
-            , HA.class' { checked: grocery.checked }
-            , HA.checked grocery.checked
-            , HA.id $ printGroceryId grocery.id
-            , onChange $ CheckedToggled grocery.id
-            ]
-            [ HE.text $ fold
-                [ grocery.description, " (", show grocery.amount, ")" ]
+        [ HE.label []
+            [ HE.label
+                [ HA.class' "grocery-description"
+                , HA.class' { checked: grocery.checked }
+                , HA.for $ printGroceryId grocery.id
+                ]
+                [ HE.input
+                    [ HA.type' "checkbox"
+                    , HA.id $ printGroceryId grocery.id
+                    , HA.checked grocery.checked
+                    , HA.onClick' $ CheckboxClicked grocery.id
+                    ]
+                , HE.text $ fold
+                    [ grocery.description, " (", show grocery.amount, ")" ]
+                ]
             ]
         , HE.div
             [ HA.class' "grocery-controls", HA.createProperty "role" "group" ]
@@ -131,7 +135,6 @@ groceriesView groceries =
     [ HE.ul [ HA.class' "no-padding" ] $ map groceryView unchecked
     , HE.h2_ [ HE.text "Done" ]
     , HE.ul [ HA.class' "no-padding" ] $ map groceryView checked
-    -- [ HE.ul [ HA.class' "no-padding" ] $ NEA.toArray $ map groceryView groceries
     ]
   where
   { no: unchecked, yes: checked } = NEA.partition _.checked groceries
