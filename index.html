@@ -22,6 +22,7 @@
 
     <style>
       .flex { display: flex; }
+      .flex-1 { flex: 1; }
       .column { flex-direction: column; }
       .spaced { gap: 15px; }
       .padded { padding: 10px; }
@@ -31,10 +32,27 @@
       .no-padding { padding: 0; }
       .justify-space-between { justify-content: space-between; }
       .checked { text-decoration: line-through; }
+      .fab { 
+        --pico-border-radius: 50%;
+        position: sticky;
+        bottom: 30px;
+        flex: 0;
+        aspect-ratio: 1 / 1;
+        align-self: end;
+        box-shadow: 0 0 5px 1px black;
+      }
 
+      .groceries-list article {
+        margin: 0;
+        padding: 0;
+      }
       .grocery-description {
         flex: 1 0 auto;
         margin: 0;
+        align-self: stretch;
+        display: flex;
+        align-items: center;
+        padding: var(--pico-block-spacing-vertical) var(--pico-block-spacing-horizontal);
       }
       .grocery-controls {
         flex: 0;

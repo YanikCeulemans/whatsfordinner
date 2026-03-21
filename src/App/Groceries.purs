@@ -87,6 +87,16 @@ init =
     , amount: MkAmount { value: 1.0, unit: Just "kg" }
     , checked: true
     }
+  , { id: MkGroceryId 3
+    , description: "Carrots"
+    , amount: MkAmount { value: 1.0, unit: Just "kg" }
+    , checked: true
+    }
+  , { id: MkGroceryId 4
+    , description: "Carrots"
+    , amount: MkAmount { value: 1.0, unit: Just "kg" }
+    , checked: true
+    }
   ]
 
 data Message
@@ -106,35 +116,34 @@ update model =
 groceryView :: Grocery -> F.Html Message
 groceryView grocery =
   HE.li [ HA.class' "no-list-style" ]
-    [ HE.article [ HA.class' "flex spaced items-center justify-space-between" ]
-        [ HE.label []
-            [ HE.label
-                [ HA.class' "grocery-description"
-                , HA.class' { checked: grocery.checked }
-                , HA.for $ printGroceryId grocery.id
-                ]
-                [ HE.input
-                    [ HA.type' "checkbox"
-                    , HA.id $ printGroceryId grocery.id
-                    , HA.checked grocery.checked
-                    , HA.onClick' $ CheckboxClicked grocery.id
-                    ]
-                , HE.text $ fold
-                    [ grocery.description, " (", show grocery.amount, ")" ]
-                ]
+    [ HE.article
+        [ HA.class' "flex spaced items-center"
+        ]
+        [ HE.label
+            [ HA.class' "grocery-description flex-1"
+            , HA.class' { checked: grocery.checked }
+            , HA.for $ printGroceryId grocery.id
             ]
-        , HE.div
-            [ HA.class' "grocery-controls", HA.createProperty "role" "group" ]
-            [ HE.button [] [ HE.text "..." ] ]
+            [ HE.input
+                [ HA.type' "checkbox"
+                , HA.id $ printGroceryId grocery.id
+                , HA.checked grocery.checked
+                , HA.onClick' $ CheckboxClicked grocery.id
+                ]
+            , HE.text $ fold
+                [ grocery.description, " (", show grocery.amount, ")" ]
+            ]
         ]
     ]
 
 groceriesView :: NonEmptyArray Grocery -> F.Html Message
 groceriesView groceries =
   HE.fragment
-    [ HE.ul [ HA.class' "no-padding" ] $ map groceryView unchecked
+    [ HE.ul [ HA.class' "no-padding groceries-list" ] $ map groceryView
+        unchecked
     , HE.h2_ [ HE.text "Done" ]
-    , HE.ul [ HA.class' "no-padding" ] $ map groceryView checked
+    , HE.button [ HA.class' "secondary" ] [ HE.text "Clear completed" ]
+    , HE.ul [ HA.class' "no-padding groceries-list" ] $ map groceryView checked
     ]
   where
   { no: unchecked, yes: checked } = NEA.partition _.checked groceries
@@ -144,11 +153,16 @@ view model =
   HE.fragment
     [ HE.main [ HA.class' "flex column container spaced" ]
         [ HE.h1_ [ HE.text "Groceries" ]
-        , HE.a [ HA.href $ Route.print $ GroceriesGenerate ]
-            [ HE.text "Generate" ]
+        , HE.div [ HA.class' "flex justify-space-between" ]
+            [ HE.a [ HA.href $ Route.print $ GroceriesGenerate ]
+                [ HE.text "Generate" ]
+            , HE.button [ HA.class' "secondary" ]
+                [ HE.text "Edit" ]
+            ]
         , case NEA.fromArray model of
             Nothing -> HE.text "No groceries have been added yet"
             Just nea -> groceriesView nea
+        , HE.button [ HA.class' "fab" ] [ HE.text "+" ]
         ]
     , HE.footer [ HA.class' "container" ]
         [ HE.nav [ HA.class' "flex spaced justify-center" ]
