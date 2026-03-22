@@ -1,1 +1,1 @@
-{"type":"module"}
+{"type":"module","devDependencies":{"purescript":"^0.15.16","purescript-language-server":"^0.18.5","purs-tidy":"^0.11.1","spago":"^1.0.3"}}
