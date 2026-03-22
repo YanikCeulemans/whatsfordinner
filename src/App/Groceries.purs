@@ -62,42 +62,18 @@ type Grocery =
   { id :: GroceryId
   , description :: String
   , amount :: Amount
-  }
-
-type Checkable a =
-  { item :: a
   , checked :: Boolean
   }
 
-toggleChecked x = x { checked = not x.checked }
-
-data DndState a
-  = Item a
-  | Placeholder
-
-instance Functor DndState where
-  map f = case _ of
-    Item x -> Item $ f x
-    Placeholder -> Placeholder
-
-instance Foldable DndState where
-  foldl f a = case _ of
-    Item x -> f a x
-    Placeholder -> a
-  foldr = foldrDefault
-  foldMap = foldMapDefaultR
-
-type Model = Array (Checkable (DndState Grocery))
+type Model =
+  { groceries :: Array Grocery
+  , placeholderIndex :: Maybe Int
+  }
 
 updateGroceryAmount :: GroceryId -> Number -> Model -> Model
 updateGroceryAmount id delta model =
-  updateCheckable <$> model
+  model { groceries = updateGrocery <$> model.groceries }
   where
-  updateItemAmount item
-    | item.id == id = item { amount = updateAmount delta item.amount }
-    | otherwise = item
-  updateCheckable checkable = checkable
-    { item = map updateItemAmount checkable.item }
   updateGrocery grocery
     | grocery.id == id = grocery
         { amount = updateAmount delta grocery.amount }
@@ -105,11 +81,8 @@ updateGroceryAmount id delta model =
 
 toggleGroceryChecked :: GroceryId -> Model -> Model
 toggleGroceryChecked id model =
-  toggle <$> model
+  model { groceries = toggleChecked <$> model.groceries }
   where
-  toggle checkable =
-    if fold (\g -> ?h g == id) false checkable.item then toggleChecked checkable
-    else checkable
   toggleChecked grocery
     | grocery.id == id = grocery
         { checked = not grocery.checked }
@@ -117,36 +90,30 @@ toggleGroceryChecked id model =
 
 init :: Model
 init =
-  [ { item: Item
-        { id: MkGroceryId 1
+  { groceries:
+      [ { id: MkGroceryId 1
         , description: "Onion"
         , amount: MkAmount { value: 3.0, unit: Nothing }
+        , checked: false
         }
-
-    , checked: false
-    }
-  , { item: Item
-        { id: MkGroceryId 2
+      , { id: MkGroceryId 2
         , description: "Carrots"
         , amount: MkAmount { value: 1.0, unit: Just "kg" }
+        , checked: true
         }
-    , checked: true
-    }
-  , { item: Item
-        { id: MkGroceryId 3
+      , { id: MkGroceryId 3
         , description: "Carrots"
         , amount: MkAmount { value: 1.0, unit: Just "kg" }
+        , checked: false
         }
-    , checked: false
-    }
-  , { item: Item
-        { id: MkGroceryId 4
+      , { id: MkGroceryId 4
         , description: "Carrots"
         , amount: MkAmount { value: 1.0, unit: Just "kg" }
+        , checked: false
         }
-    , checked: false
-    }
-  ]
+      ]
+  , placeholderIndex: Nothing
+  }
 
 data Message
   = UpdateAmount GroceryId Number
@@ -198,8 +165,8 @@ update model =
     DragEnded event ->
       model /\ [ preventDefaultDropTarget event $> Nothing ]
 
-groceryView :: Boolean -> Grocery -> F.Html Message
-groceryView checked grocery =
+groceryView :: Grocery -> F.Html Message
+groceryView grocery =
   HE.li
     [ HA.class' "no-list-style"
     , HA.draggable "true"
@@ -210,13 +177,13 @@ groceryView checked grocery =
         ]
         [ HE.label
             [ HA.class' "grocery-description flex-1"
-            , HA.class' { checked: checked }
+            , HA.class' { checked: grocery.checked }
             , HA.for $ printGroceryId grocery.id
             ]
             [ HE.input
                 [ HA.type' "checkbox"
                 , HA.id $ printGroceryId grocery.id
-                , HA.checked checked
+                , HA.checked grocery.checked
                 , HA.onClick' $ CheckboxClicked grocery.id
                 ]
             , HE.text $ fold
@@ -225,18 +192,40 @@ groceryView checked grocery =
         ]
     ]
 
-groceriesView :: NonEmptyArray (Checkable (DndState Grocery)) -> F.Html Message
-groceriesView groceries =
+placeholderView :: forall msg. FT.Html msg
+placeholderView =
+  HE.li [ HA.class' "no-list-style", HA.draggable "false" ]
+    [ HE.article [ HA.class' "flex spaced items-center" ]
+        [ HE.label [ HA.class' "grocery-description" ]
+            [ HE.text "Placeholder" ]
+        ]
+    ]
+
+data DndState a
+  = Item a
+  | Placeholder
+
+dndView :: DndState Grocery -> F.Html Message
+dndView = case _ of
+  Item x -> groceryView x
+  Placeholder -> placeholderView
+
+groceriesView :: Maybe Int -> NonEmptyArray Grocery -> F.Html Message
+groceriesView placeholderIndex groceries =
   HE.fragment
     [ HE.ul [ HA.class' "no-padding groceries-list", HA.onDragend' DragEnded ] $
-        map groceryView
-          unchecked
+        map dndView unchecked
     , HE.h2_ [ HE.text "Done" ]
     , HE.ul [ HA.class' "no-padding groceries-list" ] $ map groceryView checked
     , HE.button [ HA.class' "secondary" ] [ HE.text "Clear completed" ]
     ]
   where
-  { no: unchecked, yes: checked } = NEA.partition _.checked groceries
+  { no: uncheckedGroceries, yes: checked } = NEA.partition _.checked groceries
+  -- This should have the possibility to generate 2 results -> use bind
+  go pi i g = Placeholder
+  unchecked = case placeholderIndex of
+    Nothing -> map Item uncheckedGroceries
+    Just i -> Array.mapWithIndex (go i) uncheckedGroceries
 
 view :: Model -> F.Html Message
 view model =
@@ -249,9 +238,9 @@ view model =
             , HE.button [ HA.class' "secondary" ]
                 [ HE.text "Edit" ]
             ]
-        , case NEA.fromArray model of
+        , case NEA.fromArray model.groceries of
             Nothing -> HE.text "No groceries have been added yet"
-            Just nea -> groceriesView nea
+            Just nea -> groceriesView model.placeholderIndex nea
         , HE.button [ HA.class' "fab" ] [ HE.text "+" ]
         ]
     , HE.footer [ HA.class' "container" ]
