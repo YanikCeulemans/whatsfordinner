@@ -1,5 +1,6 @@
 module App.Groceries
   ( Model
+  , DragModel
   , Grocery
   , Amount
   , Message
@@ -55,6 +56,9 @@ newtype GroceryId = MkGroceryId Int
 
 derive instance Eq GroceryId
 
+instance Show GroceryId where
+  show (MkGroceryId id) = show id
+
 printGroceryId :: GroceryId -> String
 printGroceryId (MkGroceryId id) = show id
 
@@ -65,9 +69,19 @@ type Grocery =
   , checked :: Boolean
   }
 
+newtype DragModel a =
+  MkDragModel
+    { dragItem :: a
+    , dragOverItem :: a
+    }
+
+instance Show a => Show (DragModel a) where
+  show (MkDragModel { dragItem, dragOverItem }) =
+    fold [ "dragItem: ", show dragItem, ", dragOverItem: ", show dragOverItem ]
+
 type Model =
   { groceries :: Array Grocery
-  , placeholderIndex :: Maybe Int
+  , dragModel :: Maybe (DragModel GroceryId)
   }
 
 updateGroceryAmount :: GroceryId -> Number -> Model -> Model
@@ -112,25 +126,19 @@ init =
         , checked: false
         }
       ]
-  , placeholderIndex: Nothing
+  , dragModel: Nothing
   }
 
 uncheckedGroceries :: Model -> Array Grocery
 uncheckedGroceries model =
   Array.filter (not <<< _.checked) model.groceries
 
-type DragModel a =
-  { dragItem :: a
-  , dragOverItem :: a
-  }
-
 data Message
   = UpdateAmount GroceryId Number
   | CheckboxClicked GroceryId Event
   | DragEnded Event
   | DragStarted GroceryId Event
-  | DraggedOver (DndState GroceryId) Event
-  | DraggedOverGrocery (DragModel GroceryId)
+  | DraggedOver GroceryId Event
   | DragLeaveOccurred Event
 
 dragType :: String
@@ -185,21 +193,6 @@ preventDefaultDropTarget event =
       <#> Array.elem dragType
       # Maybe.fromMaybe false
 
-setPlaceholderIndex :: DragModel GroceryId -> Model -> Model
-setPlaceholderIndex dm@{ dragItem, dragOverItem } model
-  | dragItem == dragOverItem =
-      let _ = Debug.spy "set placeholder self" dm in model
-  | otherwise =
-      model { placeholderIndex = foundIndex }
-      where
-      _ = Debug.spy "set placeholder other" dm
-      go grocery = dragOverItem == grocery.id
-      foundIndex = Array.findIndex go $ uncheckedGroceries model
-
-unsetPlaceholderIndex :: Model -> Model
-unsetPlaceholderIndex model =
-  model { placeholderIndex = Nothing }
-
 update :: F.Update Model Message
 update model =
   case _ of
@@ -211,45 +204,25 @@ update model =
         [ Nothing <$ (liftEffect $ WE.preventDefault event) ]
 
     DragStarted id event ->
-      model /\ [ setDataTransferData id event $> Nothing ]
+      updatedModel /\ [ setDataTransferData id event $> Nothing ]
+      where
+      updatedModel = model
+        { dragModel = Just $ MkDragModel { dragItem: id, dragOverItem: id } }
 
     DragEnded event ->
-      (Debug.spy "drag ended" model) /\
+      model { dragModel = Nothing } /\
         [ preventDefaultDropTarget event $> Nothing ]
 
-    DraggedOver Placeholder event ->
-      model /\
-        [ preventDefaultDropTarget (Debug.spy "DraggedOver placeholder" event)
-            $> Nothing
-        ]
-    DraggedOver (Item id) event ->
-      unsetPlaceholderIndex model /\
-        [ {-- preventDefaultDropTarget event $> Nothing
-        ,--} do
-            dragOverItem <- getDragOverItemId event
-            dragItem <- getDragItemId event
-            if dragItem == dragOverItem then pure Nothing
-            else
-              ( { dragItem: _, dragOverItem: _ }
-                  <$> dragItem
-                  <*> dragOverItem
-              )
-                <#> DraggedOverGrocery
-                # pure
-        ]
-
-    DraggedOverGrocery dragModel ->
-      setPlaceholderIndex dragModel model /\ []
+    DraggedOver id event ->
+      updatedModel /\ [ preventDefaultDropTarget event $> Nothing ]
+      where
+      setDragOverItem :: DragModel GroceryId -> DragModel GroceryId
+      setDragOverItem (MkDragModel dm) = MkDragModel $ dm { dragOverItem = id }
+      updatedModel = model
+        { dragModel = setDragOverItem <$> model.dragModel }
 
     DragLeaveOccurred event ->
-      -- (Debug.spy "drag leave occurred" $ unsetPlaceholderIndex model) /\ []
       model /\ []
-
-    other ->
-      let
-        _ = Debug.spy "other" other
-      in
-        model /\ []
 
 groceryView :: Grocery -> F.Html Message
 groceryView grocery =
@@ -257,8 +230,8 @@ groceryView grocery =
     [ HA.class' "no-list-style"
     , HA.draggable "true"
     , HA.onDragstart' $ DragStarted grocery.id
-    , HA.onDragover' $ DraggedOver $ Item grocery.id
-    , HA.onDragleave' DragLeaveOccurred
+    , HA.onDragover' $ DraggedOver grocery.id
+    -- , HA.onDragleave' DragLeaveOccurred
     , HA.id $ printGroceryId grocery.id
     ]
     [ HE.article
@@ -281,51 +254,27 @@ groceryView grocery =
         ]
     ]
 
-placeholderView :: FT.Html Message
-placeholderView =
-  HE.li
-    [ HA.class' "no-list-style"
-    , HA.draggable "false"
-    , HA.onDragover' $ DraggedOver Placeholder
-    ]
-    [ HE.article [ HA.class' "flex spaced items-center" ]
-        [ HE.label [ HA.class' "grocery-description" ]
-            [ HE.text "Placeholder" ]
-        ]
-    ]
-
-data DndState a
-  = Item a
-  | Placeholder
-
-dndView :: DndState Grocery -> F.Html Message
-dndView = case _ of
-  Item x -> groceryView x
-  Placeholder -> placeholderView
-
-groceriesView :: Maybe Int -> NonEmptyArray Grocery -> F.Html Message
+groceriesView
+  :: Maybe (DragModel GroceryId) -> NonEmptyArray Grocery -> F.Html Message
 groceriesView placeholderIndex groceries =
   HE.fragment
     [ HE.ul [ HA.class' "no-padding groceries-list", HA.onDragend' DragEnded ] $
-        map dndView unchecked
+        map groceryView unchecked
     , HE.h2_ [ HE.text "Done" ]
     , HE.ul [ HA.class' "no-padding groceries-list" ] $ map groceryView checked
     , HE.button [ HA.class' "secondary" ] [ HE.text "Clear completed" ]
     ]
   where
-  { no: uncheckedGroceries, yes: checked } = NEA.partition _.checked groceries
-  unchecked = case placeholderIndex of
-    Nothing -> map Item uncheckedGroceries
-    Just pi -> do
-      index /\ grocery <- Array.mapWithIndex (/\) uncheckedGroceries
-      if index == pi then [ Placeholder, Item grocery ]
-      else pure $ Item grocery
+  { no: unchecked, yes: checked } = NEA.partition _.checked groceries
 
 view :: Model -> F.Html Message
 view model =
   HE.fragment
     [ HE.main [ HA.class' "flex column container spaced" ]
         [ HE.h1_ [ HE.text "Groceries" ]
+        , HE.code_
+            [ HE.text $ show model.dragModel
+            ]
         , HE.div [ HA.class' "flex justify-space-between" ]
             [ HE.a [ HA.href $ Route.print $ GroceriesGenerate ]
                 [ HE.text "Generate" ]
@@ -334,7 +283,7 @@ view model =
             ]
         , case NEA.fromArray model.groceries of
             Nothing -> HE.text "No groceries have been added yet"
-            Just nea -> groceriesView model.placeholderIndex nea
+            Just nea -> groceriesView model.dragModel nea
         , HE.button [ HA.class' "fab" ] [ HE.text "+" ]
         ]
     , HE.footer [ HA.class' "container" ]
