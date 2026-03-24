@@ -13,26 +13,26 @@ import Prelude
 
 import App.Route (Route(..))
 import App.Route as Route
-import Control.MonadPlus as CM
 import Data.Array (fold)
 import Data.Array as Array
 import Data.Array.NonEmpty (NonEmptyArray)
 import Data.Array.NonEmpty as NEA
-import Data.Foldable (class Foldable, foldMapDefaultR, foldrDefault)
+import Data.Int as Int
 import Data.Maybe (Maybe(..))
 import Data.Maybe as Maybe
 import Data.MediaType (MediaType(..))
 import Data.MediaType.Common as MediaType
-import Data.Traversable (for_, traverse)
+import Data.Traversable (for, for_)
 import Data.Tuple.Nested ((/\))
 import Debug as Debug
 import Effect.Class (class MonadEffect, liftEffect)
-import Effect.Class.Console as Console
 import FFI.DataTransfer as FfiDataTransfer
 import Flame as F
 import Flame.Html.Attribute as HA
 import Flame.Html.Element as HE
 import Flame.Types as FT
+import Web.DOM.Element as E
+import Web.DOM.Node as Node
 import Web.Event.Event (Event)
 import Web.Event.Event as WE
 import Web.HTML.Event.DataTransfer as DataTransfer
@@ -102,17 +102,26 @@ init =
         , checked: true
         }
       , { id: MkGroceryId 3
-        , description: "Carrots"
-        , amount: MkAmount { value: 1.0, unit: Just "kg" }
+        , description: "Mushrooms"
+        , amount: MkAmount { value: 250.0, unit: Just "g" }
         , checked: false
         }
       , { id: MkGroceryId 4
-        , description: "Carrots"
-        , amount: MkAmount { value: 1.0, unit: Just "kg" }
+        , description: "Bell peppers"
+        , amount: MkAmount { value: 2.0, unit: Nothing }
         , checked: false
         }
       ]
   , placeholderIndex: Nothing
+  }
+
+uncheckedGroceries :: Model -> Array Grocery
+uncheckedGroceries model =
+  Array.filter (not <<< _.checked) model.groceries
+
+type DragModel a =
+  { dragItem :: a
+  , dragOverItem :: a
   }
 
 data Message
@@ -120,6 +129,9 @@ data Message
   | CheckboxClicked GroceryId Event
   | DragEnded Event
   | DragStarted GroceryId Event
+  | DraggedOver (DndState GroceryId) Event
+  | DraggedOverGrocery (DragModel GroceryId)
+  | DragLeaveOccurred Event
 
 dragType :: String
 dragType = "grocery"
@@ -127,7 +139,6 @@ dragType = "grocery"
 setDataTransferData
   :: forall m. MonadEffect m => GroceryId -> Event -> m Unit
 setDataTransferData id event = liftEffect do
-  Console.log "setting data transfer data"
   for_ dataTransfer \dt -> do
     DataTransfer.setData (MediaType dragType) mempty dt
     DataTransfer.setData MediaType.textPlain printedId dt
@@ -137,6 +148,31 @@ setDataTransferData id event = liftEffect do
     DragEvent.fromEvent event
       # map DragEvent.dataTransfer
   printedId = printGroceryId id
+
+getDragItemId :: forall m. MonadEffect m => Event -> m (Maybe GroceryId)
+getDragItemId event = join <$> liftEffect do
+  for dataTransfer \dt -> do
+    printedId <- DataTransfer.getData MediaType.textPlain dt
+    pure $ MkGroceryId <$> Int.fromString printedId
+  where
+  dataTransfer =
+    DragEvent.fromEvent event
+      # map DragEvent.dataTransfer
+
+getDragOverItemId :: forall m. MonadEffect m => Event -> m (Maybe GroceryId)
+getDragOverItemId event = do
+  recHelp $ E.fromEventTarget =<< WE.target event
+  where
+  recHelp :: Maybe _ -> m (Maybe GroceryId)
+  recHelp =
+    case _ of
+      Nothing -> pure Nothing
+      Just element -> do
+        id <- Int.fromString <$> (liftEffect $ E.id element)
+        case id of
+          Nothing ->
+            recHelp =<< (liftEffect $ Node.parentElement $ E.toNode element)
+          Just idInt -> pure $ Just $ MkGroceryId idInt
 
 preventDefaultDropTarget :: forall m. MonadEffect m => Event -> m Unit
 preventDefaultDropTarget event =
@@ -148,6 +184,21 @@ preventDefaultDropTarget event =
       # map DataTransfer.types
       <#> Array.elem dragType
       # Maybe.fromMaybe false
+
+setPlaceholderIndex :: DragModel GroceryId -> Model -> Model
+setPlaceholderIndex dm@{ dragItem, dragOverItem } model
+  | dragItem == dragOverItem =
+      let _ = Debug.spy "set placeholder self" dm in model
+  | otherwise =
+      model { placeholderIndex = foundIndex }
+      where
+      _ = Debug.spy "set placeholder other" dm
+      go grocery = dragOverItem == grocery.id
+      foundIndex = Array.findIndex go $ uncheckedGroceries model
+
+unsetPlaceholderIndex :: Model -> Model
+unsetPlaceholderIndex model =
+  model { placeholderIndex = Nothing }
 
 update :: F.Update Model Message
 update model =
@@ -163,7 +214,42 @@ update model =
       model /\ [ setDataTransferData id event $> Nothing ]
 
     DragEnded event ->
-      model /\ [ preventDefaultDropTarget event $> Nothing ]
+      (Debug.spy "drag ended" model) /\
+        [ preventDefaultDropTarget event $> Nothing ]
+
+    DraggedOver Placeholder event ->
+      model /\
+        [ preventDefaultDropTarget (Debug.spy "DraggedOver placeholder" event)
+            $> Nothing
+        ]
+    DraggedOver (Item id) event ->
+      unsetPlaceholderIndex model /\
+        [ {-- preventDefaultDropTarget event $> Nothing
+        ,--} do
+            dragOverItem <- getDragOverItemId event
+            dragItem <- getDragItemId event
+            if dragItem == dragOverItem then pure Nothing
+            else
+              ( { dragItem: _, dragOverItem: _ }
+                  <$> dragItem
+                  <*> dragOverItem
+              )
+                <#> DraggedOverGrocery
+                # pure
+        ]
+
+    DraggedOverGrocery dragModel ->
+      setPlaceholderIndex dragModel model /\ []
+
+    DragLeaveOccurred event ->
+      -- (Debug.spy "drag leave occurred" $ unsetPlaceholderIndex model) /\ []
+      model /\ []
+
+    other ->
+      let
+        _ = Debug.spy "other" other
+      in
+        model /\ []
 
 groceryView :: Grocery -> F.Html Message
 groceryView grocery =
@@ -171,6 +257,9 @@ groceryView grocery =
     [ HA.class' "no-list-style"
     , HA.draggable "true"
     , HA.onDragstart' $ DragStarted grocery.id
+    , HA.onDragover' $ DraggedOver $ Item grocery.id
+    , HA.onDragleave' DragLeaveOccurred
+    , HA.id $ printGroceryId grocery.id
     ]
     [ HE.article
         [ HA.class' "flex spaced items-center"
@@ -192,9 +281,13 @@ groceryView grocery =
         ]
     ]
 
-placeholderView :: forall msg. FT.Html msg
+placeholderView :: FT.Html Message
 placeholderView =
-  HE.li [ HA.class' "no-list-style", HA.draggable "false" ]
+  HE.li
+    [ HA.class' "no-list-style"
+    , HA.draggable "false"
+    , HA.onDragover' $ DraggedOver Placeholder
+    ]
     [ HE.article [ HA.class' "flex spaced items-center" ]
         [ HE.label [ HA.class' "grocery-description" ]
             [ HE.text "Placeholder" ]
@@ -221,11 +314,12 @@ groceriesView placeholderIndex groceries =
     ]
   where
   { no: uncheckedGroceries, yes: checked } = NEA.partition _.checked groceries
-  -- This should have the possibility to generate 2 results -> use bind
-  go pi i g = Placeholder
   unchecked = case placeholderIndex of
     Nothing -> map Item uncheckedGroceries
-    Just i -> Array.mapWithIndex (go i) uncheckedGroceries
+    Just pi -> do
+      index /\ grocery <- Array.mapWithIndex (/\) uncheckedGroceries
+      if index == pi then [ Placeholder, Item grocery ]
+      else pure $ Item grocery
 
 view :: Model -> F.Html Message
 view model =
