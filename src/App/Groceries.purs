@@ -12,28 +12,24 @@ module App.Groceries
 
 import Prelude
 
+import App.Layout as Layout
 import App.Route (Route(..))
 import App.Route as Route
 import Data.Array (fold)
 import Data.Array as Array
 import Data.Array.NonEmpty (NonEmptyArray)
 import Data.Array.NonEmpty as NEA
-import Data.Int as Int
 import Data.Maybe (Maybe(..))
 import Data.Maybe as Maybe
 import Data.MediaType (MediaType(..))
 import Data.MediaType.Common as MediaType
-import Data.Traversable (for, for_)
+import Data.Traversable (for_)
 import Data.Tuple.Nested ((/\))
-import Debug as Debug
 import Effect.Class (class MonadEffect, liftEffect)
 import FFI.DataTransfer as FfiDataTransfer
 import Flame as F
 import Flame.Html.Attribute as HA
 import Flame.Html.Element as HE
-import Flame.Types as FT
-import Web.DOM.Element as E
-import Web.DOM.Node as Node
 import Web.Event.Event (Event)
 import Web.Event.Event as WE
 import Web.HTML.Event.DataTransfer as DataTransfer
@@ -129,10 +125,6 @@ init =
   , dragModel: Nothing
   }
 
-uncheckedGroceries :: Model -> Array Grocery
-uncheckedGroceries model =
-  Array.filter (not <<< _.checked) model.groceries
-
 data Message
   = UpdateAmount GroceryId Number
   | CheckboxClicked GroceryId Event
@@ -156,31 +148,6 @@ setDataTransferData id event = liftEffect do
     DragEvent.fromEvent event
       # map DragEvent.dataTransfer
   printedId = printGroceryId id
-
-getDragItemId :: forall m. MonadEffect m => Event -> m (Maybe GroceryId)
-getDragItemId event = join <$> liftEffect do
-  for dataTransfer \dt -> do
-    printedId <- DataTransfer.getData MediaType.textPlain dt
-    pure $ MkGroceryId <$> Int.fromString printedId
-  where
-  dataTransfer =
-    DragEvent.fromEvent event
-      # map DragEvent.dataTransfer
-
-getDragOverItemId :: forall m. MonadEffect m => Event -> m (Maybe GroceryId)
-getDragOverItemId event = do
-  recHelp $ E.fromEventTarget =<< WE.target event
-  where
-  recHelp :: Maybe _ -> m (Maybe GroceryId)
-  recHelp =
-    case _ of
-      Nothing -> pure Nothing
-      Just element -> do
-        id <- Int.fromString <$> (liftEffect $ E.id element)
-        case id of
-          Nothing ->
-            recHelp =<< (liftEffect $ Node.parentElement $ E.toNode element)
-          Just idInt -> pure $ Just $ MkGroceryId idInt
 
 preventDefaultDropTarget :: forall m. MonadEffect m => Event -> m Unit
 preventDefaultDropTarget event =
@@ -221,7 +188,7 @@ update model =
       updatedModel = model
         { dragModel = setDragOverItem <$> model.dragModel }
 
-    DragLeaveOccurred event ->
+    DragLeaveOccurred _event ->
       model /\ []
 
 groceryView :: Grocery -> F.Html Message
@@ -256,7 +223,7 @@ groceryView grocery =
 
 groceriesView
   :: Maybe (DragModel GroceryId) -> NonEmptyArray Grocery -> F.Html Message
-groceriesView placeholderIndex groceries =
+groceriesView _dragModel groceries =
   HE.fragment
     [ HE.ul [ HA.class' "no-padding groceries-list", HA.onDragend' DragEnded ] $
         map groceryView unchecked
@@ -269,31 +236,20 @@ groceriesView placeholderIndex groceries =
 
 view :: Model -> F.Html Message
 view model =
-  HE.fragment
-    [ HE.main [ HA.class' "flex column container spaced" ]
-        [ HE.h1_ [ HE.text "Groceries" ]
-        , HE.code_
-            [ HE.text $ show model.dragModel
-            ]
-        , HE.div [ HA.class' "flex justify-space-between" ]
-            [ HE.a [ HA.href $ Route.print $ GroceriesGenerate ]
-                [ HE.text "Generate" ]
-            , HE.button [ HA.class' "secondary" ]
-                [ HE.text "Edit" ]
-            ]
-        , case NEA.fromArray model.groceries of
-            Nothing -> HE.text "No groceries have been added yet"
-            Just nea -> groceriesView model.dragModel nea
-        , HE.button [ HA.class' "fab" ] [ HE.text "+" ]
-        ]
-    , HE.footer [ HA.class' "container" ]
-        [ HE.nav [ HA.class' "flex spaced justify-center" ]
-            [ HE.a
-                [ HA.href $ Route.print $ Route.Home ]
-                [ HE.text "Next days" ]
-            , HE.a
-                [ HA.href $ Route.print $ Route.Groceries ]
-                [ HE.text "Groceries" ]
-            ]
-        ]
-    ]
+  Layout.main $
+    HE.div [ HA.class' "flex column" ]
+      [ HE.h1_ [ HE.text "Groceries" ]
+      , HE.code_
+          [ HE.text $ show model.dragModel
+          ]
+      , HE.div [ HA.class' "flex justify-space-between" ]
+          [ HE.a [ HA.href $ Route.print $ GroceriesGenerate ]
+              [ HE.text "Generate" ]
+          , HE.button [ HA.class' "secondary" ]
+              [ HE.text "Edit" ]
+          ]
+      , case NEA.fromArray model.groceries of
+          Nothing -> HE.text "No groceries have been added yet"
+          Just nea -> groceriesView model.dragModel nea
+      , HE.button [ HA.class' "fab" ] [ HE.text "+" ]
+      ]

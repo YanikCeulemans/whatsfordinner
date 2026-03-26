@@ -4,11 +4,12 @@ import Prelude
 
 import App.Data as AData
 import App.Groceries as Groceries
+import App.Layout as Layout
 import App.Route (Route(..))
 import App.Route as Route
 import Data.Array as Array
 import Data.Date (Date, Weekday(..))
-import Data.Date as Date
+import Data.Date (adjust, weekday) as Date
 import Data.DateTime (DateTime(..))
 import Data.Foldable (fold)
 import Data.Formatter.DateTime as Format
@@ -25,17 +26,20 @@ import Domain.MealSchedule as MealSchedule
 import Domain.PlannedMeal (PlannedMeal(..))
 import Domain.Range (Range)
 import Domain.Range as Range
-import Effect.Class (liftEffect)
-import Effect.Class.Console as Console
+import Effect (Effect)
+import Effect.Class (class MonadEffect, liftEffect)
 import Effect.Now (nowDate)
 import FFI.Doc as FFIDoc
+import FFI.Navigation as FFINav
 import Flame (Application, Html, Update)
-import Flame.Application as F
+import Flame (AppId) as F
+import Flame.Application (noMessages) as F
 import Flame.Html.Attribute as HA
 import Flame.Html.Element as HE
 import Flame.Subscription as FS
 import Partial.Unsafe (unsafeCrashWith)
-import Web.Event.Event (EventType(..))
+import Web.Event.Event (Event, EventType(..))
+import Web.Event.EventTarget as ET
 import Web.HTML (window)
 import Web.HTML.HTMLDocument.VisibilityState (VisibilityState(..))
 import Web.HTML.Window (document)
@@ -67,21 +71,43 @@ routeToModel model = case _ of
   _ -> model
     { route = HomeM { mealSchedule: AData.mealSchedule } }
 
-init :: Date -> String -> Model
-init targetDate startUrlText =
+init :: String -> Date -> Model
+init startUrlText targetDate =
   routeToModel initModel $ Route.parse startUrlText
   where
   initModel = { route: HomeM { mealSchedule: AData.mealSchedule }, targetDate }
 
+handleOnNavigate :: F.AppId String Message -> Event -> Effect Unit
+handleOnNavigate appId evt =
+  liftEffect $ FFINav.intercept opts navEvt
+  where
+  navEvt = FFINav.fromEvent evt
+  opts =
+    { handler: do
+        liftEffect $ FS.send appId $ NavigationOccurred
+          navEvt.destination.url
+    }
+
+initializeApp
+  :: forall m. MonadEffect m => F.AppId String Message -> m (Maybe Message)
+initializeApp appId = liftEffect do
+  onNavigate <- ET.eventListener $ handleOnNavigate appId
+  navigation <- FFINav.toEventTarget <$> FFINav.navigation
+  ET.addEventListener (EventType "navigate") onNavigate true navigation
+  pure Nothing
+
 data Message
-  = DocumentVisibilityChanged
+  = InitializeRequested (F.AppId String Message)
+  | DocumentVisibilityChanged
   | TargetDateUpdated Date
   | NavigationOccurred String
   | GroceriesMessage Groceries.Message
 
 update :: Update Model Message
-update model message = case model.route /\ message of
-  _ /\ DocumentVisibilityChanged ->
+update model message = case message of
+  InitializeRequested appId ->
+    model /\ [ initializeApp appId ]
+  DocumentVisibilityChanged ->
     model /\
       [ do
           vs <- liftEffect $ FFIDoc.visibilityState =<< document =<< window
@@ -90,29 +116,25 @@ update model message = case model.route /\ message of
             _ -> pure Nothing
       ]
 
-  _ /\ TargetDateUpdated newDate ->
+  TargetDateUpdated newDate ->
     F.noMessages $ model { targetDate = newDate }
 
-  _ /\ NavigationOccurred destinationUrlText ->
+  NavigationOccurred destinationUrlText ->
     updatedModel /\ []
     where
     updatedModel = routeToModel model $ Route.parse destinationUrlText
 
-  GroceriesM groceriesM /\ GroceriesMessage groceriesMessage ->
-    updatedModel /\ effs
-    where
-    updatedGroceriesM /\ groceriesEffs = Groceries.update groceriesM
-      groceriesMessage
-    updatedModel = model
-      { route = GroceriesM updatedGroceriesM }
-    effs = (map <<< map <<< map) GroceriesMessage groceriesEffs
-
-  _ /\ GroceriesMessage _ ->
-    model /\
-      [ do
-          Console.warn "received groceries message when not on groceries view"
-          pure Nothing
-      ]
+  GroceriesMessage groceriesMessage ->
+    case model.route of
+      GroceriesM groceriesModel ->
+        updatedModel /\ effs
+        where
+        updatedGroceriesM /\ groceriesEffs = Groceries.update groceriesModel
+          groceriesMessage
+        updatedModel = model
+          { route = GroceriesM updatedGroceriesM }
+        effs = (map <<< map <<< map) GroceriesMessage groceriesEffs
+      _ -> model /\ []
 
 displayDateTime :: DateTime -> String
 displayDateTime =
@@ -197,74 +219,38 @@ homeView targetDate model =
         model.mealSchedule
     zipped = Array.zip weekDays weekMeals
   in
-    HE.fragment
-      [ HE.main [ HA.class' "flex column container" ]
-          [ HE.h1_ [ HE.text "The next 7 days" ]
-          , case zipped of
-              [] -> HE.text ""
-              entries ->
-                HE.div [ HA.class' "flex column spaced" ]
-                  $ map (viewScheduleEntry targetDate) entries
-          ]
-      , HE.footer [ HA.class' "container" ]
-          [ HE.nav [ HA.class' "flex spaced justify-center" ]
-              [ HE.a
-                  [ HA.href "/" ]
-                  [ HE.text "Next days" ]
-              , HE.a
-                  [ HA.href "/groceries" ]
-                  [ HE.text "Groceries" ]
-              ]
-          ]
-      ]
+    Layout.main $
+      HE.div [ HA.class' "flex column" ]
+        [ HE.h2_ [ HE.text "Yolo" ]
+        , case zipped of
+            [] -> HE.text ""
+            entries ->
+              HE.div [ HA.class' "flex column spaced" ]
+                $ map (viewScheduleEntry targetDate) entries
+        ]
 
-groceriesView :: Groceries.Model -> Html Message
-groceriesView _model =
-  HE.fragment
-    [ HE.main [ HA.class' "flex column container" ]
-        [ HE.h1_ [ HE.text "Groceries" ]
-        , HE.form_
-            [ HE.fieldset_
-                [ HE.label_
-                    [ HE.text "Start date"
-                    , HE.input
-                        [ HA.name "start_date", HA.type' "date" ]
-                    ]
-                , HE.label_
-                    [ HE.text "End date"
-                    , HE.input
-                        [ HA.name "end_date", HA.type' "date" ]
-                    ]
-                ]
-            , HE.input [ HA.type' "submit", HA.value "Generatee" ]
-            ]
-        ]
-    , HE.footer [ HA.class' "container" ]
-        [ HE.nav [ HA.class' "flex spaced justify-center" ]
-            [ HE.a
-                [ HA.href "/" ]
-                [ HE.text "Next days" ]
-            , HE.a
-                [ HA.href "/groceries" ]
-                [ HE.text "Groceries" ]
-            ]
-        ]
-    ]
+-- [ HE.h1_ [ HE.text "The next 7 days" ]
+-- , case zipped of
+--     [] -> HE.text "empty"
+--     entries ->
+-- -- HE.div [ HA.class' "flex column spaced" ]
+-- --   $ map (viewScheduleEntry targetDate) entries
+-- ]
 
 view :: Model -> Html Message
 view model = case model.route of
   HomeM homeM -> homeView model.targetDate homeM
   GroceriesM groceriesM -> GroceriesMessage <$> Groceries.view groceriesM
-  GroceriesGenerateM _groceriesGenerateM -> HE.text "TODO"
+  GroceriesGenerateM _groceriesGenerateM -> Layout.main $ HE.text "TODO"
 
 app :: Date -> String -> Application Model Message
-app targetDate documentUrlText =
+app startDate documentUrlText =
   { subscribe:
       [ FS.onCustomEvent' (EventType "visibilitychange")
           DocumentVisibilityChanged
       ]
   , view
-  , model: init targetDate documentUrlText
+  , model: init documentUrlText startDate
   , update
   }
 
