@@ -1,8 +1,12 @@
 [tasks.dev]
-run = 'watchexec -e .purs,.js -i output spago bundle'
+run = 'watchexec -e .purs,.js -i output spago bundle --platform browser --bundle-type app'
 
 [tasks.serve]
 run = 'parcel index.html'
+
+[tasks.docs_serve]
+run = 'python -m http.server 8080'
+dir = './generated-docs/html/'
 
 [env]
 _.path = './node_modules/.bin'

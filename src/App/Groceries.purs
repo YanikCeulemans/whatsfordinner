@@ -13,8 +13,8 @@ module App.Groceries
 import Prelude
 
 import App.Layout as Layout
-import App.Route (Route(..))
-import App.Route as Route
+import Data.Route (Route(..))
+import Data.Route as Route
 import Data.Array (fold)
 import Data.Array as Array
 import Data.Array.NonEmpty (NonEmptyArray)

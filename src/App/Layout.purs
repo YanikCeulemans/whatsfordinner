@@ -1,6 +1,6 @@
 module App.Layout where
 
-import App.Route as Route
+import Data.Route as Route
 import App.Shared as Shared
 import Flame (Html)
 import Flame.Html.Attribute as HA

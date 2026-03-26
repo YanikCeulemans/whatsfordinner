@@ -5,8 +5,8 @@ import Prelude
 import App.Data as AData
 import App.Groceries as Groceries
 import App.Layout as Layout
-import App.Route (Route(..))
-import App.Route as Route
+import Data.Route (Route(..))
+import Data.Route as Route
 import Data.Array as Array
 import Data.Date (Date, Weekday(..))
 import Data.Date (adjust, weekday) as Date

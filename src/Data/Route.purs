@@ -1,4 +1,4 @@
-module Data.Route (Route(..), parse, print) where
+module Data.Route (Route(..), parse, parse', print) where
 
 import Prelude hiding ((/))
 
@@ -18,6 +18,7 @@ data Route
   | GroceriesGenerate
 
 derive instance Generic Route _
+derive instance Eq Route
 
 route :: RouteDuplex' Route
 route = root $ sum
@@ -33,6 +34,9 @@ parse :: String -> Maybe Route
 parse urlText = do
   url <- Either.hush $ URL.mk urlText
   parseRouteFromPathAndQuery $ fold [ URL.pathname url, URL.search url ]
+
+parse' :: String -> Maybe Route
+parse' = parseRouteFromPathAndQuery
 
 print :: Route -> String
 print = D.print route
