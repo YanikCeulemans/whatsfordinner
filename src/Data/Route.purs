@@ -1,4 +1,4 @@
-module App.Route (Route(..), parse, print) where
+module Data.Route (Route(..), parse, print) where
 
 import Prelude hiding ((/))
 
