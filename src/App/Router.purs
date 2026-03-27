@@ -37,6 +37,7 @@ component =
   where
   initialState route = { route }
 
+  -- TODO: add next 7 days as child when route is home
   render :: State -> PlainHTML
   render { route } =
     HH.div_

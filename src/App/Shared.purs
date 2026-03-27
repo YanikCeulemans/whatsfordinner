@@ -4,9 +4,8 @@ import Prelude
 
 import Data.Route (Route)
 import Data.Route as Route
-import Flame (Html)
-import Flame.Html.Attribute as HA
-import Flame.Html.Element as HE
+import Halogen.HTML as HH
+import Halogen.HTML.Properties as HP
 
-link :: forall msg. Route -> Array (Html msg) -> Html msg
-link route content = HE.a [ HA.href $ Route.print route ] content
+link :: forall w i. Route -> Array (HH.HTML w i) -> HH.HTML w i
+link route content = HH.a [ HP.href $ Route.print route ] content
