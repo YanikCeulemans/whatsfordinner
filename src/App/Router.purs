@@ -2,21 +2,29 @@ module App.Route where
 
 import Prelude
 
+import App.Layout as Layout
+import App.Next7Days as Next7Days
+import Data.Date (Date)
 import Data.Maybe (Maybe(..))
 import Data.Route (Route)
 import Data.Route as Route
 import Effect.Aff.Class (class MonadAff)
 import Halogen as H
-import Halogen.HTML (PlainHTML)
 import Halogen.HTML as HH
 import Halogen.HTML.Properties as HP
+import Type.Proxy (Proxy(..))
+
+type Slots = (next7Days :: forall query. H.Slot query Void Int)
+
+_next7Days = Proxy :: Proxy "next7Days"
 
 data Query a = Navigate Route a
 
-type Input = Maybe Route
+type Input = State
 
 type State =
   { route :: Maybe Route
+  , currentDate :: Date
   }
 
 data Action = Initialize
@@ -26,7 +34,7 @@ component
 component =
   H.mkComponent
     { initialState
-    , render: HH.fromPlainHTML <<< render
+    , render
     , eval:
         H.mkEval $ H.defaultEval
           { handleAction = handleAction
@@ -35,13 +43,17 @@ component =
           }
     }
   where
-  initialState route = { route }
+  initialState input = input
 
   -- TODO: add next 7 days as child when route is home
-  render :: State -> PlainHTML
-  render { route } =
-    HH.div_
+  render :: forall action. State -> H.ComponentHTML action Slots m
+  render { route, currentDate } =
+    Layout.main $ HH.div_
       [ HH.code_ [ HH.text $ show $ Route.print <$> route ]
+      , case route of
+          Just Route.Home -> HH.slot_ _next7Days 0 Next7Days.component ?h
+          Nothing -> HH.h1_ [ HH.text "Not found" ]
+          _ -> HH.text "TODO"
       , HH.a [ HP.href $ Route.print Route.Home ] [ HH.text "Home" ]
       , HH.a [ HP.href $ Route.print Route.Groceries ] [ HH.text "Groceries" ]
       ]

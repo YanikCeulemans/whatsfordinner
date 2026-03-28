@@ -1,14 +1,4 @@
-module App.Groceries
-  ( Model
-  , DragModel
-  , Grocery
-  , Amount
-  , Message
-  , GroceryId
-  , init
-  , update
-  , view
-  ) where
+module App.Groceries where
 
 import Prelude
 
@@ -124,7 +114,7 @@ init =
       ]
   , dragModel: Nothing
   }
-
+{--
 data Message
   = UpdateAmount GroceryId Number
   | CheckboxClicked GroceryId Event
@@ -253,3 +243,4 @@ view model =
           Just nea -> groceriesView model.dragModel nea
       , HE.button [ HA.class' "fab" ] [ HE.text "+" ]
       ]
+      --}
