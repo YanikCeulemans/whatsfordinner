@@ -3,7 +3,7 @@ module App.Groceries where
 import Prelude
 
 import App.Layout as Layout
-import Data.Array (fold)
+import Data.Array (fold, mapWithIndex)
 import Data.Array as Array
 import Data.Array.NonEmpty (NonEmptyArray)
 import Data.Array.NonEmpty as NEA
@@ -49,6 +49,7 @@ type Grocery =
   }
 
 newtype DragModel a =
+  -- TODO: remove the newtype and just keep the record, we don't need this specific show instance anyway
   MkDragModel
     { dragItem :: a
     , dragOverItem :: a
@@ -65,8 +66,34 @@ type Model =
 
 type State =
   { groceries :: Array Grocery
-  , dragState :: Maybe (DragModel GroceryId)
+  , dragState :: Maybe (DragModel Int)
   }
+
+toggleGrocery :: GroceryId -> State -> State
+toggleGrocery id state =
+  state { groceries = toggleChecked <$> state.groceries }
+  where
+  toggleChecked grocery
+    | grocery.id == id = grocery
+        { checked = not grocery.checked }
+    | otherwise = grocery
+
+startDrag :: Int -> State -> State
+startDrag index state =
+  state
+    { dragState = Just $ MkDragModel { dragItem: index, dragOverItem: index } }
+
+overDrag :: Int -> State -> State
+overDrag index state =
+  state { dragState = updateDragState <$> state.dragState }
+  where
+  updateDragState (MkDragModel dragState) =
+    MkDragModel $
+      _ { dragOverItem = index } dragState
+
+endDrag :: State -> State
+endDrag state =
+  state { dragState = Nothing }
 
 updateGroceryAmount :: GroceryId -> Number -> Model -> Model
 updateGroceryAmount id delta model =
@@ -85,33 +112,6 @@ toggleGroceryChecked id model =
     | grocery.id == id = grocery
         { checked = not grocery.checked }
     | otherwise = grocery
-
-init :: Model
-init =
-  { groceries:
-      [ { id: MkGroceryId 1
-        , description: "Onion"
-        , amount: MkAmount { value: 3.0, unit: Nothing }
-        , checked: false
-        }
-      , { id: MkGroceryId 2
-        , description: "Carrots"
-        , amount: MkAmount { value: 1.0, unit: Just "kg" }
-        , checked: true
-        }
-      , { id: MkGroceryId 3
-        , description: "Mushrooms"
-        , amount: MkAmount { value: 250.0, unit: Just "g" }
-        , checked: false
-        }
-      , { id: MkGroceryId 4
-        , description: "Bell peppers"
-        , amount: MkAmount { value: 2.0, unit: Nothing }
-        , checked: false
-        }
-      ]
-  , dragModel: Nothing
-  }
 
 dummyGroceries :: Array Grocery
 dummyGroceries =
@@ -135,132 +135,89 @@ dummyGroceries =
     , amount: MkAmount { value: 2.0, unit: Nothing }
     , checked: false
     }
+  , { id: MkGroceryId 5
+    , description: "Zucchini"
+    , amount: MkAmount { value: 1.0, unit: Nothing }
+    , checked: false
+    }
+  , { id: MkGroceryId 6
+    , description: "Potatoes"
+    , amount: MkAmount { value: 2.0, unit: Just "kg" }
+    , checked: false
+    }
   ]
 
 data Action
   = ToggleGrocery GroceryId
-  | StartDrag GroceryId DragEvent
-  | OverDrag GroceryId DragEvent
+  | StartDrag Int DragEvent
+  | OverDrag Int DragEvent
+  | EndDrag DragEvent
 
-{--
-data Message
-  = UpdateAmount GroceryId Number
-  | CheckboxClicked GroceryId Event
-  | DragEnded Event
-  | DragStarted GroceryId Event
-  | DraggedOver GroceryId Event
-  | DragLeaveOccurred Event
-
-dragType :: String
-dragType = "grocery"
-
-setDataTransferData
-  :: forall m. MonadEffect m => GroceryId -> Event -> m Unit
-setDataTransferData id event = liftEffect do
-  for_ dataTransfer \dt -> do
-    DataTransfer.setData (MediaType dragType) mempty dt
-    DataTransfer.setData MediaType.textPlain printedId dt
-    FfiDataTransfer.setEffectAllowed FfiDataTransfer.Move dt
-  where
-  dataTransfer =
-    DragEvent.fromEvent event
-      # map DragEvent.dataTransfer
-  printedId = printGroceryId id
-
-preventDefaultDropTarget :: forall m. MonadEffect m => Event -> m Unit
-preventDefaultDropTarget event =
-  when isDropTarget $ liftEffect $ WE.preventDefault event
-  where
-  isDropTarget =
-    DragEvent.fromEvent event
-      # map DragEvent.dataTransfer
-      # map DataTransfer.types
-      <#> Array.elem dragType
-      # Maybe.fromMaybe false
-
-update :: F.Update Model Message
-update model =
-  case _ of
-    UpdateAmount id delta ->
-      F.noMessages $ updateGroceryAmount id delta model
-
-    CheckboxClicked id event ->
-      toggleGroceryChecked id model /\
-        [ Nothing <$ (liftEffect $ WE.preventDefault event) ]
-
-    DragStarted id event ->
-      updatedModel /\ [ setDataTransferData id event $> Nothing ]
-      where
-      updatedModel = model
-        { dragModel = Just $ MkDragModel { dragItem: id, dragOverItem: id } }
-
-    DragEnded event ->
-      model { dragModel = Nothing } /\
-        [ preventDefaultDropTarget event $> Nothing ]
-
-    DraggedOver id event ->
-      updatedModel /\ [ preventDefaultDropTarget event $> Nothing ]
-      where
-      setDragOverItem :: DragModel GroceryId -> DragModel GroceryId
-      setDragOverItem (MkDragModel dm) = MkDragModel $ dm { dragOverItem = id }
-      updatedModel = model
-        { dragModel = setDragOverItem <$> model.dragModel }
-
-    DragLeaveOccurred _event ->
-      model /\ []
---}
-
-groceryView :: forall m. MonadAff m => Grocery -> H.ComponentHTML Action () m
-groceryView grocery =
-  HH.li
-    [ HP.class_ $ H.ClassName "no-list-style"
-    , HP.draggable true
-    , HE.onDragStart $ StartDrag grocery.id
-    , HE.onDragOver $ OverDrag grocery.id
-    -- , HP.onDragleave' DragLeaveOccurred
-    , HP.id $ printGroceryId grocery.id
-    ]
-    [ HH.article
-        [ HP.class_ $ H.ClassName "flex spaced items-center"
-        ]
-        [ HH.label
-            [ HP.classes $ H.ClassName <$>
-                ( Array.catMaybes $
-                    [ Just "grocery-description flex-1"
-                    , if grocery.checked then Just "checked" else Nothing
-                    ]
-                )
-            , HP.for $ printGroceryId grocery.id
-            ]
-            [ HH.input
-                [ HP.type_ HP.InputCheckbox
-                , HP.id $ printGroceryId grocery.id
-                , HP.checked grocery.checked
-                -- , HP.onClick' $ CheckboxClicked grocery.id
-                ]
-            , HH.text $ fold
-                [ grocery.description, " (", show grocery.amount, ")" ]
-            ]
-        ]
-    ]
+groceryView
+  :: forall m
+   . MonadAff m
+  => Maybe (DragModel Int)
+  -> Int
+  -> Grocery
+  -> H.ComponentHTML Action () m
+groceryView dragState index grocery =
+  let
+    dragOverItem (MkDragModel ds) = ds.dragOverItem
+    isDraggedOver = (dragOverItem <$> dragState) == Just index
+  in
+    HH.li
+      [ HP.classes $ H.ClassName <$> Array.catMaybes
+          [ Just "no-list-style"
+          , if isDraggedOver then Just
+              "add-above-border"
+            else Nothing
+          ]
+      , HP.draggable true
+      , HE.onDragStart $ StartDrag index
+      , HE.onDragOver $ OverDrag index
+      -- , HP.onDragleave' DragLeaveOccurred
+      , HP.id $ printGroceryId grocery.id
+      ]
+      [ HH.article
+          [ HP.class_ $ H.ClassName "flex spaced items-center"
+          ]
+          [ HH.label
+              [ HP.classes $ H.ClassName <$>
+                  ( Array.catMaybes $
+                      [ Just "grocery-description flex-1"
+                      , if grocery.checked then Just "checked" else Nothing
+                      ]
+                  )
+              , HP.for $ printGroceryId grocery.id
+              ]
+              [ HH.input
+                  [ HP.type_ HP.InputCheckbox
+                  , HP.id $ printGroceryId grocery.id
+                  , HP.checked grocery.checked
+                  -- , HP.onClick' $ CheckboxClicked grocery.id
+                  ]
+              , HH.text $ fold
+                  [ grocery.description, " (", show grocery.amount, ")" ]
+              ]
+          ]
+      ]
 
 groceriesView
   :: forall m
    . MonadAff m
-  => Maybe (DragModel GroceryId)
+  => Maybe (DragModel Int)
   -> NonEmptyArray Grocery
   -> H.ComponentHTML Action () m
-groceriesView _dragModel groceries =
+groceriesView dragModel groceries =
   HH.div_
     [ HH.ul
         [ HP.class_ $ H.ClassName "no-padding groceries-list"
-        -- , HE.onDragEnd $ EndDrag
+        , HE.onDragEnd $ EndDrag
         ] $
-        map groceryView unchecked
+        mapWithIndex (groceryView dragModel) unchecked
     , HH.h2_ [ HH.text "Done" ]
-    , HH.ul [ HP.class_ $ H.ClassName "no-padding groceries-list" ] $ map
-        groceryView
-        checked
+    , HH.ul [ HP.class_ $ H.ClassName "no-padding groceries-list" ] $
+        mapWithIndex (groceryView dragModel) checked
     , HH.button [ HP.class_ $ H.ClassName "secondary" ]
         [ HH.text "Clear completed" ]
     ]
@@ -274,6 +231,8 @@ component =
     { initialState
     , render
     , eval: H.mkEval $ H.defaultEval
+        { handleAction = handleAction
+        }
     }
 
   where
@@ -282,6 +241,21 @@ component =
     { groceries: dummyGroceries
     , dragState: Nothing
     }
+
+  handleAction
+    :: forall childSlots output m
+     . MonadAff m
+    => Action
+    -> H.HalogenM State Action childSlots output m Unit
+  handleAction = case _ of
+    StartDrag index dragEvent ->
+      H.modify_ $ startDrag index
+    OverDrag index dragEvent ->
+      H.modify_ $ overDrag index
+    EndDrag dragEvent ->
+      H.modify_ $ endDrag
+    ToggleGrocery index ->
+      H.modify_ $ toggleGrocery index
 
   render :: State -> H.ComponentHTML Action () m
   render state =
