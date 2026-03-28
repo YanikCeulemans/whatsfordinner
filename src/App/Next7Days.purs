@@ -42,12 +42,16 @@ import Web.HTML (window)
 import Web.HTML.HTMLDocument.VisibilityState (VisibilityState(..))
 import Web.HTML.Window (document)
 
-type State =
+type LoadedState =
   { mealSchedule :: MealSchedule
   , date :: Date
   }
 
-type Input = State
+data State
+  = NotRequested
+  | Initialized
+
+data Action = Initialize
 
 {--
 init :: String -> Date -> Model
@@ -188,17 +192,20 @@ viewScheduleEntry date (mealDate /\ plannedMeal) =
     ]
 
 component
-  :: forall query output m. MonadAff m => H.Component query Input output m
+  :: forall query input output m. MonadAff m => H.Component query input output m
 component =
   H.mkComponent
     { initialState
     , render: HH.fromPlainHTML <<< render
-    , eval: H.mkEval $ H.defaultEval
+    , eval: H.mkEval $ H.defaultEval { initialize = Just Initialize }
     }
 
   where
-  initialState :: Input -> State
-  initialState input = input
+  initialState :: input -> State
+  initialState _ =
+    { mealSchedule: AData.mealSchedule
+    , date: 
+    }
 
   render :: State -> HH.PlainHTML
   render state =
