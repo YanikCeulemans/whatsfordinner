@@ -3,7 +3,6 @@ module App.Next7Days where
 import Prelude
 
 import App.Data as AData
-import App.Groceries as Groceries
 import App.Layout as Layout
 import Data.Array as Array
 import Data.Date (Date, Weekday(..))
@@ -15,8 +14,6 @@ import Data.Int as Int
 import Data.List as List
 import Data.Maybe (Maybe(..))
 import Data.Maybe as Maybe
-import Data.Route (Route(..))
-import Data.Route as Route
 import Data.Time.Duration (Days(..))
 import Data.Tuple (Tuple)
 import Data.Tuple.Nested ((/\))
@@ -26,30 +23,21 @@ import Domain.MealSchedule as MealSchedule
 import Domain.PlannedMeal (PlannedMeal(..))
 import Domain.Range (Range)
 import Domain.Range as Range
-import Effect (Effect)
 import Effect.Aff.Class (class MonadAff)
-import Effect.Class (class MonadEffect, liftEffect)
 import Effect.Now (nowDate)
-import FFI.Doc as FFIDoc
-import FFI.Navigation as FFINav
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Properties as HP
 import Partial.Unsafe (unsafeCrashWith)
-import Web.Event.Event (Event, EventType(..))
-import Web.Event.EventTarget as ET
-import Web.HTML (window)
-import Web.HTML.HTMLDocument.VisibilityState (VisibilityState(..))
-import Web.HTML.Window (document)
 
-type LoadedState =
+type InitializedState =
   { mealSchedule :: MealSchedule
   , date :: Date
   }
 
 data State
-  = NotRequested
-  | Initialized
+  = NotInitialized
+  | Initialized InitializedState
 
 data Action = Initialize
 
@@ -197,36 +185,45 @@ component =
   H.mkComponent
     { initialState
     , render: HH.fromPlainHTML <<< render
-    , eval: H.mkEval $ H.defaultEval { initialize = Just Initialize }
+    , eval: H.mkEval $ H.defaultEval
+        { initialize = Just Initialize, handleAction = handleAction }
     }
 
   where
   initialState :: input -> State
-  initialState _ =
-    { mealSchedule: AData.mealSchedule
-    , date: 
-    }
+  initialState _ = NotInitialized
+
+  handleAction
+    :: forall slots. Action -> H.HalogenM State Action slots output m Unit
+  handleAction = case _ of
+    Initialize -> do
+      now <- H.liftEffect nowDate
+      H.modify_ \_ -> Initialized
+        { date: now, mealSchedule: AData.mealSchedule }
+      pure unit
 
   render :: State -> HH.PlainHTML
   render state =
-    let
-      targetDate = state.date
-      weekDays = nextDays 7 targetDate
-      nextWeekDate = unsafeAdjustDate (Days 7.0) targetDate
-      dateRange = Range.create targetDate nextWeekDate
-      weekMeals =
-        Array.fromFoldable $ MealSchedule.toList
-          dateRange
-          state.mealSchedule
-      zipped = Array.zip weekDays weekMeals
-    in
-      Layout.main $
-        HH.div [ HP.class_ $ H.ClassName "flex column" ]
-          [ HH.h1_ [ HH.text "The next 7 days" ]
-          , case zipped of
-              [] -> HH.text ""
-              entries ->
-                HH.div [ HP.class_ $ H.ClassName "flex column spaced" ]
-                  $ map (viewScheduleEntry targetDate) entries
-          ]
+    Layout.main $
+      case state of
+        NotInitialized -> HH.p_ [ HH.text "loading" ]
+        Initialized initializedState ->
+          HH.div [ HP.class_ $ H.ClassName "flex column" ]
+            [ HH.h1_ [ HH.text "The next 7 days" ]
+            , case zipped of
+                [] -> HH.text ""
+                entries ->
+                  HH.div [ HP.class_ $ H.ClassName "flex column spaced" ]
+                    $ map (viewScheduleEntry initializedState.date) entries
+            ]
+          where
+          targetDate = initializedState.date
+          weekDays = nextDays 7 targetDate
+          nextWeekDate = unsafeAdjustDate (Days 7.0) targetDate
+          dateRange = Range.create targetDate nextWeekDate
+          weekMeals =
+            Array.fromFoldable $ MealSchedule.toList
+              dateRange
+              initializedState.mealSchedule
+          zipped = Array.zip weekDays weekMeals
 

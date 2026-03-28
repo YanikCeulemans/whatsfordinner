@@ -10,7 +10,7 @@ import Halogen.HTML.Properties as HP
 
 main :: forall w i. HH.HTML w i -> HH.HTML w i
 main view =
-  HH.main_
+  HH.div_
     [ HH.main [ HP.class_ $ HC.ClassName "container" ]
         [ view ]
     , HH.footer [ HP.class_ $ HC.ClassName "container" ]

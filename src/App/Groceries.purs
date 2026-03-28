@@ -3,27 +3,20 @@ module App.Groceries where
 import Prelude
 
 import App.Layout as Layout
-import Data.Route (Route(..))
-import Data.Route as Route
 import Data.Array (fold)
 import Data.Array as Array
 import Data.Array.NonEmpty (NonEmptyArray)
 import Data.Array.NonEmpty as NEA
 import Data.Maybe (Maybe(..))
 import Data.Maybe as Maybe
-import Data.MediaType (MediaType(..))
-import Data.MediaType.Common as MediaType
-import Data.Traversable (for_)
-import Data.Tuple.Nested ((/\))
-import Effect.Class (class MonadEffect, liftEffect)
-import FFI.DataTransfer as FfiDataTransfer
-import Flame as F
-import Flame.Html.Attribute as HA
-import Flame.Html.Element as HE
-import Web.Event.Event (Event)
-import Web.Event.Event as WE
-import Web.HTML.Event.DataTransfer as DataTransfer
-import Web.HTML.Event.DragEvent as DragEvent
+import Data.Route (Route(..))
+import Data.Route as Route
+import Effect.Aff.Class (class MonadAff)
+import Halogen as H
+import Halogen.HTML as HH
+import Halogen.HTML.Events as HE
+import Halogen.HTML.Properties as HP
+import Web.HTML.Event.DragEvent (DragEvent)
 
 newtype Amount = MkAmount
   { value :: Number
@@ -70,6 +63,11 @@ type Model =
   , dragModel :: Maybe (DragModel GroceryId)
   }
 
+type State =
+  { groceries :: Array Grocery
+  , dragState :: Maybe (DragModel GroceryId)
+  }
+
 updateGroceryAmount :: GroceryId -> Number -> Model -> Model
 updateGroceryAmount id delta model =
   model { groceries = updateGrocery <$> model.groceries }
@@ -114,6 +112,36 @@ init =
       ]
   , dragModel: Nothing
   }
+
+dummyGroceries :: Array Grocery
+dummyGroceries =
+  [ { id: MkGroceryId 1
+    , description: "Onion"
+    , amount: MkAmount { value: 3.0, unit: Nothing }
+    , checked: false
+    }
+  , { id: MkGroceryId 2
+    , description: "Carrots"
+    , amount: MkAmount { value: 1.0, unit: Just "kg" }
+    , checked: true
+    }
+  , { id: MkGroceryId 3
+    , description: "Mushrooms"
+    , amount: MkAmount { value: 250.0, unit: Just "g" }
+    , checked: false
+    }
+  , { id: MkGroceryId 4
+    , description: "Bell peppers"
+    , amount: MkAmount { value: 2.0, unit: Nothing }
+    , checked: false
+    }
+  ]
+
+data Action
+  = ToggleGrocery GroceryId
+  | StartDrag GroceryId DragEvent
+  | OverDrag GroceryId DragEvent
+
 {--
 data Message
   = UpdateAmount GroceryId Number
@@ -180,67 +208,97 @@ update model =
 
     DragLeaveOccurred _event ->
       model /\ []
+--}
 
-groceryView :: Grocery -> F.Html Message
+groceryView :: forall m. MonadAff m => Grocery -> H.ComponentHTML Action () m
 groceryView grocery =
-  HE.li
-    [ HA.class' "no-list-style"
-    , HA.draggable "true"
-    , HA.onDragstart' $ DragStarted grocery.id
-    , HA.onDragover' $ DraggedOver grocery.id
-    -- , HA.onDragleave' DragLeaveOccurred
-    , HA.id $ printGroceryId grocery.id
+  HH.li
+    [ HP.class_ $ H.ClassName "no-list-style"
+    , HP.draggable true
+    , HE.onDragStart $ StartDrag grocery.id
+    , HE.onDragOver $ OverDrag grocery.id
+    -- , HP.onDragleave' DragLeaveOccurred
+    , HP.id $ printGroceryId grocery.id
     ]
-    [ HE.article
-        [ HA.class' "flex spaced items-center"
+    [ HH.article
+        [ HP.class_ $ H.ClassName "flex spaced items-center"
         ]
-        [ HE.label
-            [ HA.class' "grocery-description flex-1"
-            , HA.class' { checked: grocery.checked }
-            , HA.for $ printGroceryId grocery.id
+        [ HH.label
+            [ HP.classes $ H.ClassName <$>
+                ( Array.catMaybes $
+                    [ Just "grocery-description flex-1"
+                    , if grocery.checked then Just "checked" else Nothing
+                    ]
+                )
+            , HP.for $ printGroceryId grocery.id
             ]
-            [ HE.input
-                [ HA.type' "checkbox"
-                , HA.id $ printGroceryId grocery.id
-                , HA.checked grocery.checked
-                , HA.onClick' $ CheckboxClicked grocery.id
+            [ HH.input
+                [ HP.type_ HP.InputCheckbox
+                , HP.id $ printGroceryId grocery.id
+                , HP.checked grocery.checked
+                -- , HP.onClick' $ CheckboxClicked grocery.id
                 ]
-            , HE.text $ fold
+            , HH.text $ fold
                 [ grocery.description, " (", show grocery.amount, ")" ]
             ]
         ]
     ]
 
 groceriesView
-  :: Maybe (DragModel GroceryId) -> NonEmptyArray Grocery -> F.Html Message
+  :: forall m
+   . MonadAff m
+  => Maybe (DragModel GroceryId)
+  -> NonEmptyArray Grocery
+  -> H.ComponentHTML Action () m
 groceriesView _dragModel groceries =
-  HE.fragment
-    [ HE.ul [ HA.class' "no-padding groceries-list", HA.onDragend' DragEnded ] $
+  HH.div_
+    [ HH.ul
+        [ HP.class_ $ H.ClassName "no-padding groceries-list"
+        -- , HE.onDragEnd $ EndDrag
+        ] $
         map groceryView unchecked
-    , HE.h2_ [ HE.text "Done" ]
-    , HE.ul [ HA.class' "no-padding groceries-list" ] $ map groceryView checked
-    , HE.button [ HA.class' "secondary" ] [ HE.text "Clear completed" ]
+    , HH.h2_ [ HH.text "Done" ]
+    , HH.ul [ HP.class_ $ H.ClassName "no-padding groceries-list" ] $ map
+        groceryView
+        checked
+    , HH.button [ HP.class_ $ H.ClassName "secondary" ]
+        [ HH.text "Clear completed" ]
     ]
   where
   { no: unchecked, yes: checked } = NEA.partition _.checked groceries
 
-view :: Model -> F.Html Message
-view model =
-  Layout.main $
-    HE.div [ HA.class' "flex column" ]
-      [ HE.h1_ [ HE.text "Groceries" ]
-      , HE.code_
-          [ HE.text $ show model.dragModel
-          ]
-      , HE.div [ HA.class' "flex justify-space-between" ]
-          [ HE.a [ HA.href $ Route.print $ GroceriesGenerate ]
-              [ HE.text "Generate" ]
-          , HE.button [ HA.class' "secondary" ]
-              [ HE.text "Edit" ]
-          ]
-      , case NEA.fromArray model.groceries of
-          Nothing -> HE.text "No groceries have been added yet"
-          Just nea -> groceriesView model.dragModel nea
-      , HE.button [ HA.class' "fab" ] [ HE.text "+" ]
-      ]
-      --}
+component
+  :: forall query input output m. MonadAff m => H.Component query input output m
+component =
+  H.mkComponent
+    { initialState
+    , render
+    , eval: H.mkEval $ H.defaultEval
+    }
+
+  where
+  initialState :: input -> State
+  initialState _ =
+    { groceries: dummyGroceries
+    , dragState: Nothing
+    }
+
+  render :: State -> H.ComponentHTML Action () m
+  render state =
+    Layout.main $
+      HH.div [ HP.class_ $ H.ClassName "flex column" ]
+        [ HH.h1_ [ HH.text "Groceries" ]
+        , HH.code_
+            [ HH.text $ show state.dragState
+            ]
+        , HH.div [ HP.class_ $ H.ClassName "flex justify-space-between" ]
+            [ HH.a [ HP.href $ Route.print $ GroceriesGenerate ]
+                [ HH.text "Generate" ]
+            , HH.button [ HP.class_ $ H.ClassName "secondary" ]
+                [ HH.text "Edit" ]
+            ]
+        , case NEA.fromArray state.groceries of
+            Nothing -> HH.text "No groceries have been added yet"
+            Just nea -> groceriesView state.dragState nea
+        , HH.button [ HP.class_ $ H.ClassName "fab" ] [ HH.text "+" ]
+        ]
