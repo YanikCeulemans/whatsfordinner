@@ -112,6 +112,9 @@ toggleGrocery id state =
     | otherwise = grocery
   groceries = toggleChecked <$> allGroceries state
 
+clearCompleted :: State -> State
+clearCompleted state = state { checked = [] }
+
 dummyGroceries :: Array Grocery
 dummyGroceries =
   [ { id: MkGroceryId 1
@@ -151,6 +154,7 @@ data Action
   | StartDrag Int DragEvent
   | OverDrag Int DragEvent
   | EndDrag DragEvent
+  | ClearCompleted
 
 isPositive :: Int -> Boolean
 isPositive x = x > 0
@@ -223,24 +227,27 @@ groceryView dragState index grocery =
 groceriesView
   :: forall m
    . MonadAff m
-  => Maybe (DragState Int)
-  -> NonEmptyArray Grocery
+  => State
   -> H.ComponentHTML Action () m
-groceriesView dragState groceries =
+groceriesView state =
   HH.div_
     [ HH.ul
         [ HP.class_ $ H.ClassName "no-padding groceries-list"
         , HE.onDragEnd $ EndDrag
         ] $
-        mapWithIndex (groceryView dragState) unchecked
+        mapWithIndex (groceryView state.dragState) state.unchecked
     , HH.h2_ [ HH.text "Done" ]
     , HH.ul [ HP.class_ $ H.ClassName "no-padding groceries-list" ] $
-        mapWithIndex (groceryView dragState) checked
-    , HH.button [ HP.class_ $ H.ClassName "secondary" ]
-        [ HH.text "Clear completed" ]
+        mapWithIndex (groceryView state.dragState) state.checked
+    , case state.checked of
+        [] -> HH.text ""
+        _ ->
+          HH.button
+            [ HP.class_ $ H.ClassName "secondary"
+            , HE.onClick $ const ClearCompleted
+            ]
+            [ HH.text "Clear completed" ]
     ]
-  where
-  { no: unchecked, yes: checked } = NEA.partition _.checked groceries
 
 component
   :: forall query input output m. MonadAff m => H.Component query input output m
@@ -276,15 +283,14 @@ component =
     ToggleGrocery index mouseEvent -> do
       H.liftEffect $ E.preventDefault $ MouseEvent.toEvent mouseEvent
       H.modify_ $ toggleGrocery index
+    ClearCompleted ->
+      H.modify_ clearCompleted
 
   render :: State -> H.ComponentHTML Action () m
   render state =
     Layout.main $
       HH.div [ HP.class_ $ H.ClassName "flex column" ]
         [ HH.h1_ [ HH.text "Groceries" ]
-        , HH.code_
-            [ HH.text $ show state.dragState
-            ]
         , HH.div [ HP.class_ $ H.ClassName "flex justify-space-between" ]
             [ HH.a [ HP.href $ Route.print $ GroceriesGenerate ]
                 [ HH.text "Generate" ]
@@ -293,6 +299,6 @@ component =
             ]
         , case NEA.fromArray $ allGroceries state of
             Nothing -> HH.text "No groceries have been added yet"
-            Just nea -> groceriesView state.dragState nea
+            Just nea -> groceriesView state
         , HH.button [ HP.class_ $ H.ClassName "fab" ] [ HH.text "+" ]
         ]
