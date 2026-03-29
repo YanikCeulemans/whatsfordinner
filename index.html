@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="color-scheme" content="light dark">
-    <title>This is the title of the webpage!</title>
+    <title>Whats for dinner</title>
     <script src="index.js" defer></script>
     <link
       rel="stylesheet"
@@ -32,6 +32,15 @@
       .no-padding { padding: 0; }
       .justify-space-between { justify-content: space-between; }
       .checked { text-decoration: line-through; }
+      body > div {
+        header, main, footer {
+          padding-block: var(--pico-block-spacing-vertical);
+        }
+      }
+
+      .transparent-border { border: 2px solid transparent; }
+      .add-above-border { border-top: 2px solid green; }
+      .add-below-border { border-bottom: 2px solid green; }
       .fab { 
         --pico-border-radius: 50%;
         position: sticky;
@@ -45,7 +54,6 @@
       .groceries-list article {
         margin: 0;
         padding: 0;
-        border: 2px solid transparent;
       }
       .grocery-description {
         flex: 1 0 auto;

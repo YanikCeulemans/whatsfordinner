@@ -7,6 +7,7 @@ package:
     - effect
     - flame
     - formatters
+    - halogen
     - lists
     - prelude
     - routing-duplex

@@ -1,20 +1,22 @@
 module App.Layout where
 
-import App.Route as Route
-import App.Shared as Shared
-import Flame (Html)
-import Flame.Html.Attribute as HA
-import Flame.Html.Element as HE
+import Prelude
 
-main :: forall msg. Html msg -> Html msg
+import App.Shared as Shared
+import Data.Route as Route
+import Halogen.HTML as HH
+import Halogen.HTML.Core as HC
+import Halogen.HTML.Properties as HP
+
+main :: forall w i. HH.HTML w i -> HH.HTML w i
 main view =
-  HE.fragment
-    [ HE.main [ HA.class' "container" ]
+  HH.div_
+    [ HH.main [ HP.class_ $ HC.ClassName "container" ]
         [ view ]
-    , HE.footer [ HA.class' "container" ]
-        [ HE.nav [ HA.class' "flex spaced justify-center" ]
-            [ Shared.link Route.Home [ HE.text "Next days" ]
-            , Shared.link Route.Groceries [ HE.text "Groceries" ]
+    , HH.footer [ HP.class_ $ HC.ClassName "container" ]
+        [ HH.nav [ HP.class_ $ HC.ClassName "flex spaced justify-center" ]
+            [ Shared.link Route.Home [ HH.text "Next days" ]
+            , Shared.link Route.Groceries [ HH.text "Groceries" ]
             ]
         ]
     ]

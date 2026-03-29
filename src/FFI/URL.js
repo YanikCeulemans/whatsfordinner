@@ -2,7 +2,7 @@ export const _mkImpl = (left, right, candidate) => {
   try {
     return right(new URL(candidate))
   } catch(e) {
-    return Left(e.message)
+    return left(e.message)
   }
 }
 export const pathname = url => url.pathname

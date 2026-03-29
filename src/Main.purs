@@ -2,29 +2,77 @@ module Main where
 
 import Prelude
 
-import App.App as App
+import App.Route as Router
+import Data.Array (fold)
+import Data.Maybe (Maybe(..))
+import Data.Route (Route)
+import Data.Route as Route
 import Effect (Effect)
-import Effect.Now as Date
-import Flame as F
-import Flame.Subscription as FS
+import Effect.Aff (Aff, launchAff_)
+import Effect.Class (liftEffect)
+import FFI.Navigation as Navigation
+import Halogen as H
+import Halogen.Aff as HA
+import Halogen.VDom.Driver (runUI)
 import Web.DOM.Document as Doc
-import Web.DOM.ParentNode (QuerySelector(..))
+import Web.Event.Event (Event, EventType(..))
+import Web.Event.EventTarget as ET
 import Web.HTML as HTML
 import Web.HTML.HTMLDocument as HTMLDoc
+import Web.HTML.Location as Location
 import Web.HTML.Window as Window
 
-documentUrlText :: Effect String
-documentUrlText = do
-  doc <- Window.document =<< HTML.window
-  Doc.url $ HTMLDoc.toDocument doc
+pathAndSearch :: Effect String
+pathAndSearch = do
+  location <- HTML.window >>= Window.location
+  pathname <- Location.pathname location
+  search <- Location.search location
+  pure $ fold [ pathname, search ]
+
+-- handleOnNavigate appId evt =
+--   liftEffect $ FFINav.intercept opts navEvt
+--   where
+--   navEvt = FFINav.fromEvent evt
+--   opts =
+--     { handler: do
+--         liftEffect $ FS.send appId $ NavigationOccurred
+--           navEvt.destination.url
+--     }
+--
+-- initializeApp appId = liftEffect do
+--   onNavigate <- ET.eventListener $ handleOnNavigate appId
+--   navigation <- FFINav.toEventTarget <$> FFINav.navigation
+--   ET.addEventListener (EventType "navigate") onNavigate true navigation
+--   pure Nothing
+--
+onNavigate :: (Maybe Route -> Aff Unit) -> Event -> Effect Unit
+onNavigate f event = do
+  Navigation.intercept opts navigationEvent
+  pure unit
+  where
+  navigationEvent = Navigation.fromEvent event
+  opts =
+    { handler: do
+        navigationEvent.destination.url
+          # Route.parse
+          # f
+    }
+
+interceptNavigation :: (Maybe Route -> Aff Unit) -> Aff Unit
+interceptNavigation f = liftEffect do
+  listener <- ET.eventListener $ onNavigate f
+  navigation <- Navigation.toEventTarget <$> Navigation.navigation
+  ET.addEventListener (EventType "navigate") listener true navigation
+  pure unit
 
 main :: Effect Unit
-main = do
-  let
-    appId = F.AppId "whatsfordinner"
-    appMount = QuerySelector "#app"
-  targetDate <- Date.nowDate
-  initUrlText <- documentUrlText
-  F.mount appMount appId $ App.app targetDate initUrlText
-  FS.send appId (App.InitializeRequested appId)
-
+main = launchAff_ $ do
+  body <- HA.awaitBody
+  pas <- liftEffect pathAndSearch
+  halogenIO <- runUI Router.component (Route.parse' pas) body
+  interceptNavigation \route ->
+    case route of
+      Just r ->
+        void $ halogenIO.query $ H.mkTell $ Router.Navigate r
+      Nothing -> pure unit
+  pure unit

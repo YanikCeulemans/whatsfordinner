@@ -1,13 +1,9 @@
-module App.App where
+module App.Next7Days where
 
 import Prelude
 
-{--
 import App.Data as AData
-import App.Groceries as Groceries
 import App.Layout as Layout
-import Data.Route (Route(..))
-import Data.Route as Route
 import Data.Array as Array
 import Data.Date (Date, Weekday(..))
 import Data.Date (adjust, weekday) as Date
@@ -27,51 +23,25 @@ import Domain.MealSchedule as MealSchedule
 import Domain.PlannedMeal (PlannedMeal(..))
 import Domain.Range (Range)
 import Domain.Range as Range
-import Effect (Effect)
-import Effect.Class (class MonadEffect, liftEffect)
+import Effect.Aff.Class (class MonadAff)
 import Effect.Now (nowDate)
-import FFI.Doc as FFIDoc
-import FFI.Navigation as FFINav
-import Flame (Application, Html, Update)
-import Flame (AppId) as F
-import Flame.Application (noMessages) as F
-import Flame.Html.Attribute as HA
-import Flame.Html.Element as HE
-import Flame.Subscription as FS
+import Halogen as H
+import Halogen.HTML as HH
+import Halogen.HTML.Properties as HP
 import Partial.Unsafe (unsafeCrashWith)
-import Web.Event.Event (Event, EventType(..))
-import Web.Event.EventTarget as ET
-import Web.HTML (window)
-import Web.HTML.HTMLDocument.VisibilityState (VisibilityState(..))
-import Web.HTML.Window (document)
 
-type HomeModel =
+type InitializedState =
   { mealSchedule :: MealSchedule
+  , date :: Date
   }
 
-type GroceriesGenerateModel =
-  { startDate :: Maybe Date
-  , endDate :: Maybe Date
-  }
+data State
+  = NotInitialized
+  | Initialized InitializedState
 
-data RouteModel
-  = HomeM HomeModel
-  | GroceriesM Groceries.Model
-  | GroceriesGenerateM GroceriesGenerateModel
+data Action = Initialize
 
-type Model =
-  { route :: RouteModel
-  , targetDate :: Date
-  }
-
-routeToModel :: Model -> Maybe Route -> Model
-routeToModel model = case _ of
-  Just Groceries -> model { route = GroceriesM $ Groceries.init }
-  Just GroceriesGenerate -> model
-    { route = GroceriesGenerateM { startDate: Nothing, endDate: Nothing } }
-  _ -> model
-    { route = HomeM { mealSchedule: AData.mealSchedule } }
-
+{--
 init :: String -> Date -> Model
 init startUrlText targetDate =
   routeToModel initModel $ Route.parse startUrlText
@@ -136,6 +106,7 @@ update model message = case message of
           { route = GroceriesM updatedGroceriesM }
         effs = (map <<< map <<< map) GroceriesMessage groceriesEffs
       _ -> model /\ []
+--}
 
 displayDateTime :: DateTime -> String
 displayDateTime =
@@ -192,11 +163,11 @@ nextDays n date
         | otherwise = Just $
             unsafeAdjustDate (Days $ Int.toNumber $ n - n') date /\ (n' - 1)
 
-viewScheduleEntry :: Date -> Tuple Date PlannedMeal -> Html Message
+viewScheduleEntry :: Date -> Tuple Date PlannedMeal -> HH.PlainHTML
 viewScheduleEntry date (mealDate /\ plannedMeal) =
-  HE.article_
-    [ HE.header_
-        [ HE.text $ fold
+  HH.article_
+    [ HH.header_
+        [ HH.text $ fold
             [ show $ Date.weekday mealDate
             , ": "
             , displayDate mealDate
@@ -204,54 +175,55 @@ viewScheduleEntry date (mealDate /\ plannedMeal) =
             ]
         ]
     , case plannedMeal of
-        NoMealPlanned -> HE.text "No meal planned"
-        PlannedMeal meal -> HE.span [] [ HE.text $ show meal ]
+        NoMealPlanned -> HH.text "No meal planned"
+        PlannedMeal meal -> HH.span [] [ HH.text $ show meal ]
     ]
 
-homeView :: Date -> HomeModel -> Html Message
-homeView targetDate model =
-  let
-    weekDays = nextDays 7 targetDate
-    nextWeekDate = unsafeAdjustDate (Days 7.0) targetDate
-    dateRange = Range.create targetDate nextWeekDate
-    weekMeals =
-      Array.fromFoldable $ MealSchedule.toList
-        dateRange
-        model.mealSchedule
-    zipped = Array.zip weekDays weekMeals
-  in
+component
+  :: forall query input output m. MonadAff m => H.Component query input output m
+component =
+  H.mkComponent
+    { initialState
+    , render: HH.fromPlainHTML <<< render
+    , eval: H.mkEval $ H.defaultEval
+        { initialize = Just Initialize, handleAction = handleAction }
+    }
+
+  where
+  initialState :: input -> State
+  initialState _ = NotInitialized
+
+  handleAction
+    :: forall slots. Action -> H.HalogenM State Action slots output m Unit
+  handleAction = case _ of
+    Initialize -> do
+      now <- H.liftEffect nowDate
+      H.modify_ \_ -> Initialized
+        { date: now, mealSchedule: AData.mealSchedule }
+      pure unit
+
+  render :: State -> HH.PlainHTML
+  render state =
     Layout.main $
-      HE.div [ HA.class' "flex column" ]
-        [ HE.h2_ [ HE.text "Yolo" ]
-        , case zipped of
-            [] -> HE.text ""
-            entries ->
-              HE.div [ HA.class' "flex column spaced" ]
-                $ map (viewScheduleEntry targetDate) entries
-        ]
+      case state of
+        NotInitialized -> HH.p_ [ HH.text "loading" ]
+        Initialized initializedState ->
+          HH.div [ HP.class_ $ H.ClassName "flex column" ]
+            [ HH.h1_ [ HH.text "The next 7 days" ]
+            , case zipped of
+                [] -> HH.text ""
+                entries ->
+                  HH.div [ HP.class_ $ H.ClassName "flex column spaced" ]
+                    $ map (viewScheduleEntry initializedState.date) entries
+            ]
+          where
+          targetDate = initializedState.date
+          weekDays = nextDays 7 targetDate
+          nextWeekDate = unsafeAdjustDate (Days 7.0) targetDate
+          dateRange = Range.create targetDate nextWeekDate
+          weekMeals =
+            Array.fromFoldable $ MealSchedule.toList
+              dateRange
+              initializedState.mealSchedule
+          zipped = Array.zip weekDays weekMeals
 
--- [ HE.h1_ [ HE.text "The next 7 days" ]
--- , case zipped of
---     [] -> HE.text "empty"
---     entries ->
--- -- HE.div [ HA.class' "flex column spaced" ]
--- --   $ map (viewScheduleEntry targetDate) entries
--- ]
-
-view :: Model -> Html Message
-view model = case model.route of
-  HomeM homeM -> homeView model.targetDate homeM
-  GroceriesM groceriesM -> GroceriesMessage <$> Groceries.view groceriesM
-  GroceriesGenerateM _groceriesGenerateM -> Layout.main $ HE.text "TODO"
-
-app :: Date -> String -> Application Model Message
-app startDate documentUrlText =
-  { subscribe:
-      [ FS.onCustomEvent' (EventType "visibilitychange")
-          DocumentVisibilityChanged
-      ]
-  , view
-  , model: init documentUrlText startDate
-  , update
-  }
---}
