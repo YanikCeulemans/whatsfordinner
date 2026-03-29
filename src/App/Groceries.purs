@@ -3,6 +3,7 @@ module App.Groceries where
 import Prelude
 
 import App.Layout as Layout
+import App.Shared as S
 import Data.Array (fold, mapWithIndex)
 import Data.Array as Array
 import Data.Array.NonEmpty (NonEmptyArray)
@@ -48,25 +49,14 @@ type Grocery =
   , checked :: Boolean
   }
 
-newtype DragModel a =
-  -- TODO: remove the newtype and just keep the record, we don't need this specific show instance anyway
-  MkDragModel
-    { dragItem :: a
-    , dragOverItem :: a
-    }
-
-instance Show a => Show (DragModel a) where
-  show (MkDragModel { dragItem, dragOverItem }) =
-    fold [ "dragItem: ", show dragItem, ", dragOverItem: ", show dragOverItem ]
-
-type Model =
-  { groceries :: Array Grocery
-  , dragModel :: Maybe (DragModel GroceryId)
+type DragState a =
+  { dragItem :: a
+  , dragOverItem :: a
   }
 
 type State =
   { groceries :: Array Grocery
-  , dragState :: Maybe (DragModel Int)
+  , dragState :: Maybe (DragState Int)
   }
 
 toggleGrocery :: GroceryId -> State -> State
@@ -81,32 +71,28 @@ toggleGrocery id state =
 startDrag :: Int -> State -> State
 startDrag index state =
   state
-    { dragState = Just $ MkDragModel { dragItem: index, dragOverItem: index } }
+    { dragState = Just { dragItem: index, dragOverItem: index } }
 
 overDrag :: Int -> State -> State
 overDrag index state =
-  state { dragState = updateDragState <$> state.dragState }
-  where
-  updateDragState (MkDragModel dragState) =
-    MkDragModel $
-      _ { dragOverItem = index } dragState
+  state { dragState = _ { dragOverItem = index } <$> state.dragState }
 
 endDrag :: State -> State
 endDrag state =
   state { dragState = Nothing }
 
-updateGroceryAmount :: GroceryId -> Number -> Model -> Model
-updateGroceryAmount id delta model =
-  model { groceries = updateGrocery <$> model.groceries }
+updateGroceryAmount :: GroceryId -> Number -> State -> State
+updateGroceryAmount id delta state =
+  state { groceries = updateGrocery <$> state.groceries }
   where
   updateGrocery grocery
     | grocery.id == id = grocery
         { amount = updateAmount delta grocery.amount }
     | otherwise = grocery
 
-toggleGroceryChecked :: GroceryId -> Model -> Model
-toggleGroceryChecked id model =
-  model { groceries = toggleChecked <$> model.groceries }
+toggleGroceryChecked :: GroceryId -> State -> State
+toggleGroceryChecked id state =
+  state { groceries = toggleChecked <$> state.groceries }
   where
   toggleChecked grocery
     | grocery.id == id = grocery
@@ -153,33 +139,52 @@ data Action
   | OverDrag Int DragEvent
   | EndDrag DragEvent
 
+isPositive :: Int -> Boolean
+isPositive x = x > 0
+
+isNegative :: Int -> Boolean
+isNegative x = x < 0
+
+dragDelta :: forall a. Ring a => DragState a -> a
+dragDelta { dragItem, dragOverItem } = dragItem - dragOverItem
+
 groceryView
   :: forall m
    . MonadAff m
-  => Maybe (DragModel Int)
+  => Maybe (DragState Int)
   -> Int
   -> Grocery
   -> H.ComponentHTML Action () m
 groceryView dragState index grocery =
   let
-    dragOverItem (MkDragModel ds) = ds.dragOverItem
-    isDraggedOver = (dragOverItem <$> dragState) == Just index
+    isDraggedOver =
+      (_.dragOverItem <$> dragState) == Just index
+        && (_.dragItem <$> dragState) /= Just index
+        && not grocery.checked
+    isDragAbove = Maybe.maybe false (dragDelta >>> isPositive) dragState
+    isDragBelow = Maybe.maybe false (dragDelta >>> isNegative) dragState
   in
     HH.li
-      [ HP.classes $ H.ClassName <$> Array.catMaybes
-          [ Just "no-list-style"
-          , if isDraggedOver then Just
-              "add-above-border"
-            else Nothing
+      ( join
+          [ [ HP.class_ $ H.ClassName "no-list-style"
+            , HP.id $ printGroceryId grocery.id
+            ]
+          , case grocery.checked of
+              false ->
+                [ HP.draggable true
+                , HE.onDragStart $ StartDrag index
+                , HE.onDragOver $ OverDrag index
+                -- , HP.onDragleave' DragLeaveOccurred
+                ]
+              true -> []
           ]
-      , HP.draggable true
-      , HE.onDragStart $ StartDrag index
-      , HE.onDragOver $ OverDrag index
-      -- , HP.onDragleave' DragLeaveOccurred
-      , HP.id $ printGroceryId grocery.id
-      ]
+      )
       [ HH.article
-          [ HP.class_ $ H.ClassName "flex spaced items-center"
+          [ S.classes'
+              { "flex spaced items-center transparent-border": true
+              , "add-above-border": isDraggedOver && isDragAbove
+              , "add-below-border": isDraggedOver && isDragBelow
+              }
           ]
           [ HH.label
               [ HP.classes $ H.ClassName <$>
@@ -205,19 +210,19 @@ groceryView dragState index grocery =
 groceriesView
   :: forall m
    . MonadAff m
-  => Maybe (DragModel Int)
+  => Maybe (DragState Int)
   -> NonEmptyArray Grocery
   -> H.ComponentHTML Action () m
-groceriesView dragModel groceries =
+groceriesView dragState groceries =
   HH.div_
     [ HH.ul
         [ HP.class_ $ H.ClassName "no-padding groceries-list"
         , HE.onDragEnd $ EndDrag
         ] $
-        mapWithIndex (groceryView dragModel) unchecked
+        mapWithIndex (groceryView dragState) unchecked
     , HH.h2_ [ HH.text "Done" ]
     , HH.ul [ HP.class_ $ H.ClassName "no-padding groceries-list" ] $
-        mapWithIndex (groceryView dragModel) checked
+        mapWithIndex (groceryView dragState) checked
     , HH.button [ HP.class_ $ H.ClassName "secondary" ]
         [ HH.text "Clear completed" ]
     ]
@@ -243,9 +248,8 @@ component =
     }
 
   handleAction
-    :: forall childSlots output m
-     . MonadAff m
-    => Action
+    :: forall childSlots
+     . Action
     -> H.HalogenM State Action childSlots output m Unit
   handleAction = case _ of
     StartDrag index dragEvent ->
