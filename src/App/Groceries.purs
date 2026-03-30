@@ -6,8 +6,6 @@ import App.Layout as Layout
 import App.Shared as S
 import Data.Array (fold, mapWithIndex, (!!))
 import Data.Array as Array
-import Data.Array.NonEmpty (NonEmptyArray)
-import Data.Array.NonEmpty as NEA
 import Data.Maybe (Maybe(..))
 import Data.Maybe as Maybe
 import Data.Route (Route(..))
@@ -297,8 +295,8 @@ component =
             , HH.button [ HP.class_ $ H.ClassName "secondary" ]
                 [ HH.text "Edit" ]
             ]
-        , case NEA.fromArray $ allGroceries state of
-            Nothing -> HH.text "No groceries have been added yet"
-            Just nea -> groceriesView state
+        , case allGroceries state of
+            [] -> HH.text "No groceries have been added yet"
+            _ -> groceriesView state
         , HH.button [ HP.class_ $ H.ClassName "fab" ] [ HH.text "+" ]
         ]
