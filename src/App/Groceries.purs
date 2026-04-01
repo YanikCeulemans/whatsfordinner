@@ -12,8 +12,10 @@ import Data.Number as Number
 import Data.Route (Route(..))
 import Data.Route as Route
 import Data.Traversable (traverse)
+import Debug as Debug
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class (class MonadEffect)
+import Effect.Class.Console as Console
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -24,23 +26,30 @@ import Web.Event.Event as E
 import Web.HTML.Event.DragEvent (DragEvent)
 import Web.HTML.Event.DragEvent as DragEvent
 import Web.HTML.HTMLInputElement as InputElement
+import Web.UIEvent.InputEvent as InputEvent
 import Web.UIEvent.MouseEvent (MouseEvent)
 import Web.UIEvent.MouseEvent as MouseEvent
 
 class PreventableEvent e where
   preventDefault :: forall m. MonadEffect m => e -> m Unit
 
+instance PreventableEvent Event where
+  preventDefault = H.liftEffect <<< E.preventDefault
+
 instance PreventableEvent MouseEvent where
-  preventDefault = H.liftEffect <<< E.preventDefault <<< MouseEvent.toEvent
+  preventDefault = preventDefault <<< MouseEvent.toEvent
 
 instance PreventableEvent DragEvent where
-  preventDefault = H.liftEffect <<< E.preventDefault <<< DragEvent.toEvent
+  preventDefault = preventDefault <<< DragEvent.toEvent
 
 eventTargetInputValue :: forall m. MonadEffect m => Event -> m (Maybe String)
 eventTargetInputValue event =
   E.target event >>= InputElement.fromEventTarget
     # traverse InputElement.value
     # H.liftEffect
+
+eventInputData :: Event -> Maybe String
+eventInputData event = InputEvent.fromEvent event >>= InputEvent.data_
 
 newtype Amount = MkAmount
   { value :: Number
@@ -54,6 +63,10 @@ instance Show Amount where
 updateAmount :: Number -> Amount -> Amount
 updateAmount delta (MkAmount amount@{ value }) = MkAmount $ amount
   { value = max 1.0 $ value + delta }
+
+setAmount :: Number -> Amount -> Amount
+setAmount amountVal (MkAmount amount) = MkAmount $ amount
+  { value = Debug.spy "setAmount" $ max 1.0 amountVal }
 
 amountValue :: Amount -> Number
 amountValue (MkAmount { value }) = value
@@ -120,15 +133,6 @@ endDrag state = Maybe.fromMaybe withoutDragState do
   pure $ withoutDragState { unchecked = updatedGroceries' }
   where
   withoutDragState = state { dragState = Nothing }
-
-updateGroceryAmount :: GroceryId -> Number -> State -> State
-updateGroceryAmount id delta state =
-  state { unchecked = updateGrocery <$> state.unchecked }
-  where
-  updateGrocery grocery
-    | grocery.id == id = grocery
-        { amount = updateAmount delta grocery.amount }
-    | otherwise = grocery
 
 toggleGrocery :: GroceryId -> State -> State
 toggleGrocery id state =
@@ -305,13 +309,16 @@ groceryAddView groceryAddCandidate =
                 [ HP.type_ InputNumber
                 , HE.onInput UpdateGroceryAddCandidateAmountValue
                 , HP.value $ show $ amountValue groceryAddCandidate.amount
+                , HP.min 1.0
                 ]
             ]
         , HH.label_
             [ HH.text "Unit"
             , HH.input
                 [ HE.onInput UpdateGroceryAddCandidateAmountUnit
-                , HP.value $ show $ amountUnit groceryAddCandidate.amount
+                -- , HP.value $ show $ amountUnit groceryAddCandidate.amount
+                , HP.value $ Maybe.fromMaybe "" $ amountUnit
+                    groceryAddCandidate.amount
                 ]
             ]
         , HH.input [ HP.type_ InputButton, HP.value "Add" ]
@@ -386,21 +393,22 @@ component =
       updateDescription value = _ { description = value }
 
     UpdateGroceryAddCandidateAmountValue event -> do
-      value <- eventTargetInputValue event
-      case Number.fromString =<< value of
+      preventDefault $ Debug.spy "evt" event
+      case Number.fromString =<< eventInputData event of
         Nothing -> pure unit
-        Just numberValue ->
+        Just numberValue -> do
+          Console.logShow { numberValue }
           H.modify_ \s -> s
             { groceryAddCandidate = updateAmountValue numberValue <$>
                 s.groceryAddCandidate
             }
 
+          Console.logShow =<< H.gets _.groceryAddCandidate
+
       where
-      updateAmountValue value x = x
-        { amount = updateAmount value x.amount }
+      updateAmountValue value x = x { amount = setAmount value x.amount }
 
     UpdateGroceryAddCandidateAmountUnit event -> do
-      -- TODO: continue here
       pure unit
 
   render :: State -> H.ComponentHTML Action () m
