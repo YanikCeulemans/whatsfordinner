@@ -8,8 +8,10 @@ import Data.Array (fold, mapWithIndex, (!!))
 import Data.Array as Array
 import Data.Maybe (Maybe(..))
 import Data.Maybe as Maybe
+import Data.Number as Number
 import Data.Route (Route(..))
 import Data.Route as Route
+import Data.Traversable (traverse)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class (class MonadEffect)
 import Halogen as H
@@ -34,6 +36,12 @@ instance PreventableEvent MouseEvent where
 instance PreventableEvent DragEvent where
   preventDefault = H.liftEffect <<< E.preventDefault <<< DragEvent.toEvent
 
+eventTargetInputValue :: forall m. MonadEffect m => Event -> m (Maybe String)
+eventTargetInputValue event =
+  E.target event >>= InputElement.fromEventTarget
+    # traverse InputElement.value
+    # H.liftEffect
+
 newtype Amount = MkAmount
   { value :: Number
   , unit :: Maybe String
@@ -46,6 +54,12 @@ instance Show Amount where
 updateAmount :: Number -> Amount -> Amount
 updateAmount delta (MkAmount amount@{ value }) = MkAmount $ amount
   { value = max 1.0 $ value + delta }
+
+amountValue :: Amount -> Number
+amountValue (MkAmount { value }) = value
+
+amountUnit :: Amount -> Maybe String
+amountUnit (MkAmount { unit }) = unit
 
 newtype GroceryId = MkGroceryId Int
 
@@ -175,6 +189,8 @@ data Action
   | ShowAddGrocery
   | CancelAddGrocery MouseEvent
   | UpdateGroceryAddCandidateDescription Event
+  | UpdateGroceryAddCandidateAmountValue Event
+  | UpdateGroceryAddCandidateAmountUnit Event
 
 isPositive :: Int -> Boolean
 isPositive x = x > 0
@@ -269,6 +285,44 @@ groceriesView state =
             [ HH.text "Clear completed" ]
     ]
 
+groceryAddView
+  :: forall m. MonadAff m => GroceryAddCandidate -> H.ComponentHTML Action () m
+groceryAddView groceryAddCandidate =
+  HH.div [ HP.class_ $ H.ClassName "flex column" ]
+    [ HH.h1_ [ HH.text "Add grocery" ]
+    , HH.code_ [ HH.text $ groceryAddCandidate.description ]
+    , HH.form []
+        [ HH.label_
+            [ HH.text "description"
+            , HH.input
+                [ HE.onInput UpdateGroceryAddCandidateDescription
+                , HP.value $ groceryAddCandidate.description
+                ]
+            ]
+        , HH.label_
+            [ HH.text "Amount"
+            , HH.input
+                [ HP.type_ InputNumber
+                , HE.onInput UpdateGroceryAddCandidateAmountValue
+                , HP.value $ show $ amountValue groceryAddCandidate.amount
+                ]
+            ]
+        , HH.label_
+            [ HH.text "Unit"
+            , HH.input
+                [ HE.onInput UpdateGroceryAddCandidateAmountUnit
+                , HP.value $ show $ amountUnit groceryAddCandidate.amount
+                ]
+            ]
+        , HH.input [ HP.type_ InputButton, HP.value "Add" ]
+        , HH.button
+            [ HP.class_ $ H.ClassName "secondary"
+            , HE.onClick $ CancelAddGrocery
+            ]
+            [ HH.text "Cancel" ]
+        ]
+    ]
+
 component
   :: forall query input output m. MonadAff m => H.Component query input output m
 component =
@@ -321,11 +375,8 @@ component =
       H.modify_ _ { groceryAddCandidate = Nothing }
 
     UpdateGroceryAddCandidateDescription event -> do
-      value <- H.liftEffect $ Maybe.fromMaybe (pure "") $
-        InputElement.value <$> (InputElement.fromEventTarget =<< E.target event)
-      -- ( (E.target event >>= InputElement.fromEventTarget) <#>
-      --     ?InputElement.value
-      -- )
+      value <- Maybe.fromMaybe "" <$> eventTargetInputValue event
+
       H.modify_ \s -> s
         { groceryAddCandidate = updateDescription value <$>
             s.groceryAddCandidate
@@ -334,12 +385,30 @@ component =
       where
       updateDescription value = _ { description = value }
 
+    UpdateGroceryAddCandidateAmountValue event -> do
+      value <- eventTargetInputValue event
+      case Number.fromString =<< value of
+        Nothing -> pure unit
+        Just numberValue ->
+          H.modify_ \s -> s
+            { groceryAddCandidate = updateAmountValue numberValue <$>
+                s.groceryAddCandidate
+            }
+
+      where
+      updateAmountValue value x = x
+        { amount = updateAmount value x.amount }
+
+    UpdateGroceryAddCandidateAmountUnit event -> do
+      -- TODO: continue here
+      pure unit
+
   render :: State -> H.ComponentHTML Action () m
   render state =
     Layout.main $
-      HH.div [ HP.class_ $ H.ClassName "flex column" ]
-        case state.groceryAddCandidate of
-          Nothing ->
+      case state.groceryAddCandidate of
+        Nothing ->
+          HH.div [ HP.class_ $ H.ClassName "flex column" ]
             [ HH.h1_ [ HH.text "Groceries" ]
             , HH.div [ HP.class_ $ H.ClassName "flex justify-space-between" ]
                 [ HH.a [ HP.href $ Route.print $ GroceriesGenerate ]
@@ -356,22 +425,4 @@ component =
                 ]
                 [ HH.text "+" ]
             ]
-          Just groceryAddCandidate ->
-            [ HH.h1_ [ HH.text "Add grocery" ]
-            , HH.code_ [ HH.text $ groceryAddCandidate.description ]
-            , HH.form []
-                [ HH.label_
-                    [ HH.text "description"
-                    , HH.input
-                        [ HE.onInput UpdateGroceryAddCandidateDescription
-                        , HP.value $ groceryAddCandidate.description
-                        ]
-                    ]
-                , HH.input [ HP.type_ InputButton, HP.value "Add" ]
-                , HH.button
-                    [ HP.class_ $ H.ClassName "secondary"
-                    , HE.onClick $ CancelAddGrocery
-                    ]
-                    [ HH.text "Cancel" ]
-                ]
-            ]
+        Just groceryAddCandidate -> groceryAddView groceryAddCandidate
