@@ -16,6 +16,7 @@ data Route
   = Home
   | Groceries
   | GroceriesGenerate
+  | AddGrocery
 
 derive instance Generic Route _
 derive instance Eq Route
@@ -25,6 +26,7 @@ route = root $ sum
   { "Home": noArgs
   , "Groceries": "groceries" / noArgs
   , "GroceriesGenerate": "groceries" / "generate" / noArgs
+  , "AddGrocery": "groceries" / "add" / noArgs
   }
 
 parseRouteFromPathAndQuery :: String -> Maybe Route

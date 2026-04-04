@@ -42,12 +42,6 @@ instance PreventableEvent MouseEvent where
 instance PreventableEvent DragEvent where
   preventDefault = preventDefault <<< DragEvent.toEvent
 
-eventTargetInputValue :: forall m. MonadEffect m => Event -> m (Maybe String)
-eventTargetInputValue event =
-  E.target event >>= InputElement.fromEventTarget
-    # traverse InputElement.value
-    # H.liftEffect
-
 eventInputData :: Event -> Maybe String
 eventInputData event = InputEvent.fromEvent event >>= InputEvent.data_
 
@@ -386,7 +380,7 @@ component =
       H.modify_ _ { groceryAddCandidate = Nothing }
 
     UpdateGroceryAddCandidateDescription event -> do
-      value <- Maybe.fromMaybe "" <$> eventTargetInputValue event
+      value <- Maybe.fromMaybe "" <$> S.eventTargetInputValue event
 
       H.modify_ \s -> s
         { groceryAddCandidate = updateDescription value <$>
@@ -397,7 +391,7 @@ component =
       updateDescription value = _ { description = value }
 
     UpdateGroceryAddCandidateAmountValue event -> do
-      value <- eventTargetInputValue event
+      value <- S.eventTargetInputValue event
       case value of
         Nothing -> pure unit
         Just v -> do
@@ -428,10 +422,5 @@ component =
             , case allGroceries state of
                 [] -> HH.text "No groceries have been added yet"
                 _ -> groceriesView state
-            , HH.button
-                [ HP.class_ $ H.ClassName "fab"
-                , HE.onClick $ const ShowAddGrocery
-                ]
-                [ HH.text "+" ]
             ]
         Just groceryAddCandidate -> groceryAddView groceryAddCandidate
