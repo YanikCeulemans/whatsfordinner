@@ -66,13 +66,18 @@ updateAmount delta (MkAmount amount@{ value }) = MkAmount $ amount
 
 setAmount :: Number -> Amount -> Amount
 setAmount amountVal (MkAmount amount) = MkAmount $ amount
-  { value = Debug.spy "setAmount" $ max 1.0 amountVal }
+  { value = max 1.0 amountVal }
 
 amountValue :: Amount -> Number
 amountValue (MkAmount { value }) = value
 
 amountUnit :: Amount -> Maybe String
 amountUnit (MkAmount { unit }) = unit
+
+type AmountCandidate =
+  { value :: String
+  , unit :: String
+  }
 
 newtype GroceryId = MkGroceryId Int
 
@@ -98,7 +103,7 @@ type DragState a =
 
 type GroceryAddCandidate =
   { description :: String
-  , amount :: Amount
+  , amount :: AmountCandidate
   }
 
 type State =
@@ -308,7 +313,7 @@ groceryAddView groceryAddCandidate =
             , HH.input
                 [ HP.type_ InputNumber
                 , HE.onInput UpdateGroceryAddCandidateAmountValue
-                , HP.value $ show $ amountValue groceryAddCandidate.amount
+                , HP.value $ groceryAddCandidate.amount.value
                 , HP.min 1.0
                 ]
             ]
@@ -317,8 +322,7 @@ groceryAddView groceryAddCandidate =
             , HH.input
                 [ HE.onInput UpdateGroceryAddCandidateAmountUnit
                 -- , HP.value $ show $ amountUnit groceryAddCandidate.amount
-                , HP.value $ Maybe.fromMaybe "" $ amountUnit
-                    groceryAddCandidate.amount
+                , HP.value groceryAddCandidate.amount.unit
                 ]
             ]
         , HH.input [ HP.type_ InputButton, HP.value "Add" ]
@@ -375,7 +379,7 @@ component =
     ShowAddGrocery ->
       H.modify_ _
         { groceryAddCandidate = Just
-            { description: "", amount: MkAmount { value: 1.0, unit: Nothing } }
+            { description: "", amount: { value: "1", unit: "" } }
         }
     CancelAddGrocery mouseEvent -> do
       preventDefault mouseEvent
@@ -393,20 +397,17 @@ component =
       updateDescription value = _ { description = value }
 
     UpdateGroceryAddCandidateAmountValue event -> do
-      preventDefault $ Debug.spy "evt" event
-      case Number.fromString =<< eventInputData event of
+      value <- eventTargetInputValue event
+      case value of
         Nothing -> pure unit
-        Just numberValue -> do
-          Console.logShow { numberValue }
+        Just v -> do
           H.modify_ \s -> s
-            { groceryAddCandidate = updateAmountValue numberValue <$>
+            { groceryAddCandidate = updateAmountValue v <$>
                 s.groceryAddCandidate
             }
 
-          Console.logShow =<< H.gets _.groceryAddCandidate
-
       where
-      updateAmountValue value x = x { amount = setAmount value x.amount }
+      updateAmountValue value x = x { amount = x.amount { value = value } }
 
     UpdateGroceryAddCandidateAmountUnit event -> do
       pure unit
