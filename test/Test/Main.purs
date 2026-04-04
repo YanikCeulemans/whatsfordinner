@@ -4,6 +4,7 @@ import Prelude
 
 import Data.Date as Date
 import Data.Date.Component (Month(..))
+import Data.Either (Either(..))
 import Data.Enum (toEnum)
 import Data.Foldable (class Foldable)
 import Data.List (List(..), (:))
@@ -11,6 +12,7 @@ import Data.List as List
 import Data.Maybe (Maybe(..))
 import Data.Maybe as Maybe
 import Data.Time.Duration (Days(..))
+import Data.ULID as DULID
 import Domain.Meal (Meal(..))
 import Domain.MealSchedule (Id(..), MealSchedule)
 import Domain.MealSchedule as MealSchedule
@@ -20,6 +22,7 @@ import Domain.RingList (RingList)
 import Domain.RingList as RingList
 import Effect (Effect)
 import Partial.Unsafe (unsafeCrashWith)
+import Simple.ULID as ULID
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (shouldEqual)
 import Test.Spec.Reporter (consoleReporter)
@@ -161,11 +164,22 @@ rangeSpec =
           sut = Range.create 1 3
         Range.toArray (_ + 1) sut `shouldEqual` [ 1, 2, 3 ]
 
+ulidSpec :: Spec Unit
+ulidSpec =
+  describe "ULID" do
+    describe "parse" do
+      it "should work" do
+        let
+          ulid = "01BX5ZZKBKACTAV9WEVGEMMVRY"
+          actual = DULID.parse ulid
+        (actual <#> ULID.toString) `shouldEqual` Right ulid
+
 spec :: Spec Unit
 spec = do
   ringListSpec
   mealScheduleSpec
   rangeSpec
+  ulidSpec
 
 main :: Effect Unit
 main = runSpecAndExitProcess [ consoleReporter ] spec

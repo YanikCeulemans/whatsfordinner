@@ -11,6 +11,7 @@ package:
     - lists
     - prelude
     - routing-duplex
+    - simple-ulid
     - spec
     - spec-node
     - web-html

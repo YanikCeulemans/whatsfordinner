@@ -16,6 +16,7 @@ import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties (InputType(..))
 import Halogen.HTML.Properties as HP
+import Simple.ULID (ULID)
 import Web.Event.Event (Event)
 
 data FormField
@@ -65,8 +66,11 @@ parseAmountValue candidate =
 parseAmountUnit :: String -> FormField
 parseAmountUnit = String.trim >>> Valid
 
+type Input = ULID
+
 type State =
-  { form :: FormState
+  { id :: ULID
+  , form :: FormState
   }
 
 updateForm :: (FormState -> FormState) -> State -> State
@@ -78,7 +82,7 @@ data Action
   | SetAmountUnitFormFieldState Event
 
 component
-  :: forall query input output m. MonadAff m => H.Component query input output m
+  :: forall query output m. MonadAff m => H.Component query Input output m
 component =
   H.mkComponent
     { initialState
@@ -87,8 +91,9 @@ component =
     }
 
   where
-  initialState _ =
-    { form:
+  initialState id =
+    { id
+    , form:
         { description: Pristine
         , amountValue: Pristine
         , amountUnit: Pristine

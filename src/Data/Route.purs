@@ -6,27 +6,33 @@ import Data.Array (fold)
 import Data.Either as Either
 import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe)
+import Data.ULID as DULID
 import FFI.URL as URL
-import Routing.Duplex (RouteDuplex', root)
+import Routing.Duplex (RouteDuplex', as, root, segment)
 import Routing.Duplex as D
 import Routing.Duplex.Generic (noArgs, sum)
 import Routing.Duplex.Generic.Syntax ((/))
+import Simple.ULID (ULID)
+import Simple.ULID as ULID
 
 data Route
   = Home
   | Groceries
   | GroceriesGenerate
-  | AddGrocery
+  | AddGrocery ULID
 
 derive instance Generic Route _
 derive instance Eq Route
+
+ulid :: RouteDuplex' String -> RouteDuplex' ULID
+ulid = as ULID.toString DULID.parse
 
 route :: RouteDuplex' Route
 route = root $ sum
   { "Home": noArgs
   , "Groceries": "groceries" / noArgs
   , "GroceriesGenerate": "groceries" / "generate" / noArgs
-  , "AddGrocery": "groceries" / "add" / noArgs
+  , "AddGrocery": "groceries" / "add" / ulid segment
   }
 
 parseRouteFromPathAndQuery :: String -> Maybe Route

@@ -18,7 +18,6 @@ main view =
             [ HP.class_ $ HC.ClassName "flex spaced justify-center container" ]
             [ Shared.link Route.Home [ HH.text "Next days" ]
             , Shared.link Route.Groceries [ HH.text "Groceries" ]
-            , Shared.link Route.AddGrocery [ HH.text "Add Grocery" ]
             ]
         ]
     ]

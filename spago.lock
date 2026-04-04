@@ -15,6 +15,7 @@
             "lists",
             "prelude",
             "routing-duplex",
+            "simple-ulid",
             "spec",
             "spec-node",
             "web-html"
@@ -1768,6 +1769,24 @@
       "version": "2.0.0",
       "integrity": "sha256-EJrxtKt5xC7TYjBZrSBO/J7Aw3DmtilYjt4olpAXWVc=",
       "dependencies": [
+        "unsafe-coerce"
+      ]
+    },
+    "simple-ulid": {
+      "type": "registry",
+      "version": "3.0.0",
+      "integrity": "sha256-8hmrfL8aNeS43iHK1dIv0vrUNvS+EWT24mbUcaD9xxo=",
+      "dependencies": [
+        "arrays",
+        "datetime",
+        "effect",
+        "exceptions",
+        "integers",
+        "now",
+        "numbers",
+        "prelude",
+        "strings",
+        "tailrec",
         "unsafe-coerce"
       ]
     },
