@@ -8,24 +8,22 @@ import Data.Array (fold, mapWithIndex, (!!))
 import Data.Array as Array
 import Data.Maybe (Maybe(..))
 import Data.Maybe as Maybe
-import Data.Number as Number
 import Data.Route (Route(..))
 import Data.Route as Route
-import Data.Traversable (traverse)
-import Debug as Debug
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class (class MonadEffect)
-import Effect.Class.Console as Console
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties (InputType(..))
 import Halogen.HTML.Properties as HP
+import Simple.ULID (ULID)
+import Simple.ULID as ULID
+import Simple.ULID.Window as ULIDW
 import Web.Event.Event (Event)
 import Web.Event.Event as E
 import Web.HTML.Event.DragEvent (DragEvent)
 import Web.HTML.Event.DragEvent as DragEvent
-import Web.HTML.HTMLInputElement as InputElement
 import Web.UIEvent.InputEvent as InputEvent
 import Web.UIEvent.MouseEvent (MouseEvent)
 import Web.UIEvent.MouseEvent as MouseEvent
@@ -105,6 +103,7 @@ type State =
   , checked :: Array Grocery
   , dragState :: Maybe (DragState Int)
   , groceryAddCandidate :: Maybe GroceryAddCandidate
+  , nextId :: Maybe ULID
   }
 
 allGroceries :: State -> Array Grocery
@@ -184,7 +183,8 @@ dummyGroceries =
   ]
 
 data Action
-  = ToggleGrocery GroceryId MouseEvent
+  = Initialize
+  | ToggleGrocery GroceryId MouseEvent
   | StartDrag Int DragEvent
   | OverDrag Int DragEvent
   | EndDrag DragEvent
@@ -328,6 +328,10 @@ groceryAddView groceryAddCandidate =
         ]
     ]
 
+addGroceryLinkView :: forall w i. ULID -> HH.HTML w i
+addGroceryLinkView id =
+  S.link (Route.AddGrocery id) [ HH.text "Add" ]
+
 component
   :: forall query input output m. MonadAff m => H.Component query input output m
 component =
@@ -336,6 +340,7 @@ component =
     , render
     , eval: H.mkEval $ H.defaultEval
         { handleAction = handleAction
+        , initialize = Just Initialize
         }
     }
 
@@ -346,6 +351,7 @@ component =
     , checked: Array.filter _.checked dummyGroceries
     , dragState: Nothing
     , groceryAddCandidate: Nothing
+    , nextId: Nothing
     }
 
   handleAction
@@ -353,6 +359,10 @@ component =
      . Action
     -> H.HalogenM State Action childSlots output m Unit
   handleAction = case _ of
+    Initialize -> do
+      id <- H.liftEffect $ ULID.genULID ULIDW.prng
+      H.modify_ _ { nextId = Just id }
+
     StartDrag index _dragEvent ->
       H.modify_ $ startDrag index
 
@@ -412,7 +422,10 @@ component =
       case state.groceryAddCandidate of
         Nothing ->
           HH.div [ HP.class_ $ H.ClassName "flex column" ]
-            [ HH.h1_ [ HH.text "Groceries" ]
+            [ HH.div [ HP.class_ $ H.ClassName "flex justify-space-between" ]
+                [ HH.h1_ [ HH.text "Groceries" ]
+                , Maybe.maybe (HH.text "") addGroceryLinkView state.nextId
+                ]
             , HH.div [ HP.class_ $ H.ClassName "flex justify-space-between" ]
                 [ HH.a [ HP.href $ Route.print $ GroceriesGenerate ]
                     [ HH.text "Generate" ]
