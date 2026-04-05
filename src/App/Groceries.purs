@@ -3,13 +3,21 @@ module App.Groceries where
 import Prelude
 
 import App.Layout as Layout
+import App.Shared (preventDefault)
 import App.Shared as S
 import Data.Array (fold, mapWithIndex, (!!))
 import Data.Array as Array
+import Data.Either as Either
 import Data.Maybe (Maybe(..))
 import Data.Maybe as Maybe
 import Data.Route (Route(..))
 import Data.Route as Route
+import Data.ULID as DULID
+import Domain.Amount (Amount)
+import Domain.Amount as Amount
+import Domain.Grocery (Grocery)
+import Domain.GroceryId (GroceryId(..))
+import Domain.GroceryId as GroceryId
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class (class MonadEffect)
 import Halogen as H
@@ -17,6 +25,7 @@ import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties (InputType(..))
 import Halogen.HTML.Properties as HP
+import Partial.Unsafe (unsafeCrashWith)
 import Simple.ULID (ULID)
 import Simple.ULID as ULID
 import Simple.ULID.Window as ULIDW
@@ -28,64 +37,12 @@ import Web.UIEvent.InputEvent as InputEvent
 import Web.UIEvent.MouseEvent (MouseEvent)
 import Web.UIEvent.MouseEvent as MouseEvent
 
-class PreventableEvent e where
-  preventDefault :: forall m. MonadEffect m => e -> m Unit
-
-instance PreventableEvent Event where
-  preventDefault = H.liftEffect <<< E.preventDefault
-
-instance PreventableEvent MouseEvent where
-  preventDefault = preventDefault <<< MouseEvent.toEvent
-
-instance PreventableEvent DragEvent where
-  preventDefault = preventDefault <<< DragEvent.toEvent
-
 eventInputData :: Event -> Maybe String
 eventInputData event = InputEvent.fromEvent event >>= InputEvent.data_
-
-newtype Amount = MkAmount
-  { value :: Number
-  , unit :: Maybe String
-  }
-
-instance Show Amount where
-  show (MkAmount amount) = fold
-    [ show amount.value, Maybe.fromMaybe "" amount.unit ]
-
-updateAmount :: Number -> Amount -> Amount
-updateAmount delta (MkAmount amount@{ value }) = MkAmount $ amount
-  { value = max 1.0 $ value + delta }
-
-setAmount :: Number -> Amount -> Amount
-setAmount amountVal (MkAmount amount) = MkAmount $ amount
-  { value = max 1.0 amountVal }
-
-amountValue :: Amount -> Number
-amountValue (MkAmount { value }) = value
-
-amountUnit :: Amount -> Maybe String
-amountUnit (MkAmount { unit }) = unit
 
 type AmountCandidate =
   { value :: String
   , unit :: String
-  }
-
-newtype GroceryId = MkGroceryId Int
-
-derive instance Eq GroceryId
-
-instance Show GroceryId where
-  show (MkGroceryId id) = show id
-
-printGroceryId :: GroceryId -> String
-printGroceryId (MkGroceryId id) = show id
-
-type Grocery =
-  { id :: GroceryId
-  , description :: String
-  , amount :: Amount
-  , checked :: Boolean
   }
 
 type DragState a =
@@ -148,36 +105,41 @@ toggleGrocery id state =
 clearCompleted :: State -> State
 clearCompleted state = state { checked = [] }
 
+parseULID :: String -> ULID
+parseULID = DULID.parse >>> Either.either crash identity
+  where
+  crash e = unsafeCrashWith $ "invalid hardcoded ULID: " <> e
+
 dummyGroceries :: Array Grocery
 dummyGroceries =
-  [ { id: MkGroceryId 1
+  [ { id: MkGroceryId $ parseULID "01KNEQ7KMSBM0Q4XP56C6YP3NG"
     , description: "Onion"
-    , amount: MkAmount { value: 3.0, unit: Nothing }
+    , amount: Amount.unitless 3.0
     , checked: false
     }
-  , { id: MkGroceryId 2
+  , { id: MkGroceryId $ parseULID "01KNEQ7KMTPNHDW1X8N4P9G7WV"
     , description: "Carrots"
-    , amount: MkAmount { value: 1.0, unit: Just "kg" }
+    , amount: Amount.create 1.0 "kg"
     , checked: true
     }
-  , { id: MkGroceryId 3
+  , { id: MkGroceryId $ parseULID "01KNEQ7KMTCC0KREZGB172ASD0"
     , description: "Mushrooms"
-    , amount: MkAmount { value: 250.0, unit: Just "g" }
+    , amount: Amount.create 250.0 "g"
     , checked: false
     }
-  , { id: MkGroceryId 4
+  , { id: MkGroceryId $ parseULID "01KNEQ7KMTP534FYCKA4ZCBEFS"
     , description: "Bell peppers"
-    , amount: MkAmount { value: 2.0, unit: Nothing }
+    , amount: Amount.unitless 2.0
     , checked: false
     }
-  , { id: MkGroceryId 5
+  , { id: MkGroceryId $ parseULID "01KNEQ7KMTG18271MG7NEEBV05"
     , description: "Zucchini"
-    , amount: MkAmount { value: 1.0, unit: Nothing }
+    , amount: Amount.unitless 1.0
     , checked: false
     }
-  , { id: MkGroceryId 6
+  , { id: MkGroceryId $ parseULID "01KNEQ7KMT0XDE57C3HJPE6GVQ"
     , description: "Potatoes"
-    , amount: MkAmount { value: 2.0, unit: Just "kg" }
+    , amount: Amount.create 2.0 "kg"
     , checked: false
     }
   ]
@@ -204,6 +166,12 @@ isNegative x = x < 0
 dragDelta :: forall a. Ring a => DragState a -> a
 dragDelta { dragItem, dragOverItem } = dragItem - dragOverItem
 
+printAmount :: Amount -> String
+printAmount amount =
+  [ Just $ show $ Amount.value amount, Amount.unit amount ]
+    # Array.catMaybes
+    # Array.intercalate " "
+
 groceryView
   :: forall m
    . MonadAff m
@@ -223,7 +191,7 @@ groceryView dragState index grocery =
     HH.li
       ( join
           [ [ HP.class_ $ H.ClassName "no-list-style"
-            , HP.id $ printGroceryId grocery.id
+            , HP.id $ GroceryId.print grocery.id
             , HE.onClick $ ToggleGrocery grocery.id
             ]
           , case grocery.checked of
@@ -249,16 +217,16 @@ groceryView dragState index grocery =
                       , if grocery.checked then Just "checked" else Nothing
                       ]
                   )
-              , HP.for $ printGroceryId grocery.id
+              , HP.for $ GroceryId.print grocery.id
               ]
               [ HH.input
                   [ HP.type_ HP.InputCheckbox
-                  , HP.id $ printGroceryId grocery.id
+                  , HP.id $ GroceryId.print grocery.id
                   , HP.checked grocery.checked
                   -- , HP.onClick' $ CheckboxClicked grocery.id
                   ]
               , HH.text $ fold
-                  [ grocery.description, " (", show grocery.amount, ")" ]
+                  [ grocery.description, " (", printAmount grocery.amount, ")" ]
               ]
           ]
       ]

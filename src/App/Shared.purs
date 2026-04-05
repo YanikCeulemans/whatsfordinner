@@ -16,8 +16,13 @@ import Halogen.HTML as HH
 import Halogen.HTML.Properties as HP
 import Type.Row.Homogeneous (class Homogeneous)
 import Web.Event.Event (Event)
+import Web.Event.Event as E
 import Web.Event.Event as Event
+import Web.HTML.Event.DragEvent (DragEvent)
+import Web.HTML.Event.DragEvent as DragEvent
 import Web.HTML.HTMLInputElement as InputElement
+import Web.UIEvent.MouseEvent (MouseEvent)
+import Web.UIEvent.MouseEvent as MouseEvent
 
 link :: forall w i. Route -> Array (HH.HTML w i) -> HH.HTML w i
 link route content = HH.a [ HP.href $ Route.print route ] content
@@ -55,4 +60,16 @@ eventTargetInputValueOrEmpty event =
     # traverse InputElement.value
     <#> Maybe.fromMaybe ""
     # H.liftEffect
+
+class PreventableEvent e where
+  preventDefault :: forall m. MonadEffect m => e -> m Unit
+
+instance PreventableEvent Event where
+  preventDefault = H.liftEffect <<< E.preventDefault
+
+instance PreventableEvent MouseEvent where
+  preventDefault = preventDefault <<< MouseEvent.toEvent
+
+instance PreventableEvent DragEvent where
+  preventDefault = preventDefault <<< DragEvent.toEvent
 

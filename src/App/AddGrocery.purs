@@ -3,14 +3,19 @@ module App.AddGrocery where
 import Prelude
 
 import App.Layout as Layout
+import App.Shared (preventDefault)
 import App.Shared as S
+import Data.Array (fold)
+import Data.Array as Array
 import Data.Maybe (Maybe(..))
 import Data.Maybe as Maybe
+import Data.Monoid.Conj (Conj(..))
 import Data.Number as Number
 import Data.Route as Route
 import Data.String as String
 import Data.String.NonEmpty as NES
 import Debug as Debug
+import Domain.Grocery (Grocery)
 import Effect.Aff.Class (class MonadAff)
 import Halogen as H
 import Halogen.HTML as HH
@@ -32,6 +37,11 @@ fieldValue = case _ of
   Pristine -> ""
   Invalid v -> v
   Valid v -> v
+
+isFieldValid :: FormField -> Boolean
+isFieldValid = case _ of
+  Valid _ -> true
+  _ -> false
 
 ariaValid :: forall r i. FormField -> Array (HP.IProp r i)
 ariaValid = case _ of
@@ -69,6 +79,11 @@ parseAmountValue candidate =
 parseAmountUnit :: String -> FormField
 parseAmountUnit = String.trim >>> Valid
 
+isFormStateValid :: FormState -> Boolean
+isFormStateValid { description, amountValue, amountUnit } =
+  [ description, amountValue, amountUnit ]
+    # Array.all isFieldValid
+
 type State =
   { id :: Maybe ULID
   , form :: FormState
@@ -77,11 +92,28 @@ type State =
 updateForm :: (FormState -> FormState) -> State -> State
 updateForm f state = state { form = f state.form }
 
+validateForm :: State -> State
+validateForm state =
+  state { form = validatedForm }
+  where
+  touchField = case _ of
+    Pristine -> Invalid ""
+    other -> other
+  validatedForm =
+    { description: touchField state.form.description
+    , amountValue: touchField state.form.amountValue
+    , amountUnit: touchField state.form.amountUnit
+    }
+
+buildGrocery :: State -> Maybe Grocery
+buildGrocery state = Nothing
+
 data Action
   = Initialize
   | SetDescriptionFormFieldState Event
   | SetAmountValueFormFieldState Event
   | SetAmountUnitFormFieldState Event
+  | SubmitForm Event
 
 component
   :: forall query input output m. MonadAff m => H.Component query input output m
@@ -121,6 +153,11 @@ component =
       value <- S.eventTargetInputValueOrEmpty event
       H.modify_ $ updateForm _ { amountUnit = parseAmountUnit value }
 
+    SubmitForm event -> do
+      preventDefault event
+      groceryCandidate <- buildGrocery <$> H.modify validateForm
+      pure unit
+
   render :: State -> H.ComponentHTML Action () m
   render s@{ form } =
     let
@@ -132,7 +169,7 @@ component =
               [ HH.h1_ [ HH.text "Add grocery" ]
               , S.link Route.Groceries [ HH.text "Cancel" ]
               ]
-          , HH.form []
+          , HH.form [ HE.onSubmit SubmitForm ]
               [ HH.label_
                   [ HH.text "description"
                   , HH.input
@@ -171,6 +208,6 @@ component =
                           ]
                       )
                   ]
-              , HH.input [ HP.type_ InputButton, HP.value "Add" ]
+              , HH.input [ HP.type_ InputSubmit, HP.value "Add" ]
               ]
           ]
