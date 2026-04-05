@@ -55,7 +55,7 @@ component =
       Just Home -> HH.slot_ _next7Days 0 Next7Days.component unit
       Just Groceries -> HH.slot_ _groceries 0 Groceries.component unit
       Just GroceriesGenerate -> HH.text "TODO"
-      Just (AddGrocery id) -> HH.slot_ _addGrocery 0 AddGrocery.component id
+      Just AddGrocery -> HH.slot_ _addGrocery 0 AddGrocery.component unit
       Nothing -> HH.h1_ [ HH.text "Not found" ]
 
   handleAction

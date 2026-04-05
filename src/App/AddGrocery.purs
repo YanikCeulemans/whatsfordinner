@@ -4,6 +4,7 @@ import Prelude
 
 import App.Layout as Layout
 import App.Shared as S
+import Data.Maybe (Maybe(..))
 import Data.Maybe as Maybe
 import Data.Number as Number
 import Data.Route as Route
@@ -17,6 +18,8 @@ import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties (InputType(..))
 import Halogen.HTML.Properties as HP
 import Simple.ULID (ULID)
+import Simple.ULID as ULID
+import Simple.ULID.Window as ULIDW
 import Web.Event.Event (Event)
 
 data FormField
@@ -66,10 +69,8 @@ parseAmountValue candidate =
 parseAmountUnit :: String -> FormField
 parseAmountUnit = String.trim >>> Valid
 
-type Input = ULID
-
 type State =
-  { id :: ULID
+  { id :: Maybe ULID
   , form :: FormState
   }
 
@@ -77,22 +78,24 @@ updateForm :: (FormState -> FormState) -> State -> State
 updateForm f state = state { form = f state.form }
 
 data Action
-  = SetDescriptionFormFieldState Event
+  = Initialize
+  | SetDescriptionFormFieldState Event
   | SetAmountValueFormFieldState Event
   | SetAmountUnitFormFieldState Event
 
 component
-  :: forall query output m. MonadAff m => H.Component query Input output m
+  :: forall query input output m. MonadAff m => H.Component query input output m
 component =
   H.mkComponent
     { initialState
     , render
-    , eval: H.mkEval $ H.defaultEval { handleAction = handleAction }
+    , eval: H.mkEval $ H.defaultEval
+        { handleAction = handleAction, initialize = Just Initialize }
     }
 
   where
-  initialState id =
-    { id
+  initialState _ =
+    { id: Nothing
     , form:
         { description: Pristine
         , amountValue: Pristine
@@ -102,6 +105,10 @@ component =
 
   handleAction :: Action -> H.HalogenM State Action () output m Unit
   handleAction = case _ of
+    Initialize -> do
+      id <- H.liftEffect $ ULID.genULID ULIDW.prng
+      H.modify_ _ { id = Just id }
+
     SetDescriptionFormFieldState event -> do
       value <- S.eventTargetInputValueOrEmpty event
       H.modify_ $ updateForm _ { description = parseNonEmptyString value }

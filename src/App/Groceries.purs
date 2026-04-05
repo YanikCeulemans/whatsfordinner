@@ -328,10 +328,6 @@ groceryAddView groceryAddCandidate =
         ]
     ]
 
-addGroceryLinkView :: forall w i. ULID -> HH.HTML w i
-addGroceryLinkView id =
-  S.link (Route.AddGrocery id) [ HH.text "Add" ]
-
 component
   :: forall query input output m. MonadAff m => H.Component query input output m
 component =
@@ -424,7 +420,7 @@ component =
           HH.div [ HP.class_ $ H.ClassName "flex column" ]
             [ HH.div [ HP.class_ $ H.ClassName "flex justify-space-between" ]
                 [ HH.h1_ [ HH.text "Groceries" ]
-                , Maybe.maybe (HH.text "") addGroceryLinkView state.nextId
+                , S.link Route.AddGrocery [ HH.text "Add" ]
                 ]
             , HH.div [ HP.class_ $ H.ClassName "flex justify-space-between" ]
                 [ HH.a [ HP.href $ Route.print $ GroceriesGenerate ]
