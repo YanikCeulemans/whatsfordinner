@@ -24,6 +24,7 @@ import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties (InputType(..))
 import Halogen.HTML.Properties as HP
+import Halogen.HTML.Properties.ARIA as HPA
 import Simple.ULID (ULID)
 import Simple.ULID as ULID
 import Simple.ULID.Window as ULIDW
@@ -136,7 +137,7 @@ buildGrocery state =
   amount =
     case amountUnit of
       Nothing -> Amount.unitless <$> amountValue
-      Just unit -> Amount.create <$> amountValue <*> amountUnit
+      Just unit' -> Amount.create <$> amountValue <*> pure unit'
 
 data Action
   = Initialize
@@ -213,31 +214,33 @@ component =
                           ]
                       )
                   ]
-              , HH.label_
-                  [ HH.text "Amount"
-                  , HH.input
-                      ( join
-                          [ [ HP.type_ InputNumber
-                            , HE.onInput SetAmountValueFormFieldState
-                            , HP.value $ fieldValue form.amountValue
-                            , HP.min 1.0
-                            ]
-                          , ariaValid form.amountValue
-                          , ariaInvalid form.amountValue
-                          ]
-                      )
-                  ]
-              , HH.label_
-                  [ HH.text "Unit"
-                  , HH.input
-                      ( join
-                          [ [ HE.onInput SetAmountUnitFormFieldState
-                            , HP.value $ fieldValue form.amountUnit
-                            ]
-                          , ariaValid form.amountUnit
-                          , ariaInvalid form.amountUnit
-                          ]
-                      )
+              , HH.fieldset [ HPA.role "group" ]
+                  [ HH.label_
+                      [ HH.text "Amount"
+                      , HH.input
+                          ( join
+                              [ [ HP.type_ InputNumber
+                                , HE.onInput SetAmountValueFormFieldState
+                                , HP.value $ fieldValue form.amountValue
+                                , HP.min 1.0
+                                ]
+                              , ariaValid form.amountValue
+                              , ariaInvalid form.amountValue
+                              ]
+                          )
+                      ]
+                  , HH.label_
+                      [ HH.text "Unit"
+                      , HH.input
+                          ( join
+                              [ [ HE.onInput SetAmountUnitFormFieldState
+                                , HP.value $ fieldValue form.amountUnit
+                                ]
+                              , ariaValid form.amountUnit
+                              , ariaInvalid form.amountUnit
+                              ]
+                          )
+                      ]
                   ]
               , HH.input [ HP.type_ InputSubmit, HP.value "Add" ]
               ]
