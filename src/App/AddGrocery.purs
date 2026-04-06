@@ -15,7 +15,9 @@ import Data.Route as Route
 import Data.String as String
 import Data.String.NonEmpty as NES
 import Debug as Debug
+import Domain.Amount as Amount
 import Domain.Grocery (Grocery)
+import Domain.GroceryId (GroceryId(..))
 import Effect.Aff.Class (class MonadAff)
 import Halogen as H
 import Halogen.HTML as HH
@@ -42,6 +44,11 @@ isFieldValid :: FormField -> Boolean
 isFieldValid = case _ of
   Valid _ -> true
   _ -> false
+
+validFieldValue :: FormField -> Maybe String
+validFieldValue = case _ of
+  Valid v -> Just v
+  _ -> Nothing
 
 ariaValid :: forall r i. FormField -> Array (HP.IProp r i)
 ariaValid = case _ of
@@ -106,7 +113,30 @@ validateForm state =
     }
 
 buildGrocery :: State -> Maybe Grocery
-buildGrocery state = Nothing
+buildGrocery state =
+  { id: _
+  , description: _
+  , amount: _
+  , checked: false
+  }
+    <$> id
+    <*> description
+    <*> amount
+  where
+  id = MkGroceryId <$> state.id
+  description = validFieldValue state.form.description
+  amountUnit =
+    state.form.amountUnit
+      # validFieldValue
+      # map String.trim
+      >>= case _ of
+        "" -> Nothing
+        other -> Just other
+  amountValue = state.form.amountValue # validFieldValue >>= Number.fromString
+  amount =
+    case amountUnit of
+      Nothing -> Amount.unitless <$> amountValue
+      Just unit -> Amount.create <$> amountValue <*> amountUnit
 
 data Action
   = Initialize
@@ -156,6 +186,7 @@ component =
     SubmitForm event -> do
       preventDefault event
       groceryCandidate <- buildGrocery <$> H.modify validateForm
+      Debug.traceM { groceryCandidate }
       pure unit
 
   render :: State -> H.ComponentHTML Action () m
