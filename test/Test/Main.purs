@@ -23,6 +23,7 @@ import Domain.RingList as RingList
 import Effect (Effect)
 import Partial.Unsafe (unsafeCrashWith)
 import Simple.ULID as ULID
+import Test.Domain.GroceryId as GroceryId
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (shouldEqual)
 import Test.Spec.Reporter (consoleReporter)
@@ -180,6 +181,7 @@ spec = do
   mealScheduleSpec
   rangeSpec
   ulidSpec
+  GroceryId.spec
 
 main :: Effect Unit
 main = runSpecAndExitProcess [ consoleReporter ] spec

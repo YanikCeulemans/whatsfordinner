@@ -2,6 +2,8 @@ package:
   name: lekker
   dependencies:
     - aff-promise
+    - argonaut
+    - codec-argonaut
     - console
     - debug
     - effect

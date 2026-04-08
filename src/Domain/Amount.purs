@@ -1,5 +1,6 @@
 module Domain.Amount
   ( Amount
+  , amountCodec
   , increaseWith
   , setValue
   , value
@@ -10,7 +11,11 @@ module Domain.Amount
 
 import Prelude
 
+import Data.Codec.Argonaut (JsonCodec)
+import Data.Codec.Argonaut as CA
+import Data.Codec.Argonaut.Record as CAR
 import Data.Maybe (Maybe(..))
+import Data.Profunctor (dimap)
 
 newtype Amount = MkAmount
   { value :: Number
@@ -18,6 +23,17 @@ newtype Amount = MkAmount
   }
 
 derive newtype instance Show Amount
+
+amountCodec :: JsonCodec Amount
+amountCodec =
+  dimap unwrap MkAmount $ CA.object "Amount"
+    ( CAR.record
+        { value: CA.number
+        , unit: CAR.optional CA.string
+        }
+    )
+  where
+  unwrap (MkAmount x) = x
 
 sanitize :: Number -> Number
 sanitize = max 1.0

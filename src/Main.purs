@@ -3,6 +3,7 @@ module Main where
 import Prelude
 
 import App.Route as Router
+import AppM as AppM
 import Data.Array (fold)
 import Data.Maybe (Maybe(..))
 import Data.Route (Route)
@@ -29,22 +30,6 @@ pathAndSearch = do
   search <- Location.search location
   pure $ fold [ pathname, search ]
 
--- handleOnNavigate appId evt =
---   liftEffect $ FFINav.intercept opts navEvt
---   where
---   navEvt = FFINav.fromEvent evt
---   opts =
---     { handler: do
---         liftEffect $ FS.send appId $ NavigationOccurred
---           navEvt.destination.url
---     }
---
--- initializeApp appId = liftEffect do
---   onNavigate <- ET.eventListener $ handleOnNavigate appId
---   navigation <- FFINav.toEventTarget <$> FFINav.navigation
---   ET.addEventListener (EventType "navigate") onNavigate true navigation
---   pure Nothing
---
 onNavigate :: (Maybe Route -> Aff Unit) -> Event -> Effect Unit
 onNavigate f event = do
   Navigation.intercept opts navigationEvent
@@ -67,12 +52,14 @@ interceptNavigation f = liftEffect do
 
 main :: Effect Unit
 main = launchAff_ $ do
+  let
+    component = H.hoist AppM.runAppM Router.component
+
   body <- HA.awaitBody
   pas <- liftEffect pathAndSearch
-  halogenIO <- runUI Router.component (Route.parse' pas) body
+  halogenIO <- runUI component (Route.parse' pas) body
   interceptNavigation \route ->
     case route of
       Just r ->
         void $ halogenIO.query $ H.mkTell $ Router.Navigate r
       Nothing -> pure unit
-  pure unit

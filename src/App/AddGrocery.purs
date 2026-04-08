@@ -5,15 +5,15 @@ import Prelude
 import App.Layout as Layout
 import App.Shared (preventDefault)
 import App.Shared as S
-import Data.Array (fold)
+import Capabilities.Resource.Grocery (class ManageGrocery, upsertGrocery)
 import Data.Array as Array
 import Data.Maybe (Maybe(..))
 import Data.Maybe as Maybe
-import Data.Monoid.Conj (Conj(..))
 import Data.Number as Number
 import Data.Route as Route
 import Data.String as String
 import Data.String.NonEmpty as NES
+import Data.Traversable (for_)
 import Debug as Debug
 import Domain.Amount as Amount
 import Domain.Grocery (Grocery)
@@ -147,7 +147,10 @@ data Action
   | SubmitForm Event
 
 component
-  :: forall query input output m. MonadAff m => H.Component query input output m
+  :: forall query input output m
+   . MonadAff m
+  => ManageGrocery m
+  => H.Component query input output m
 component =
   H.mkComponent
     { initialState
@@ -188,6 +191,7 @@ component =
       preventDefault event
       groceryCandidate <- buildGrocery <$> H.modify validateForm
       Debug.traceM { groceryCandidate }
+      for_ groceryCandidate upsertGrocery
       pure unit
 
   render :: State -> H.ComponentHTML Action () m
