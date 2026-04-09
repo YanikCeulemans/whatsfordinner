@@ -19,8 +19,8 @@ newtype GroceryId = MkGroceryId ULID
 derive instance Eq GroceryId
 derive newtype instance Show GroceryId
 
-groceryIdCodec :: JsonCodec GroceryId
-groceryIdCodec =
+codec :: JsonCodec GroceryId
+codec =
   CA.codec' wrap unwrap
   where
   unwrap :: GroceryId -> J.Json

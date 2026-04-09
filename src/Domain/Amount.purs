@@ -1,6 +1,6 @@
 module Domain.Amount
   ( Amount
-  , amountCodec
+  , codec
   , increaseWith
   , setValue
   , value
@@ -23,12 +23,13 @@ newtype Amount = MkAmount
   }
 
 derive newtype instance Show Amount
+derive newtype instance Eq Amount
 
-amountCodec :: JsonCodec Amount
-amountCodec =
+codec :: JsonCodec Amount
+codec =
   dimap unwrap MkAmount $ CA.object "Amount"
     ( CAR.record
-        { value: CA.number
+        { value: dimap identity sanitize CA.number
         , unit: CAR.optional CA.string
         }
     )

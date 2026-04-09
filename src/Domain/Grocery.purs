@@ -21,9 +21,9 @@ groceryCodec :: JsonCodec Grocery
 groceryCodec =
   CA.object "Grocery"
     $ CAR.record
-        { id: GroceryId.groceryIdCodec
+        { id: GroceryId.codec
         , description: CA.string
-        , amount: Amount.amountCodec
+        , amount: Amount.codec
         , checked: CA.boolean
         }
 

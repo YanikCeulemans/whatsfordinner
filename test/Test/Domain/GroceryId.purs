@@ -26,10 +26,10 @@ groceryId = GroceryId.MkGroceryId
   crash _ = unsafeCrashWith "invalid hardcoded ulid"
 
 encode :: GroceryId -> J.Json
-encode = CA.encode GroceryId.groceryIdCodec
+encode = CA.encode GroceryId.codec
 
 decode :: J.Json -> Either CA.JsonDecodeError GroceryId
-decode = CA.decode GroceryId.groceryIdCodec
+decode = CA.decode GroceryId.codec
 
 quoted :: String -> String
 quoted x = fold [ "\"", x, "\"" ]
