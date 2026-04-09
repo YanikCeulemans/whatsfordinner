@@ -24,6 +24,7 @@ import Effect (Effect)
 import Partial.Unsafe (unsafeCrashWith)
 import Simple.ULID as ULID
 import Test.Domain.Amount as Amount
+import Test.Domain.Grocery as Grocery
 import Test.Domain.GroceryId as GroceryId
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (shouldEqual)
@@ -184,6 +185,7 @@ spec = do
   ulidSpec
   GroceryId.spec
   Amount.spec
+  Grocery.spec
 
 main :: Effect Unit
 main = runSpecAndExitProcess [ consoleReporter ] spec

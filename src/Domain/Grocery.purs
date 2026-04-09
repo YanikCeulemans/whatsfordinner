@@ -17,8 +17,8 @@ type Grocery =
   , checked :: Boolean
   }
 
-groceryCodec :: JsonCodec Grocery
-groceryCodec =
+codec :: JsonCodec Grocery
+codec =
   CA.object "Grocery"
     $ CAR.record
         { id: GroceryId.codec
