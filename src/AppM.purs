@@ -4,7 +4,16 @@ import Prelude
 
 import Capabilities.Resource.ManageGroceryList (class ManageGroceryList)
 import Data.Argonaut as A
+import Data.Argonaut.Parser as AP
+import Data.Bifunctor (lmap)
+import Data.Codec.Argonaut as CA
+import Data.Either (Either)
+import Data.Either as Either
+import Data.Maybe as Maybe
+import Data.Traversable (traverse)
 import Domain.Grocery (Grocery)
+import Domain.GroceryList (GroceryList)
+import Domain.GroceryList as GroceryList
 import Domain.GroceryListId (GroceryListId)
 import Domain.GroceryListId as GroceryListId
 import Effect.Aff (Aff)
@@ -27,11 +36,32 @@ derive newtype instance Monad AppM
 derive newtype instance MonadEffect AppM
 derive newtype instance MonadAff AppM
 
+decodeGroceryList :: String -> Either String GroceryList
+decodeGroceryList candidate =
+  AP.jsonParser candidate >>=
+    ( CA.decode GroceryList.codec >>> lmap
+        CA.printJsonDecodeError
+    )
+
+encodeGroceryList :: GroceryList -> String
+encodeGroceryList = CA.encode GroceryList.codec >>> A.stringify
+
 localStorageUpsertGrocery :: GroceryListId -> Grocery -> Aff Unit
 localStorageUpsertGrocery id grocery = liftEffect do
   storage <- Window.localStorage =<< HTML.window
   serializedGroceryList <- Storage.getItem printedId storage
-  pure unit
+  let
+    decodedList =
+      serializedGroceryList
+        # traverse decodeGroceryList
+        # Either.hush
+        # join
+        # Maybe.fromMaybe mempty
+
+    upsertedGroceryList = GroceryList.upsertGrocery grocery decodedList
+    encodedList = encodeGroceryList upsertedGroceryList
+
+  Storage.setItem printedId encodedList storage
   where
   printedId = GroceryListId.print id
 
