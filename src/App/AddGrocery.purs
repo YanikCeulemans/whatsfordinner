@@ -5,8 +5,9 @@ import Prelude
 import App.Layout as Layout
 import App.Shared (preventDefault)
 import App.Shared as S
-import Capabilities.Resource.Grocery (class ManageGrocery, upsertGrocery)
+import Capabilities.Resource.ManageGroceryList (class ManageGroceryList, upsertGrocery)
 import Data.Array as Array
+import Data.Either as Either
 import Data.Maybe (Maybe(..))
 import Data.Maybe as Maybe
 import Data.Number as Number
@@ -14,10 +15,12 @@ import Data.Route as Route
 import Data.String as String
 import Data.String.NonEmpty as NES
 import Data.Traversable (for_)
+import Data.ULID as DULID
 import Debug as Debug
 import Domain.Amount as Amount
 import Domain.Grocery (Grocery)
 import Domain.GroceryId (GroceryId(..))
+import Domain.GroceryListId (GroceryListId(..))
 import Effect.Aff.Class (class MonadAff)
 import Halogen as H
 import Halogen.HTML as HH
@@ -25,6 +28,7 @@ import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties (InputType(..))
 import Halogen.HTML.Properties as HP
 import Halogen.HTML.Properties.ARIA as HPA
+import Partial.Unsafe (unsafeCrashWith)
 import Simple.ULID (ULID)
 import Simple.ULID as ULID
 import Simple.ULID.Window as ULIDW
@@ -92,6 +96,14 @@ isFormStateValid { description, amountValue, amountUnit } =
   [ description, amountValue, amountUnit ]
     # Array.all isFieldValid
 
+dummyListId :: GroceryListId
+dummyListId =
+  DULID.parse "01KNW48VB0PNCFC0KZ8SW289ZV"
+    # Either.fromRight' crash
+    # MkGroceryListId
+  where
+  crash _ = unsafeCrashWith "invalid hardcoded dummy list id ULID"
+
 type State =
   { id :: Maybe ULID
   , form :: FormState
@@ -149,7 +161,7 @@ data Action
 component
   :: forall query input output m
    . MonadAff m
-  => ManageGrocery m
+  => ManageGroceryList m
   => H.Component query input output m
 component =
   H.mkComponent
@@ -191,8 +203,10 @@ component =
       preventDefault event
       groceryCandidate <- buildGrocery <$> H.modify validateForm
       Debug.traceM { groceryCandidate }
-      for_ groceryCandidate upsertGrocery
+      for_ groceryCandidate upsertGroceryForDummyList
       pure unit
+      where
+      upsertGroceryForDummyList = upsertGrocery dummyListId
 
   render :: State -> H.ComponentHTML Action () m
   render s@{ form } =

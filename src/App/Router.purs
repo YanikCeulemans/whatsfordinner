@@ -5,7 +5,7 @@ import Prelude
 import App.AddGrocery as AddGrocery
 import App.Groceries as Groceries
 import App.Next7Days as Next7Days
-import Capabilities.Resource.Grocery (class ManageGrocery)
+import Capabilities.Resource.ManageGroceryList (class ManageGroceryList)
 import Data.Maybe (Maybe(..))
 import Data.Route (Route(..))
 import Data.Route as Route
@@ -37,7 +37,7 @@ data Action = Initialize
 component
   :: forall output m
    . MonadAff m
-  => ManageGrocery m
+  => ManageGroceryList m
   => H.Component Query Input output m
 component =
   H.mkComponent
