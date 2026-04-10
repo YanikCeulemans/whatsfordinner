@@ -7,7 +7,6 @@ package:
     - console
     - debug
     - effect
-    - flame
     - formatters
     - halogen
     - lists
