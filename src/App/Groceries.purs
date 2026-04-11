@@ -16,6 +16,7 @@ import Data.Maybe as Maybe
 import Data.Route (Route(..))
 import Data.Route as Route
 import Data.ULID as DULID
+import Debug as Debug
 import Domain.Amount (Amount)
 import Domain.Amount as Amount
 import Domain.Grocery (Grocery)
@@ -149,24 +150,30 @@ data Action
   | EndDrag DragEvent
   | ClearCompleted
 
-isPositive :: Int -> Boolean
-isPositive x = x > 0
+printAmount :: Amount -> String
+printAmount amount =
+  case Amount.unit amount of
+    Nothing -> show $ Int.ceil value
+    Just unit' -> show value <> unit'
+  where
+  value = Amount.value amount
 
-isNegative :: Int -> Boolean
-isNegative x = x < 0
+data DragDirection = Above | Below
+
+derive instance Eq DragDirection
 
 dragDelta :: forall a. Ring a => DragState a -> a
 dragDelta { dragItem, dragOverItem } = dragItem - dragOverItem
 
-printAmount :: Amount -> String
-printAmount amount =
-  case Amount.unit amount of
-    Nothing -> show $ Int.ceil $ value
-    Just unit' ->
-      [ show value, unit' ]
-        # Array.intercalate " "
-  where
-  value = Amount.value amount
+dragDirection :: Int -> DragState Int -> Maybe DragDirection
+dragDirection index { dragItem, dragOverItem }
+  | index /= dragOverItem = Nothing
+  | otherwise = help $ dragItem - dragOverItem
+      where
+      help n
+        | n == 0 = Nothing
+        | n > 0 = Just Above
+        | otherwise = Just Below
 
 groceryView
   :: forall m
@@ -177,12 +184,9 @@ groceryView
   -> H.ComponentHTML Action () m
 groceryView dragState index grocery =
   let
-    isDraggedOver =
-      (_.dragOverItem <$> dragState) == Just index
-        && (_.dragItem <$> dragState) /= Just index
-        && not grocery.checked
-    isDragAbove = Maybe.maybe false (dragDelta >>> isPositive) dragState
-    isDragBelow = Maybe.maybe false (dragDelta >>> isNegative) dragState
+    direction
+      | grocery.checked = Nothing
+      | otherwise = dragDirection index =<< dragState
   in
     HH.li
       ( join
@@ -202,8 +206,8 @@ groceryView dragState index grocery =
       [ HH.article
           [ S.classes'
               { "flex spaced items-center transparent-border": true
-              , "add-above-border": isDraggedOver && isDragAbove
-              , "add-below-border": isDraggedOver && isDragBelow
+              , "add-above-border": direction == Just Above
+              , "add-below-border": direction == Just Below
               }
           ]
           [ HH.label
