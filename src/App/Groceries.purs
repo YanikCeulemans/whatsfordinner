@@ -10,6 +10,7 @@ import Capabilities.Resource.ManageGroceryList (class ManageGroceryList, upsertG
 import Data.Array (fold, mapWithIndex, (!!))
 import Data.Array as Array
 import Data.Either as Either
+import Data.Int as Int
 import Data.Maybe (Maybe(..))
 import Data.Maybe as Maybe
 import Data.Route (Route(..))
@@ -159,9 +160,13 @@ dragDelta { dragItem, dragOverItem } = dragItem - dragOverItem
 
 printAmount :: Amount -> String
 printAmount amount =
-  [ Just $ show $ Amount.value amount, Amount.unit amount ]
-    # Array.catMaybes
-    # Array.intercalate " "
+  case Amount.unit amount of
+    Nothing -> show $ Int.ceil $ value
+    Just unit' ->
+      [ show value, unit' ]
+        # Array.intercalate " "
+  where
+  value = Amount.value amount
 
 groceryView
   :: forall m
@@ -214,7 +219,6 @@ groceryView dragState index grocery =
                   [ HP.type_ HP.InputCheckbox
                   , HP.id $ GroceryId.print grocery.id
                   , HP.checked grocery.checked
-                  -- , HP.onClick' $ CheckboxClicked grocery.id
                   ]
               , HH.text $ fold
                   [ grocery.description, " (", printAmount grocery.amount, ")" ]
@@ -302,17 +306,16 @@ component =
   render :: State -> H.ComponentHTML Action () m
   render state =
     Layout.main $
-      HH.div [ HP.class_ $ H.ClassName "flex column" ]
+      HH.div [ HP.class_ $ H.ClassName "flex column spaced" ]
         [ HH.div [ HP.class_ $ H.ClassName "flex justify-space-between" ]
             [ HH.h1_ [ HH.text "Groceries" ]
-            , S.link Route.AddGrocery [ HH.text "Add" ]
+            , HH.div [ HP.class_ $ H.ClassName "flex spaced" ]
+                [ S.link GroceriesGenerate [ HH.text "Generate" ]
+                , S.link Route.AddGrocery [ HH.text "Add" ]
+                ]
             ]
-        , HH.div [ HP.class_ $ H.ClassName "flex justify-space-between" ]
-            [ HH.a [ HP.href $ Route.print $ GroceriesGenerate ]
-                [ HH.text "Generate" ]
-            , HH.button [ HP.class_ $ H.ClassName "secondary" ]
-                [ HH.text "Edit" ]
-            ]
+        , HH.button [ HP.class_ $ H.ClassName "secondary" ]
+            [ HH.text "Edit" ]
         , case allGroceries state of
             [] -> HH.text "No groceries have been added yet"
             _ -> groceriesView state
