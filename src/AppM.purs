@@ -40,14 +40,16 @@ derive newtype instance MonadAff AppM
 
 -- TODO: Id types with phantom type instead of bespoke ids?
 
-withStorageItem :: String -> (Maybe String -> Aff String) -> Aff Unit
+withStorageItem
+  :: forall m. MonadAff m => String -> (Maybe String -> m String) -> m Unit
 withStorageItem key mf = do
   storage <- liftEffect $ Window.localStorage =<< HTML.window
   item <- liftEffect $ Storage.getItem key storage
   updatedItem <- mf item
   liftEffect $ Storage.setItem key updatedItem storage
 
-withCodec :: forall m a. Codec.Codec' m String a
+withCodec
+  :: forall m a. Codec.Codec' m String a -> (m a -> a) -> String -> String
 withCodec = ?h
 
 decodeGroceryList :: String -> Either String GroceryList
