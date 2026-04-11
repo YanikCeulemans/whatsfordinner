@@ -2,6 +2,7 @@ module AppM where
 
 import Prelude
 
+import Capabilities.Navigation (class Navigation)
 import Capabilities.Resource.ManageGroceryList (class ManageGroceryList)
 import Data.Argonaut as A
 import Data.Argonaut.Decode.Parser as CAP
@@ -14,6 +15,8 @@ import Data.Either as Either
 import Data.Maybe (Maybe)
 import Data.Maybe as Maybe
 import Data.Profunctor (lcmap)
+import Data.Route (Route)
+import Data.Route as Route
 import Data.Traversable (for, traverse)
 import Domain.Grocery (Grocery)
 import Domain.GroceryList (GroceryList)
@@ -24,6 +27,7 @@ import Effect.Aff (Aff, Milliseconds(..))
 import Effect.Aff as Aff
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class (class MonadEffect, liftEffect)
+import FFI.Navigation as Nav
 import Web.HTML as HTML
 import Web.HTML.Window as Window
 import Web.Storage.Storage as Storage
@@ -85,3 +89,13 @@ localStorageUpsertGrocery id grocery = do
 instance ManageGroceryList AppM where
   upsertGrocery :: GroceryListId -> Grocery -> AppM Unit
   upsertGrocery id grocery = AppM $ localStorageUpsertGrocery id grocery
+
+setLocation :: Route -> Aff Unit
+setLocation route = do
+  navigation <- liftEffect Nav.navigation
+  Nav.navigate printedRoute navigation
+  where
+  printedRoute = Route.print route
+
+instance Navigation AppM where
+  navigate route = AppM $ setLocation route

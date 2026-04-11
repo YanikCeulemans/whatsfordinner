@@ -5,6 +5,7 @@ import Prelude
 import App.Layout as Layout
 import App.Shared (preventDefault)
 import App.Shared as S
+import Capabilities.Navigation (class Navigation, navigate)
 import Capabilities.Resource.ManageGroceryList (class ManageGroceryList, upsertGrocery)
 import Data.Array as Array
 import Data.Either as Either
@@ -183,6 +184,7 @@ component
   :: forall query input output m
    . MonadAff m
   => ManageGroceryList m
+  => Navigation m
   => H.Component query input output m
 component =
   H.mkComponent
@@ -223,8 +225,8 @@ component =
       groceryCandidate <- buildGrocery <$> H.modify validateForm
       H.modify_ _ { remoteData = Loading }
       for_ groceryCandidate upsertGroceryForDummyList
-      H.modify_ _ { remoteData = Success unit, form = pristineFormState }
-      handleAction Initialize
+      H.modify_ _ { remoteData = Success unit }
+      navigate $ Route.Groceries
       where
       upsertGroceryForDummyList = upsertGrocery dummyListId
 

@@ -4,3 +4,7 @@ export const _interceptImpl = (opts, evt) => {
     handler: opts.handler,
   });
 };
+export const _navigateImpl = (url, n) => {
+  const { finished } = n.navigate(url);
+  return finished;
+}

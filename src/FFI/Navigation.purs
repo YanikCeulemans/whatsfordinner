@@ -42,3 +42,8 @@ intercept opts evt = do
   runEffectFn2 _interceptImpl optsImpl evt
   where
   optsImpl = toInterceptOptionsImpl opts
+
+foreign import _navigateImpl :: EffectFn2 String Navigation (Promise Unit)
+
+navigate :: String -> Navigation -> Aff Unit
+navigate url nav = Promise.toAffE $ runEffectFn2 _navigateImpl url nav

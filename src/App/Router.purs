@@ -5,10 +5,10 @@ import Prelude
 import App.AddGrocery as AddGrocery
 import App.Groceries as Groceries
 import App.Next7Days as Next7Days
+import Capabilities.Navigation (class Navigation)
 import Capabilities.Resource.ManageGroceryList (class ManageGroceryList)
 import Data.Maybe (Maybe(..))
 import Data.Route (Route(..))
-import Data.Route as Route
 import Effect.Aff.Class (class MonadAff)
 import Halogen as H
 import Halogen.HTML as HH
@@ -38,6 +38,7 @@ component
   :: forall output m
    . MonadAff m
   => ManageGroceryList m
+  => Navigation m
   => H.Component Query Input output m
 component =
   H.mkComponent
