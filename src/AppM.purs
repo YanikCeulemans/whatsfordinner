@@ -3,12 +3,14 @@ module AppM where
 import Prelude
 
 import Capabilities.Resource.ManageGroceryList (class ManageGroceryList)
+import Data.Codec as Codec
 import Data.Argonaut as A
 import Data.Argonaut.Parser as AP
 import Data.Bifunctor (lmap)
 import Data.Codec.Argonaut as CA
 import Data.Either (Either)
 import Data.Either as Either
+import Data.Maybe (Maybe)
 import Data.Maybe as Maybe
 import Data.Traversable (traverse)
 import Domain.Grocery (Grocery)
@@ -35,6 +37,18 @@ derive newtype instance Bind AppM
 derive newtype instance Monad AppM
 derive newtype instance MonadEffect AppM
 derive newtype instance MonadAff AppM
+
+-- TODO: Id types with phantom type instead of bespoke ids?
+
+withStorageItem :: String -> (Maybe String -> Aff String) -> Aff Unit
+withStorageItem key mf = do
+  storage <- liftEffect $ Window.localStorage =<< HTML.window
+  item <- liftEffect $ Storage.getItem key storage
+  updatedItem <- mf item
+  liftEffect $ Storage.setItem key updatedItem storage
+
+withCodec :: forall m a. Codec.Codec' m String a
+withCodec = ?h
 
 decodeGroceryList :: String -> Either String GroceryList
 decodeGroceryList candidate =
