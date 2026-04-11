@@ -3,16 +3,18 @@ module AppM where
 import Prelude
 
 import Capabilities.Resource.ManageGroceryList (class ManageGroceryList)
-import Data.Codec as Codec
 import Data.Argonaut as A
+import Data.Argonaut.Decode.Parser as CAP
 import Data.Argonaut.Parser as AP
 import Data.Bifunctor (lmap)
+import Data.Codec as Codec
 import Data.Codec.Argonaut as CA
 import Data.Either (Either)
 import Data.Either as Either
 import Data.Maybe (Maybe)
 import Data.Maybe as Maybe
-import Data.Traversable (traverse)
+import Data.Profunctor (lcmap)
+import Data.Traversable (for, traverse)
 import Domain.Grocery (Grocery)
 import Domain.GroceryList (GroceryList)
 import Domain.GroceryList as GroceryList
@@ -41,16 +43,13 @@ derive newtype instance MonadAff AppM
 -- TODO: Id types with phantom type instead of bespoke ids?
 
 withStorageItem
-  :: forall m. MonadAff m => String -> (Maybe String -> m String) -> m Unit
-withStorageItem key mf = do
-  storage <- liftEffect $ Window.localStorage =<< HTML.window
-  item <- liftEffect $ Storage.getItem key storage
-  updatedItem <- mf item
-  liftEffect $ Storage.setItem key updatedItem storage
-
-withCodec
-  :: forall m a. Codec.Codec' m String a -> (m a -> a) -> String -> String
-withCodec = ?h
+  :: forall m. MonadAff m => String -> (Maybe String -> String) -> m Unit
+withStorageItem key mf = liftEffect do
+  storage <- Window.localStorage =<< HTML.window
+  item <- Storage.getItem key storage
+  let
+    updatedItem = mf item
+  Storage.setItem key updatedItem storage
 
 decodeGroceryList :: String -> Either String GroceryList
 decodeGroceryList candidate =
@@ -62,22 +61,22 @@ decodeGroceryList candidate =
 encodeGroceryList :: GroceryList -> String
 encodeGroceryList = CA.encode GroceryList.codec >>> A.stringify
 
+upsertGrocery :: Grocery -> Maybe String -> String
+upsertGrocery grocery serializedGroceryList =
+  encodeGroceryList upsertedGroceryList
+  where
+  decodedList =
+    serializedGroceryList
+      # traverse decodeGroceryList
+      # Either.hush
+      # join
+      # Maybe.fromMaybe mempty
+
+  upsertedGroceryList = GroceryList.upsertGrocery grocery decodedList
+
 localStorageUpsertGrocery :: GroceryListId -> Grocery -> Aff Unit
-localStorageUpsertGrocery id grocery = liftEffect do
-  storage <- Window.localStorage =<< HTML.window
-  serializedGroceryList <- Storage.getItem printedId storage
-  let
-    decodedList =
-      serializedGroceryList
-        # traverse decodeGroceryList
-        # Either.hush
-        # join
-        # Maybe.fromMaybe mempty
-
-    upsertedGroceryList = GroceryList.upsertGrocery grocery decodedList
-    encodedList = encodeGroceryList upsertedGroceryList
-
-  Storage.setItem printedId encodedList storage
+localStorageUpsertGrocery id grocery = do
+  withStorageItem printedId $ upsertGrocery grocery
   where
   printedId = GroceryListId.print id
 
