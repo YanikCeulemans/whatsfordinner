@@ -20,7 +20,8 @@ import Domain.GroceryList (GroceryList)
 import Domain.GroceryList as GroceryList
 import Domain.GroceryListId (GroceryListId)
 import Domain.GroceryListId as GroceryListId
-import Effect.Aff (Aff)
+import Effect.Aff (Aff, Milliseconds(..))
+import Effect.Aff as Aff
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class (class MonadEffect, liftEffect)
 import Web.HTML as HTML
@@ -76,6 +77,7 @@ upsertGrocery grocery serializedGroceryList =
 
 localStorageUpsertGrocery :: GroceryListId -> Grocery -> Aff Unit
 localStorageUpsertGrocery id grocery = do
+  Aff.delay $ Milliseconds 1500.0
   withStorageItem printedId $ upsertGrocery grocery
   where
   printedId = GroceryListId.print id

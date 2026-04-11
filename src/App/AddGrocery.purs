@@ -16,7 +16,6 @@ import Data.String as String
 import Data.String.NonEmpty as NES
 import Data.Traversable (for_)
 import Data.ULID as DULID
-import Debug as Debug
 import Domain.Amount as Amount
 import Domain.Grocery (Grocery)
 import Domain.GroceryId (GroceryId(..))
@@ -25,14 +24,28 @@ import Effect.Aff.Class (class MonadAff)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
-import Halogen.HTML.Properties (InputType(..))
+import Halogen.HTML.Properties (ButtonType(..), InputType(..))
 import Halogen.HTML.Properties as HP
+import Halogen.HTML.Properties.ARIA as Aria
 import Halogen.HTML.Properties.ARIA as HPA
 import Partial.Unsafe (unsafeCrashWith)
 import Simple.ULID (ULID)
 import Simple.ULID as ULID
 import Simple.ULID.Window as ULIDW
 import Web.Event.Event (Event)
+
+data RemoteData e a
+  = NotRequested
+  | Loading
+  | Error e
+  | Success a
+
+type RemoteData' a = RemoteData String a
+
+isLoading :: forall e a. RemoteData e a -> Boolean
+isLoading = case _ of
+  Loading -> true
+  _ -> false
 
 data FormField
   = Pristine
@@ -73,6 +86,13 @@ type FormState =
   , amountUnit :: FormField
   }
 
+pristineFormState :: FormState
+pristineFormState =
+  { description: Pristine
+  , amountValue: Pristine
+  , amountUnit: Pristine
+  }
+
 parseNonEmptyString :: String -> FormField
 parseNonEmptyString candidate =
   String.trim candidate
@@ -107,6 +127,7 @@ dummyListId =
 type State =
   { id :: Maybe ULID
   , form :: FormState
+  , remoteData :: RemoteData' Unit
   }
 
 updateForm :: (FormState -> FormState) -> State -> State
@@ -122,7 +143,7 @@ validateForm state =
   validatedForm =
     { description: touchField state.form.description
     , amountValue: touchField state.form.amountValue
-    , amountUnit: touchField state.form.amountUnit
+    , amountUnit: state.form.amountUnit
     }
 
 buildGrocery :: State -> Maybe Grocery
@@ -172,13 +193,11 @@ component =
     }
 
   where
+  initialState :: input -> State
   initialState _ =
     { id: Nothing
-    , form:
-        { description: Pristine
-        , amountValue: Pristine
-        , amountUnit: Pristine
-        }
+    , form: pristineFormState
+    , remoteData: NotRequested
     }
 
   handleAction :: Action -> H.HalogenM State Action () output m Unit
@@ -202,64 +221,66 @@ component =
     SubmitForm event -> do
       preventDefault event
       groceryCandidate <- buildGrocery <$> H.modify validateForm
-      Debug.traceM { groceryCandidate }
+      H.modify_ _ { remoteData = Loading }
       for_ groceryCandidate upsertGroceryForDummyList
-      pure unit
+      H.modify_ _ { remoteData = Success unit, form = pristineFormState }
+      handleAction Initialize
       where
       upsertGroceryForDummyList = upsertGrocery dummyListId
 
   render :: State -> H.ComponentHTML Action () m
-  render s@{ form } =
-    let
-      _ = Debug.spy "state" s
-    in
-      Layout.main $
-        HH.div [ HP.class_ $ H.ClassName "flex column" ]
-          [ HH.div [ HP.class_ $ H.ClassName "flex justify-space-between" ]
-              [ HH.h1_ [ HH.text "Add grocery" ]
-              , S.link Route.Groceries [ HH.text "Cancel" ]
-              ]
-          , HH.form [ HE.onSubmit SubmitForm ]
-              [ HH.label_
-                  [ HH.text "description"
-                  , HH.input
-                      ( join $
-                          [ [ HE.onInput SetDescriptionFormFieldState
-                            , HP.value $ fieldValue form.description
-                            ]
-                          , ariaValid form.description
-                          , ariaInvalid form.description
+  render { form, remoteData } =
+    Layout.main $
+      HH.div [ HP.class_ $ H.ClassName "flex column" ]
+        [ HH.div [ HP.class_ $ H.ClassName "flex justify-space-between" ]
+            [ HH.h1_ [ HH.text "Add grocery" ]
+            , S.link Route.Groceries [ HH.text "Cancel" ]
+            ]
+        , HH.form [ HE.onSubmit SubmitForm ]
+            [ HH.label_
+                [ HH.text "description"
+                , HH.input
+                    ( join $
+                        [ [ HE.onInput SetDescriptionFormFieldState
+                          , HP.value $ fieldValue form.description
                           ]
-                      )
-                  ]
-              , HH.fieldset [ HPA.role "group" ]
-                  [ HH.label_
-                      [ HH.text "Amount"
-                      , HH.input
-                          ( join
-                              [ [ HP.type_ InputNumber
-                                , HE.onInput SetAmountValueFormFieldState
-                                , HP.value $ fieldValue form.amountValue
-                                , HP.min 1.0
-                                ]
-                              , ariaValid form.amountValue
-                              , ariaInvalid form.amountValue
+                        , ariaValid form.description
+                        , ariaInvalid form.description
+                        ]
+                    )
+                ]
+            , HH.fieldset [ HPA.role "group" ]
+                [ HH.label_
+                    [ HH.text "Amount"
+                    , HH.input
+                        ( join
+                            [ [ HP.type_ InputNumber
+                              , HE.onInput SetAmountValueFormFieldState
+                              , HP.value $ fieldValue form.amountValue
+                              , HP.min 1.0
                               ]
-                          )
-                      ]
-                  , HH.label_
-                      [ HH.text "Unit"
-                      , HH.input
-                          ( join
-                              [ [ HE.onInput SetAmountUnitFormFieldState
-                                , HP.value $ fieldValue form.amountUnit
-                                ]
-                              , ariaValid form.amountUnit
-                              , ariaInvalid form.amountUnit
+                            , ariaValid form.amountValue
+                            , ariaInvalid form.amountValue
+                            ]
+                        )
+                    ]
+                , HH.label_
+                    [ HH.text "Unit"
+                    , HH.input
+                        ( join
+                            [ [ HE.onInput SetAmountUnitFormFieldState
+                              , HP.value $ fieldValue form.amountUnit
                               ]
-                          )
-                      ]
-                  ]
-              , HH.input [ HP.type_ InputSubmit, HP.value "Add" ]
-              ]
-          ]
+                            , ariaValid form.amountUnit
+                            , ariaInvalid form.amountUnit
+                            ]
+                        )
+                    ]
+                ]
+            , HH.button
+                [ HP.type_ ButtonSubmit
+                , Aria.busy $ show $ isLoading remoteData
+                ]
+                [ HH.text "Add" ]
+            ]
+        ]
