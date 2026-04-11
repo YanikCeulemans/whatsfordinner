@@ -2,6 +2,7 @@ module App.AddGrocery where
 
 import Prelude
 
+import App.Data as Data
 import App.Layout as Layout
 import App.Shared (preventDefault)
 import App.Shared as S
@@ -117,14 +118,6 @@ isFormStateValid { description, amountValue, amountUnit } =
   [ description, amountValue, amountUnit ]
     # Array.all isFieldValid
 
-dummyListId :: GroceryListId
-dummyListId =
-  DULID.parse "01KNW48VB0PNCFC0KZ8SW289ZV"
-    # Either.fromRight' crash
-    # MkGroceryListId
-  where
-  crash _ = unsafeCrashWith "invalid hardcoded dummy list id ULID"
-
 type State =
   { id :: Maybe ULID
   , form :: FormState
@@ -228,7 +221,7 @@ component =
       H.modify_ _ { remoteData = Success unit }
       navigate $ Route.Groceries
       where
-      upsertGroceryForDummyList = upsertGrocery dummyListId
+      upsertGroceryForDummyList = upsertGrocery Data.dummyListId
 
   render :: State -> H.ComponentHTML Action () m
   render { form, remoteData } =
@@ -245,6 +238,7 @@ component =
                     ( join $
                         [ [ HE.onInput SetDescriptionFormFieldState
                           , HP.value $ fieldValue form.description
+                          , HP.autofocus true
                           ]
                         , ariaValid form.description
                         , ariaInvalid form.description

@@ -5,19 +5,16 @@ import Prelude
 import Capabilities.Navigation (class Navigation)
 import Capabilities.Resource.ManageGroceryList (class ManageGroceryList)
 import Data.Argonaut as A
-import Data.Argonaut.Decode.Parser as CAP
 import Data.Argonaut.Parser as AP
 import Data.Bifunctor (lmap)
-import Data.Codec as Codec
 import Data.Codec.Argonaut as CA
 import Data.Either (Either)
 import Data.Either as Either
 import Data.Maybe (Maybe)
 import Data.Maybe as Maybe
-import Data.Profunctor (lcmap)
 import Data.Route (Route)
 import Data.Route as Route
-import Data.Traversable (for, traverse)
+import Data.Traversable (traverse)
 import Domain.Grocery (Grocery)
 import Domain.GroceryList (GroceryList)
 import Domain.GroceryList as GroceryList
@@ -79,15 +76,34 @@ upsertGrocery grocery serializedGroceryList =
 
   upsertedGroceryList = GroceryList.upsertGrocery grocery decodedList
 
+localStorageUpsertGroceryList :: GroceryListId -> Aff GroceryList
+localStorageUpsertGroceryList id = liftEffect do
+  storage <- Window.localStorage =<< HTML.window
+  serializedGroceryList <- Storage.getItem printedId storage
+  let
+    decodedList =
+      serializedGroceryList
+        # traverse decodeGroceryList
+        # Either.hush
+        # join
+
+  Maybe.maybe (saveEmptyList storage) pure decodedList
+  where
+  printedId = GroceryListId.print id
+  emptyGroceryList = mempty
+  saveEmptyList storage =
+    Storage.setItem printedId (encodeGroceryList emptyGroceryList) storage $>
+      emptyGroceryList
+
 localStorageUpsertGrocery :: GroceryListId -> Grocery -> Aff Unit
 localStorageUpsertGrocery id grocery = do
-  Aff.delay $ Milliseconds 1500.0
+  Aff.delay $ Milliseconds 500.0
   withStorageItem printedId $ upsertGrocery grocery
   where
   printedId = GroceryListId.print id
 
 instance ManageGroceryList AppM where
-  upsertGrocery :: GroceryListId -> Grocery -> AppM Unit
+  upsertGroceryList id = AppM $ localStorageUpsertGroceryList id
   upsertGrocery id grocery = AppM $ localStorageUpsertGrocery id grocery
 
 setLocation :: Route -> Aff Unit

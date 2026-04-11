@@ -2,9 +2,11 @@ module App.Groceries where
 
 import Prelude
 
+import App.Data as Data
 import App.Layout as Layout
 import App.Shared (preventDefault)
 import App.Shared as S
+import Capabilities.Resource.ManageGroceryList (class ManageGroceryList, upsertGroceryList)
 import Data.Array (fold, mapWithIndex, (!!))
 import Data.Array as Array
 import Data.Either as Either
@@ -19,7 +21,6 @@ import Domain.Grocery (Grocery)
 import Domain.GroceryId (GroceryId(..))
 import Domain.GroceryId as GroceryId
 import Effect.Aff.Class (class MonadAff)
-import Effect.Class (class MonadEffect)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -30,12 +31,9 @@ import Simple.ULID (ULID)
 import Simple.ULID as ULID
 import Simple.ULID.Window as ULIDW
 import Web.Event.Event (Event)
-import Web.Event.Event as E
 import Web.HTML.Event.DragEvent (DragEvent)
-import Web.HTML.Event.DragEvent as DragEvent
 import Web.UIEvent.InputEvent as InputEvent
 import Web.UIEvent.MouseEvent (MouseEvent)
-import Web.UIEvent.MouseEvent as MouseEvent
 
 eventInputData :: Event -> Maybe String
 eventInputData event = InputEvent.fromEvent event >>= InputEvent.data_
@@ -59,8 +57,6 @@ type State =
   { unchecked :: Array Grocery
   , checked :: Array Grocery
   , dragState :: Maybe (DragState Int)
-  , groceryAddCandidate :: Maybe GroceryAddCandidate
-  , nextId :: Maybe ULID
   }
 
 allGroceries :: State -> Array Grocery
@@ -151,11 +147,6 @@ data Action
   | OverDrag Int DragEvent
   | EndDrag DragEvent
   | ClearCompleted
-  | ShowAddGrocery
-  | CancelAddGrocery MouseEvent
-  | UpdateGroceryAddCandidateDescription Event
-  | UpdateGroceryAddCandidateAmountValue Event
-  | UpdateGroceryAddCandidateAmountUnit Event
 
 isPositive :: Int -> Boolean
 isPositive x = x > 0
@@ -256,48 +247,11 @@ groceriesView state =
             [ HH.text "Clear completed" ]
     ]
 
-groceryAddView
-  :: forall m. MonadAff m => GroceryAddCandidate -> H.ComponentHTML Action () m
-groceryAddView groceryAddCandidate =
-  HH.div [ HP.class_ $ H.ClassName "flex column" ]
-    [ HH.h1_ [ HH.text "Add grocery" ]
-    , HH.code_ [ HH.text $ groceryAddCandidate.description ]
-    , HH.form []
-        [ HH.label_
-            [ HH.text "description"
-            , HH.input
-                [ HE.onInput UpdateGroceryAddCandidateDescription
-                , HP.value $ groceryAddCandidate.description
-                ]
-            ]
-        , HH.label_
-            [ HH.text "Amount"
-            , HH.input
-                [ HP.type_ InputNumber
-                , HE.onInput UpdateGroceryAddCandidateAmountValue
-                , HP.value $ groceryAddCandidate.amount.value
-                , HP.min 1.0
-                ]
-            ]
-        , HH.label_
-            [ HH.text "Unit"
-            , HH.input
-                [ HE.onInput UpdateGroceryAddCandidateAmountUnit
-                -- , HP.value $ show $ amountUnit groceryAddCandidate.amount
-                , HP.value groceryAddCandidate.amount.unit
-                ]
-            ]
-        , HH.input [ HP.type_ InputButton, HP.value "Add" ]
-        , HH.button
-            [ HP.class_ $ H.ClassName "secondary"
-            , HE.onClick $ CancelAddGrocery
-            ]
-            [ HH.text "Cancel" ]
-        ]
-    ]
-
 component
-  :: forall query input output m. MonadAff m => H.Component query input output m
+  :: forall query input output m
+   . MonadAff m
+  => ManageGroceryList m
+  => H.Component query input output m
 component =
   H.mkComponent
     { initialState
@@ -311,11 +265,9 @@ component =
   where
   initialState :: input -> State
   initialState _ =
-    { unchecked: Array.filter (not <<< _.checked) dummyGroceries
-    , checked: Array.filter _.checked dummyGroceries
+    { unchecked: []
+    , checked: []
     , dragState: Nothing
-    , groceryAddCandidate: Nothing
-    , nextId: Nothing
     }
 
   handleAction
@@ -324,8 +276,11 @@ component =
     -> H.HalogenM State Action childSlots output m Unit
   handleAction = case _ of
     Initialize -> do
-      id <- H.liftEffect $ ULID.genULID ULIDW.prng
-      H.modify_ _ { nextId = Just id }
+      groceryList <- upsertGroceryList Data.dummyListId
+      H.modify_ $ _
+        { unchecked = Array.filter (not <<< _.checked) groceryList
+        , checked = Array.filter _.checked groceryList
+        }
 
     StartDrag index _dragEvent ->
       H.modify_ $ startDrag index
@@ -344,60 +299,21 @@ component =
     ClearCompleted ->
       H.modify_ clearCompleted
 
-    ShowAddGrocery ->
-      H.modify_ _
-        { groceryAddCandidate = Just
-            { description: "", amount: { value: "1", unit: "" } }
-        }
-    CancelAddGrocery mouseEvent -> do
-      preventDefault mouseEvent
-      H.modify_ _ { groceryAddCandidate = Nothing }
-
-    UpdateGroceryAddCandidateDescription event -> do
-      value <- Maybe.fromMaybe "" <$> S.eventTargetInputValue event
-
-      H.modify_ \s -> s
-        { groceryAddCandidate = updateDescription value <$>
-            s.groceryAddCandidate
-        }
-
-      where
-      updateDescription value = _ { description = value }
-
-    UpdateGroceryAddCandidateAmountValue event -> do
-      value <- S.eventTargetInputValue event
-      case value of
-        Nothing -> pure unit
-        Just v -> do
-          H.modify_ \s -> s
-            { groceryAddCandidate = updateAmountValue v <$>
-                s.groceryAddCandidate
-            }
-
-      where
-      updateAmountValue value x = x { amount = x.amount { value = value } }
-
-    UpdateGroceryAddCandidateAmountUnit event -> do
-      pure unit
-
   render :: State -> H.ComponentHTML Action () m
   render state =
     Layout.main $
-      case state.groceryAddCandidate of
-        Nothing ->
-          HH.div [ HP.class_ $ H.ClassName "flex column" ]
-            [ HH.div [ HP.class_ $ H.ClassName "flex justify-space-between" ]
-                [ HH.h1_ [ HH.text "Groceries" ]
-                , S.link Route.AddGrocery [ HH.text "Add" ]
-                ]
-            , HH.div [ HP.class_ $ H.ClassName "flex justify-space-between" ]
-                [ HH.a [ HP.href $ Route.print $ GroceriesGenerate ]
-                    [ HH.text "Generate" ]
-                , HH.button [ HP.class_ $ H.ClassName "secondary" ]
-                    [ HH.text "Edit" ]
-                ]
-            , case allGroceries state of
-                [] -> HH.text "No groceries have been added yet"
-                _ -> groceriesView state
+      HH.div [ HP.class_ $ H.ClassName "flex column" ]
+        [ HH.div [ HP.class_ $ H.ClassName "flex justify-space-between" ]
+            [ HH.h1_ [ HH.text "Groceries" ]
+            , S.link Route.AddGrocery [ HH.text "Add" ]
             ]
-        Just groceryAddCandidate -> groceryAddView groceryAddCandidate
+        , HH.div [ HP.class_ $ H.ClassName "flex justify-space-between" ]
+            [ HH.a [ HP.href $ Route.print $ GroceriesGenerate ]
+                [ HH.text "Generate" ]
+            , HH.button [ HP.class_ $ H.ClassName "secondary" ]
+                [ HH.text "Edit" ]
+            ]
+        , case allGroceries state of
+            [] -> HH.text "No groceries have been added yet"
+            _ -> groceriesView state
+        ]

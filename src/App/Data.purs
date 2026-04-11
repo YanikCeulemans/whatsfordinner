@@ -4,8 +4,11 @@ import Prelude
 
 import Data.Date (Date, Month(..))
 import Data.Date as Date
+import Data.Either as Either
 import Data.Enum (toEnum)
 import Data.Maybe as Maybe
+import Data.ULID as DULID
+import Domain.GroceryListId (GroceryListId(..))
 import Domain.Meal (Meal(..))
 import Domain.MealSchedule (Id(..), MealSchedule(..))
 import Domain.PlannedMeal (PlannedMeal(..))
@@ -139,3 +142,12 @@ mealSchedule =
             )
         ]
     }
+
+dummyListId :: GroceryListId
+dummyListId =
+  DULID.parse "01KNW48VB0PNCFC0KZ8SW289ZV"
+    # Either.fromRight' crash
+    # MkGroceryListId
+  where
+  crash _ = unsafeCrashWith "invalid hardcoded dummy list id ULID"
+
