@@ -42,3 +42,7 @@ toggleGrocery id groceryList =
 deleteGroceries :: Array Grocery -> GroceryList -> GroceryList
 deleteGroceries groceries groceryList =
   Array.difference groceryList groceries
+
+updateGroceries :: (Grocery -> Grocery) -> GroceryList -> GroceryList
+updateGroceries f groceryList =
+  map f groceryList

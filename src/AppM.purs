@@ -108,10 +108,20 @@ localStorageDeleteGroceries id groceriesToDelete = do
   where
   printedId = GroceryListId.print id
 
+localStorageUpdateGroceries
+  :: GroceryListId -> (Grocery -> Grocery) -> Aff GroceryList
+localStorageUpdateGroceries id f =
+  withStorageItem printedId
+    $ withGroceryList
+    $ GroceryList.updateGroceries f
+  where
+  printedId = GroceryListId.print id
+
 instance ManageGroceryList AppM where
   upsertGroceryList id = AppM $ localStorageUpsertGroceryList id
   upsertGrocery id grocery = AppM $ localStorageUpsertGrocery id grocery
   deleteGroceries id groceries = AppM $ localStorageDeleteGroceries id groceries
+  updateGroceries id f = AppM $ localStorageUpdateGroceries id f
 
 setLocation :: Route -> Aff Unit
 setLocation route = do

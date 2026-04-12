@@ -6,14 +6,9 @@ import App.Data as Data
 import App.Layout as Layout
 import App.Shared (preventDefault)
 import App.Shared as S
-import Capabilities.Resource.ManageGroceryList
-  ( class ManageGroceryList
-  , deleteGroceries
-  , upsertGrocery
-  , upsertGroceryList
-  )
+import Capabilities.Resource.ManageGroceryList (class ManageGroceryList, deleteGroceries, updateGroceries, upsertGrocery, upsertGroceryList)
 import Control.Alt ((<|>))
-import Data.Array (fold, mapWithIndex, (!!))
+import Data.Array (elem, fold, mapWithIndex, (!!))
 import Data.Array as Array
 import Data.Either as Either
 import Data.Int as Int
@@ -115,6 +110,12 @@ getGrocery id state =
 clearCompleted :: State -> State
 clearCompleted state = state { checked = [] }
 
+uncheckCompleted :: State -> State
+uncheckCompleted state = state
+  { unchecked = state.unchecked <> unchecked, checked = [] }
+  where
+  unchecked = _ { checked = false } <$> state.checked
+
 parseULID :: String -> ULID
 parseULID = DULID.parse >>> Either.either crash identity
   where
@@ -161,6 +162,7 @@ data Action
   | OverDrag Int DragEvent
   | EndDrag DragEvent
   | ClearCompleted
+  | UncheckCompleted
 
 printAmount :: Amount -> String
 printAmount amount =
@@ -268,7 +270,7 @@ groceriesView state =
                 [ HH.text "Clear done" ]
             , HH.button
                 [ HP.class_ $ H.ClassName "secondary"
-                , HE.onClick $ const ClearCompleted
+                , HE.onClick $ const UncheckCompleted
                 ]
                 [ HH.text "Uncheck done" ]
             ]
@@ -330,6 +332,16 @@ component =
       completed <- H.gets _.checked
       H.modify_ clearCompleted
       void $ deleteGroceries Data.dummyListId completed
+
+    UncheckCompleted -> do
+      completed <- H.gets _.checked
+      H.modify_ uncheckCompleted
+      void $ updateGroceries Data.dummyListId
+        (uncheckWhenElem (Grocery.id <$> completed))
+      where
+      uncheckWhenElem ids grocery
+        | grocery.id `elem` ids = grocery { checked = false }
+        | otherwise = grocery
 
   render :: State -> H.ComponentHTML Action () m
   render state =
