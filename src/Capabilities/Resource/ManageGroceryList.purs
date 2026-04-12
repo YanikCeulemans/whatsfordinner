@@ -10,9 +10,11 @@ import Halogen as H
 class Monad m <= ManageGroceryList m where
   upsertGroceryList :: GroceryListId -> m GroceryList
   upsertGrocery :: GroceryListId -> Grocery -> m Unit
+  deleteGroceries :: GroceryListId -> Array Grocery -> m GroceryList
 
 instance
   ManageGroceryList m =>
   ManageGroceryList (H.HalogenM st act slots msg m) where
   upsertGroceryList = H.lift <<< upsertGroceryList
   upsertGrocery id = H.lift <<< upsertGrocery id
+  deleteGroceries id = H.lift <<< deleteGroceries id

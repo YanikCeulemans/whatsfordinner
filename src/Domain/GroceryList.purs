@@ -39,3 +39,6 @@ toggleGrocery id groceryList =
     | Grocery.id grocery == id = Grocery.toggleChecked grocery
     | otherwise = grocery
 
+deleteGroceries :: Array Grocery -> GroceryList -> GroceryList
+deleteGroceries groceries groceryList =
+  Array.difference groceryList groceries

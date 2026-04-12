@@ -15,6 +15,9 @@ import Data.Maybe as Maybe
 import Data.Route (Route)
 import Data.Route as Route
 import Data.Traversable (traverse)
+import Data.Tuple (Tuple)
+import Data.Tuple as Tuple
+import Data.Tuple.Nested ((/\))
 import Domain.Grocery (Grocery)
 import Domain.GroceryList (GroceryList)
 import Domain.GroceryList as GroceryList
@@ -45,13 +48,18 @@ derive newtype instance MonadAff AppM
 -- TODO: Id types with phantom type instead of bespoke ids?
 
 withStorageItem
-  :: forall m. MonadAff m => String -> (Maybe String -> String) -> m Unit
+  :: forall m a
+   . MonadAff m
+  => String
+  -> (Maybe String -> Tuple a String)
+  -> m a
 withStorageItem key mf = liftEffect do
   storage <- Window.localStorage =<< HTML.window
   item <- Storage.getItem key storage
   let
-    updatedItem = mf item
-  Storage.setItem key updatedItem storage
+    updatedItem /\ encodedUpdatedItem = mf item
+  Storage.setItem key encodedUpdatedItem storage
+  pure updatedItem
 
 decodeGroceryList :: String -> Either String GroceryList
 decodeGroceryList candidate =
@@ -63,48 +71,47 @@ decodeGroceryList candidate =
 encodeGroceryList :: GroceryList -> String
 encodeGroceryList = CA.encode GroceryList.codec >>> A.stringify
 
-upsertGrocery :: Grocery -> Maybe String -> String
-upsertGrocery grocery serializedGroceryList =
-  encodeGroceryList upsertedGroceryList
+withGroceryList
+  :: (GroceryList -> GroceryList) -> Maybe String -> Tuple GroceryList String
+withGroceryList f serializedGroceryList =
+  groceryList /\ encodeGroceryList groceryList
   where
-  decodedList =
+  groceryList =
     serializedGroceryList
       # traverse decodeGroceryList
       # Either.hush
       # join
       # Maybe.fromMaybe mempty
-
-  upsertedGroceryList = GroceryList.upsertGrocery grocery decodedList
+      # f
 
 localStorageUpsertGroceryList :: GroceryListId -> Aff GroceryList
-localStorageUpsertGroceryList id = liftEffect do
-  storage <- Window.localStorage =<< HTML.window
-  serializedGroceryList <- Storage.getItem printedId storage
-  let
-    decodedList =
-      serializedGroceryList
-        # traverse decodeGroceryList
-        # Either.hush
-        # join
-
-  Maybe.maybe (saveEmptyList storage) pure decodedList
+localStorageUpsertGroceryList id =
+  withStorageItem printedId $ withGroceryList identity
   where
   printedId = GroceryListId.print id
-  emptyGroceryList = mempty
-  saveEmptyList storage =
-    Storage.setItem printedId (encodeGroceryList emptyGroceryList) storage $>
-      emptyGroceryList
 
 localStorageUpsertGrocery :: GroceryListId -> Grocery -> Aff Unit
 localStorageUpsertGrocery id grocery = do
   Aff.delay $ Milliseconds 500.0
-  withStorageItem printedId $ upsertGrocery grocery
+  void
+    $ withStorageItem printedId
+    $ withGroceryList
+    $ GroceryList.upsertGrocery grocery
+  where
+  printedId = GroceryListId.print id
+
+localStorageDeleteGroceries :: GroceryListId -> Array Grocery -> Aff GroceryList
+localStorageDeleteGroceries id groceriesToDelete = do
+  withStorageItem printedId
+    $ withGroceryList
+    $ GroceryList.deleteGroceries groceriesToDelete
   where
   printedId = GroceryListId.print id
 
 instance ManageGroceryList AppM where
   upsertGroceryList id = AppM $ localStorageUpsertGroceryList id
   upsertGrocery id grocery = AppM $ localStorageUpsertGrocery id grocery
+  deleteGroceries id groceries = AppM $ localStorageDeleteGroceries id groceries
 
 setLocation :: Route -> Aff Unit
 setLocation route = do

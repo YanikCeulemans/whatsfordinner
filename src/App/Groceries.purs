@@ -6,7 +6,12 @@ import App.Data as Data
 import App.Layout as Layout
 import App.Shared (preventDefault)
 import App.Shared as S
-import Capabilities.Resource.ManageGroceryList (class ManageGroceryList, upsertGrocery, upsertGroceryList)
+import Capabilities.Resource.ManageGroceryList
+  ( class ManageGroceryList
+  , deleteGroceries
+  , upsertGrocery
+  , upsertGroceryList
+  )
 import Control.Alt ((<|>))
 import Data.Array (fold, mapWithIndex, (!!))
 import Data.Array as Array
@@ -18,7 +23,6 @@ import Data.Route (Route(..))
 import Data.Route as Route
 import Data.Traversable (traverse_)
 import Data.ULID as DULID
-import Debug as Debug
 import Domain.Amount (Amount)
 import Domain.Amount as Amount
 import Domain.Grocery (Grocery)
@@ -29,12 +33,9 @@ import Effect.Aff.Class (class MonadAff)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
-import Halogen.HTML.Properties (InputType(..))
 import Halogen.HTML.Properties as HP
 import Partial.Unsafe (unsafeCrashWith)
 import Simple.ULID (ULID)
-import Simple.ULID as ULID
-import Simple.ULID.Window as ULIDW
 import Web.Event.Event (Event)
 import Web.HTML.Event.DragEvent (DragEvent)
 import Web.UIEvent.InputEvent as InputEvent
@@ -319,13 +320,16 @@ component =
       H.modify_ $ endDrag
 
     ToggleGrocery grocery mouseEvent -> do
+      -- TODO: Or simply: toggle grocery from param, upsert in state, upsert in remote state?
       preventDefault mouseEvent
       toggledGrocery <-
         getGrocery grocery.id <$> (H.modify $ toggleGrocery grocery)
       traverse_ (upsertGrocery Data.dummyListId) toggledGrocery
 
-    ClearCompleted ->
+    ClearCompleted -> do
+      completed <- H.gets _.checked
       H.modify_ clearCompleted
+      void $ deleteGroceries Data.dummyListId completed
 
   render :: State -> H.ComponentHTML Action () m
   render state =

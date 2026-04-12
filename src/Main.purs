@@ -15,11 +15,9 @@ import FFI.Navigation as Navigation
 import Halogen as H
 import Halogen.Aff as HA
 import Halogen.VDom.Driver (runUI)
-import Web.DOM.Document as Doc
 import Web.Event.Event (Event, EventType(..))
 import Web.Event.EventTarget as ET
 import Web.HTML as HTML
-import Web.HTML.HTMLDocument as HTMLDoc
 import Web.HTML.Location as Location
 import Web.HTML.Window as Window
 
