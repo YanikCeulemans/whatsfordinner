@@ -1,4 +1,4 @@
-module AppM where
+module AppM (AppM, runAppM) where
 
 import Prelude
 

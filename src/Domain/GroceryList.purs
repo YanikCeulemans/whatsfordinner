@@ -1,9 +1,13 @@
 module Domain.GroceryList where
 
+import Prelude
+
 import Data.Array as Array
 import Data.Codec.Argonaut as CA
+import Data.Maybe as Maybe
 import Domain.Grocery (Grocery)
 import Domain.Grocery as Grocery
+import Domain.GroceryId (GroceryId)
 
 type GroceryList = Array Grocery
 
@@ -20,5 +24,18 @@ upsertGrocery grocery groceryList =
       - Do we want the possiblity to have multiple lines with the same description
       - What happens when someone enters Carrots x5 when there is already Carrots 1kg on the list?
   --}
-  Array.cons grocery groceryList
+  (Array.findIndex hasId groceryList >>= update)
+    # Maybe.fromMaybe' consGroceryList
+  where
+  hasId x = Grocery.id x == Grocery.id grocery
+  update i = Array.updateAt i grocery groceryList
+  consGroceryList _ = Array.cons grocery groceryList
+
+toggleGrocery :: GroceryId -> GroceryList -> GroceryList
+toggleGrocery id groceryList =
+  groceryList <#> toggle
+  where
+  toggle grocery
+    | Grocery.id grocery == id = Grocery.toggleChecked grocery
+    | otherwise = grocery
 

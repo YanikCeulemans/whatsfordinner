@@ -27,3 +27,8 @@ codec =
         , checked: CA.boolean
         }
 
+id :: Grocery -> GroceryId
+id grocery = grocery.id
+
+toggleChecked :: Grocery -> Grocery
+toggleChecked grocery = grocery { checked = not grocery.checked }

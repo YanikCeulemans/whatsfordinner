@@ -6,7 +6,8 @@ import App.Data as Data
 import App.Layout as Layout
 import App.Shared (preventDefault)
 import App.Shared as S
-import Capabilities.Resource.ManageGroceryList (class ManageGroceryList, upsertGroceryList)
+import Capabilities.Resource.ManageGroceryList (class ManageGroceryList, upsertGrocery, upsertGroceryList)
+import Control.Alt ((<|>))
 import Data.Array (fold, mapWithIndex, (!!))
 import Data.Array as Array
 import Data.Either as Either
@@ -15,11 +16,13 @@ import Data.Maybe (Maybe(..))
 import Data.Maybe as Maybe
 import Data.Route (Route(..))
 import Data.Route as Route
+import Data.Traversable (traverse_)
 import Data.ULID as DULID
 import Debug as Debug
 import Domain.Amount (Amount)
 import Domain.Amount as Amount
 import Domain.Grocery (Grocery)
+import Domain.Grocery as Grocery
 import Domain.GroceryId (GroceryId(..))
 import Domain.GroceryId as GroceryId
 import Effect.Aff.Class (class MonadAff)
@@ -87,18 +90,26 @@ endDrag state = Maybe.fromMaybe withoutDragState do
   where
   withoutDragState = state { dragState = Nothing }
 
-toggleGrocery :: GroceryId -> State -> State
-toggleGrocery id state =
+toggleGrocery :: Grocery -> State -> State
+toggleGrocery grocery state =
   state
     { unchecked = Array.filter (not <<< _.checked) groceries
     , checked = Array.filter _.checked groceries
     }
   where
-  toggleChecked grocery
-    | grocery.id == id = grocery
+  toggleChecked grocery'
+    | grocery == grocery' = grocery'
         { checked = not grocery.checked }
-    | otherwise = grocery
+    | otherwise = grocery'
   groceries = toggleChecked <$> allGroceries state
+
+getGrocery :: GroceryId -> State -> Maybe Grocery
+getGrocery id state =
+  checkedGrocery <|> uncheckedGrocery
+  where
+  hasId grocery = Grocery.id grocery == id
+  checkedGrocery = Array.find hasId state.checked
+  uncheckedGrocery = Array.find hasId state.unchecked
 
 clearCompleted :: State -> State
 clearCompleted state = state { checked = [] }
@@ -144,7 +155,7 @@ dummyGroceries =
 
 data Action
   = Initialize
-  | ToggleGrocery GroceryId MouseEvent
+  | ToggleGrocery Grocery MouseEvent
   | StartDrag Int DragEvent
   | OverDrag Int DragEvent
   | EndDrag DragEvent
@@ -192,7 +203,7 @@ groceryView dragState index grocery =
       ( join
           [ [ HP.class_ $ H.ClassName "no-list-style"
             , HP.id $ GroceryId.print grocery.id
-            , HE.onClick $ ToggleGrocery grocery.id
+            , HE.onClick $ ToggleGrocery grocery
             ]
           , case grocery.checked of
               false ->
@@ -248,11 +259,18 @@ groceriesView state =
     , case state.checked of
         [] -> HH.text ""
         _ ->
-          HH.button
-            [ HP.class_ $ H.ClassName "secondary"
-            , HE.onClick $ const ClearCompleted
+          HH.div [ HP.class_ $ H.ClassName "flex column spaced" ]
+            [ HH.button
+                [ HP.class_ $ H.ClassName "secondary"
+                , HE.onClick $ const ClearCompleted
+                ]
+                [ HH.text "Clear done" ]
+            , HH.button
+                [ HP.class_ $ H.ClassName "secondary"
+                , HE.onClick $ const ClearCompleted
+                ]
+                [ HH.text "Uncheck done" ]
             ]
-            [ HH.text "Clear completed" ]
     ]
 
 component
@@ -300,9 +318,11 @@ component =
     EndDrag _dragEvent -> do
       H.modify_ $ endDrag
 
-    ToggleGrocery index mouseEvent -> do
+    ToggleGrocery grocery mouseEvent -> do
       preventDefault mouseEvent
-      H.modify_ $ toggleGrocery index
+      toggledGrocery <-
+        getGrocery grocery.id <$> (H.modify $ toggleGrocery grocery)
+      traverse_ (upsertGrocery Data.dummyListId) toggledGrocery
 
     ClearCompleted ->
       H.modify_ clearCompleted
