@@ -3,13 +3,11 @@ module Domain.GroceryListId where
 import Prelude
 
 import Data.Argonaut as J
-import Data.Bifunctor (bimap, lmap)
+import Data.Bifunctor (bimap)
 import Data.Codec.Argonaut (JsonCodec)
 import Data.Codec.Argonaut as CA
-import Data.Either (Either(..))
+import Data.Either (Either)
 import Data.Either as Either
-import Data.Maybe as Maybe
-import Data.Profunctor (dimap)
 import Data.ULID as DULID
 import Simple.ULID (ULID)
 import Simple.ULID as ULID
