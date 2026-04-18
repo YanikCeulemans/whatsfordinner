@@ -36,3 +36,6 @@ checked g = g.checked
 
 toggleChecked :: Grocery -> Grocery
 toggleChecked grocery = grocery { checked = not grocery.checked }
+
+uncheck :: Grocery -> Grocery
+uncheck grocery = grocery { checked = false }

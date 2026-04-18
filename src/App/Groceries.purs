@@ -20,11 +20,15 @@ import Data.Maybe (Maybe(..))
 import Data.Maybe as Maybe
 import Data.Route (Route(..))
 import Data.Route as Route
+import Data.Tuple (Tuple(..))
+import Data.Tuple as Tuple
 import Domain.Amount (Amount)
 import Domain.Amount as Amount
 import Domain.Grocery (Grocery)
 import Domain.Grocery as Grocery
 import Domain.GroceryId as GroceryId
+import Domain.GroceryList (GroceryList)
+import Domain.GroceryList as GroceryList
 import Effect.Aff.Class (class MonadAff)
 import Halogen as H
 import Halogen.HTML as HH
@@ -39,13 +43,12 @@ type DragState a =
   }
 
 type State =
-  { unchecked :: Array Grocery
-  , checked :: Array Grocery
+  { groceryList :: GroceryList
   , dragState :: Maybe (DragState Int)
   }
 
-allGroceries :: State -> Array Grocery
-allGroceries { checked, unchecked } = checked <> unchecked
+allGroceries :: State -> GroceryList
+allGroceries { groceryList } = groceryList
 
 startDrag :: Int -> State -> State
 startDrag index state =
@@ -59,36 +62,27 @@ overDrag index state =
 endDrag :: State -> State
 endDrag state = Maybe.fromMaybe withoutDragState do
   { dragItem, dragOverItem } <- state.dragState
-  foundDragItem <- state.unchecked !! dragItem
-  updatedGroceries <- Array.deleteAt dragItem state.unchecked
+  foundDragItem <- state.groceryList !! dragItem
   let
-    insertIndex =
-      if dragOverItem < dragItem then dragOverItem else dragOverItem
+    updatedList =
+      GroceryList.insertAt dragOverItem foundDragItem
+        $ GroceryList.delete foundDragItem state.groceryList
 
-  updatedGroceries' <- Array.insertAt insertIndex foundDragItem updatedGroceries
-  pure $ withoutDragState { unchecked = updatedGroceries' }
+  pure $ withoutDragState { groceryList = updatedList }
   where
   withoutDragState = state { dragState = Nothing }
 
-updateGrocery :: (Grocery -> Grocery) -> State -> State
-updateGrocery f state =
-  state
-    { checked = updatedChecked
-    , unchecked = updatedUnchecked
-    }
-  where
-  updated = f <$> (state.checked <> state.unchecked)
-  { yes: updatedChecked, no: updatedUnchecked } =
-    Array.partition Grocery.checked updated
+setGrocery :: Grocery -> State -> State
+setGrocery grocery s =
+  s { groceryList = GroceryList.set grocery s.groceryList }
 
 clearCompleted :: State -> State
-clearCompleted state = state { checked = [] }
+clearCompleted state = state
+  { groceryList = GroceryList.clearCompleted state.groceryList }
 
 uncheckCompleted :: State -> State
 uncheckCompleted state = state
-  { unchecked = state.unchecked <> unchecked, checked = [] }
-  where
-  unchecked = _ { checked = false } <$> state.checked
+  { groceryList = map Grocery.uncheck state.groceryList }
 
 data Action
   = Initialize
@@ -96,6 +90,7 @@ data Action
   | StartDrag Int DragEvent
   | OverDrag Int DragEvent
   | EndDrag DragEvent
+  -- TODO: implement drag leave to prevent dragging items out of lists
   | ClearCompleted
   | UncheckCompleted
 
@@ -125,10 +120,9 @@ groceryView
   :: forall m
    . MonadAff m
   => Maybe (DragState Int)
-  -> Int
-  -> Grocery
+  -> Tuple Int Grocery
   -> H.ComponentHTML Action () m
-groceryView dragState index grocery =
+groceryView dragState (Tuple index grocery) =
   let
     direction
       | grocery.checked = Nothing
@@ -187,11 +181,11 @@ groceriesView state =
         [ HP.class_ $ H.ClassName "no-padding groceries-list"
         , HE.onDragEnd $ EndDrag
         ] $
-        mapWithIndex (groceryView state.dragState) state.unchecked
+        map (groceryView state.dragState) uncheckedGroceries
     , HH.h2_ [ HH.text "Done" ]
     , HH.ul [ HP.class_ $ H.ClassName "no-padding groceries-list" ] $
-        mapWithIndex (groceryView state.dragState) state.checked
-    , case state.checked of
+        map (groceryView state.dragState) checkedGroceries
+    , case checkedGroceries of
         [] -> HH.text ""
         _ ->
           HH.div [ HP.class_ $ H.ClassName "flex column spaced" ]
@@ -207,6 +201,11 @@ groceriesView state =
                 [ HH.text "Uncheck done" ]
             ]
     ]
+
+  where
+  { no: uncheckedGroceries, yes: checkedGroceries } =
+    mapWithIndex Tuple state.groceryList
+      # Array.partition (Tuple.snd >>> Grocery.checked)
 
 component
   :: forall query input output m
@@ -226,8 +225,7 @@ component =
   where
   initialState :: input -> State
   initialState _ =
-    { unchecked: []
-    , checked: []
+    { groceryList: mempty
     , dragState: Nothing
     }
 
@@ -238,10 +236,7 @@ component =
   handleAction = case _ of
     Initialize -> do
       groceryList <- upsertGroceryList Data.dummyListId
-      H.modify_ $ _
-        { unchecked = Array.filter (not <<< _.checked) groceryList
-        , checked = Array.filter _.checked groceryList
-        }
+      H.modify_ _ { groceryList = groceryList }
 
     StartDrag index _dragEvent ->
       H.modify_ $ startDrag index
@@ -255,25 +250,29 @@ component =
 
     ToggleGrocery grocery mouseEvent -> do
       preventDefault mouseEvent
-      H.modify_ $ updateGrocery set
+      H.modify_ $ setGrocery toggledGrocery
       upsertGrocery Data.dummyListId toggledGrocery
       where
       toggledGrocery = Grocery.toggleChecked grocery
-      set g
-        | Grocery.id g == Grocery.id toggledGrocery = toggledGrocery
-        | otherwise = g
 
     ClearCompleted -> do
-      completed <- H.gets _.checked
+      completed <- H.gets getCheckedGroceries
       H.modify_ clearCompleted
       void $ deleteGroceries Data.dummyListId completed
+      where
+      getCheckedGroceries s =
+        GroceryList.partitionGroceriesOnChecked s.groceryList
+          # _.checked
 
     UncheckCompleted -> do
-      completed <- H.gets _.checked
+      completed <- H.gets getCheckedGroceries
       H.modify_ uncheckCompleted
       void $ updateGroceries Data.dummyListId
         (uncheckWhenElem (Grocery.id <$> completed))
       where
+      getCheckedGroceries s =
+        GroceryList.partitionGroceriesOnChecked s.groceryList
+          # _.checked
       uncheckWhenElem ids grocery
         | grocery.id `elem` ids = grocery { checked = false }
         | otherwise = grocery

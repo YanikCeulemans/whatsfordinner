@@ -46,3 +46,30 @@ deleteGroceries groceries groceryList =
 updateGroceries :: (Grocery -> Grocery) -> GroceryList -> GroceryList
 updateGroceries f groceryList =
   map f groceryList
+
+partitionGroceriesOnChecked
+  :: GroceryList -> { checked :: GroceryList, unchecked :: GroceryList }
+partitionGroceriesOnChecked gs =
+  { checked: partitioned.yes
+  , unchecked: partitioned.no
+  }
+  where
+  partitioned = Array.partition Grocery.checked gs
+
+set :: Grocery -> GroceryList -> GroceryList
+set grocery list = help <$> list
+  where
+  help g
+    | Grocery.id g == Grocery.id grocery = grocery
+    | otherwise = g
+
+delete :: Grocery -> GroceryList -> GroceryList
+delete grocery list = Array.delete grocery list
+
+insertAt :: Int -> Grocery -> GroceryList -> GroceryList
+insertAt index grocery list =
+  Array.insertAt index grocery list
+    # Maybe.fromMaybe list
+
+clearCompleted :: GroceryList -> GroceryList
+clearCompleted = Array.filter (not <<< _.checked)
