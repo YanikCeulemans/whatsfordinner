@@ -2,31 +2,29 @@ module AppM (AppM, runAppM) where
 
 import Prelude
 
-import App.Data as Data
 import Capabilities.Navigation (class Navigation)
 import Capabilities.Resource.ManageGroceryList (class ManageGroceryList)
 import Control.Monad.State (class MonadState)
+import Control.Monad.State as MonadState
 import Data.Argonaut as A
 import Data.Argonaut.Parser as AP
-import Data.Array (foldl, (..), (:))
+import Data.Array (foldl, (..))
 import Data.Array as Array
 import Data.Bifunctor (lmap)
 import Data.Codec.Argonaut as CA
 import Data.Either (Either(..))
 import Data.Either as Either
+import Data.FoldableWithIndex (forWithIndex_)
 import Data.Map (Map)
 import Data.Map as Map
-import Data.Maybe (Maybe)
-import Data.Maybe as Maybe
+import Data.Maybe (Maybe(..))
 import Data.Route (Route)
 import Data.Route as Route
-import Data.Traversable (for, traverse)
+import Data.Traversable (for)
 import Data.Tuple (Tuple(..))
-import Data.Tuple as Tuple
 import Data.Tuple.Nested ((/\))
 import Data.ULID as DULID
 import Domain.Grocery (Grocery)
-import Domain.GroceryId (GroceryId(..))
 import Domain.GroceryList (GroceryList)
 import Domain.GroceryList as GroceryList
 import Domain.GroceryListId (GroceryListId(..))
@@ -34,10 +32,9 @@ import Domain.GroceryListId as GroceryListId
 import Effect (Effect)
 import Effect.Aff (Aff, Milliseconds(..))
 import Effect.Aff as Aff
-import Effect.Aff.Class (class MonadAff)
+import Effect.Aff.Class (class MonadAff, liftAff)
 import Effect.Class (class MonadEffect, liftEffect)
 import FFI.Navigation as Nav
-import Simple.ULID (ULID)
 import Web.HTML as HTML
 import Web.HTML.Window as Window
 import Web.Storage.Storage (Storage)
@@ -58,20 +55,6 @@ derive newtype instance MonadAff AppM
 
 -- TODO: Id types with phantom type instead of bespoke ids?
 
-withStorageItem
-  :: forall m a
-   . MonadAff m
-  => String
-  -> (Maybe String -> Tuple a String)
-  -> m a
-withStorageItem key mf = liftEffect do
-  storage <- Window.localStorage =<< HTML.window
-  item <- Storage.getItem key storage
-  let
-    updatedItem /\ encodedUpdatedItem = mf item
-  Storage.setItem key encodedUpdatedItem storage
-  pure updatedItem
-
 decodeGroceryList :: String -> Either String GroceryList
 decodeGroceryList candidate =
   AP.jsonParser candidate >>=
@@ -82,57 +65,58 @@ decodeGroceryList candidate =
 encodeGroceryList :: GroceryList -> String
 encodeGroceryList = CA.encode GroceryList.codec >>> A.stringify
 
-withGroceryList
-  :: (GroceryList -> GroceryList) -> Maybe String -> Tuple GroceryList String
-withGroceryList f serializedGroceryList =
-  groceryList /\ encodeGroceryList groceryList
-  where
-  groceryList =
-    serializedGroceryList
-      # traverse decodeGroceryList
-      # Either.hush
-      # join
-      # Maybe.fromMaybe mempty
-      # f
+getOrInsert
+  :: forall k v. Ord k => k -> (Unit -> v) -> Map k v -> Tuple v (Map k v)
+getOrInsert key createValue map =
+  case Map.lookup key map of
+    Just value -> value /\ map
+    Nothing ->
+      value /\ updatedMap
+      where
+      value = createValue unit
+      updatedMap = Map.insert key value map
 
-localStorageUpsertGroceryList :: GroceryListId -> Aff GroceryList
-localStorageUpsertGroceryList id =
-  withStorageItem printedId $ withGroceryList identity
+localStorageUpsertGroceryList :: GroceryListId -> AppM GroceryList
+localStorageUpsertGroceryList id = do
+  state <- MonadState.get
+  let
+    list /\ newState = getOrInsert id createValue state
+  MonadState.put newState
+  pure list
   where
-  printedId = GroceryListId.print id
+  createValue _ = mempty
 
-localStorageUpsertGrocery :: GroceryListId -> Grocery -> Aff Unit
+localStorageUpsertGrocery :: GroceryListId -> Grocery -> AppM Unit
 localStorageUpsertGrocery id grocery = do
-  Aff.delay $ Milliseconds 500.0
-  void
-    $ withStorageItem printedId
-    $ withGroceryList
-    $ GroceryList.upsertGrocery grocery
+  liftAff $ Aff.delay $ Milliseconds 300.0
+  MonadState.modify_ upsert
   where
-  printedId = GroceryListId.print id
+  go = GroceryList.upsertGrocery grocery
+  upsert = Map.alter (map go) id
 
-localStorageDeleteGroceries :: GroceryListId -> Array Grocery -> Aff GroceryList
+localStorageDeleteGroceries
+  :: GroceryListId -> Array Grocery -> AppM GroceryList
 localStorageDeleteGroceries id groceriesToDelete = do
-  withStorageItem printedId
-    $ withGroceryList
-    $ GroceryList.deleteGroceries groceriesToDelete
-  where
-  printedId = GroceryListId.print id
+  list <- localStorageUpsertGroceryList id
+  let
+    updatedList = GroceryList.deleteGroceries groceriesToDelete list
+  MonadState.modify_ (Map.insert id updatedList)
+  pure updatedList
 
 localStorageUpdateGroceries
-  :: GroceryListId -> (Grocery -> Grocery) -> Aff GroceryList
-localStorageUpdateGroceries id f =
-  withStorageItem printedId
-    $ withGroceryList
-    $ GroceryList.updateGroceries f
-  where
-  printedId = GroceryListId.print id
+  :: GroceryListId -> (Grocery -> Grocery) -> AppM GroceryList
+localStorageUpdateGroceries id f = do
+  list <- localStorageUpsertGroceryList id
+  let
+    updatedList = map f list
+  MonadState.modify_ (Map.insert id updatedList)
+  pure updatedList
 
 instance ManageGroceryList AppM where
-  upsertGroceryList id = AppM $ localStorageUpsertGroceryList id
-  upsertGrocery id grocery = AppM $ localStorageUpsertGrocery id grocery
-  deleteGroceries id groceries = AppM $ localStorageDeleteGroceries id groceries
-  updateGroceries id f = AppM $ localStorageUpdateGroceries id f
+  upsertGroceryList id = localStorageUpsertGroceryList id
+  upsertGrocery id grocery = localStorageUpsertGrocery id grocery
+  deleteGroceries id groceries = localStorageDeleteGroceries id groceries
+  updateGroceries id f = localStorageUpdateGroceries id f
 
 setLocation :: Route -> Aff Unit
 setLocation route = do
@@ -174,6 +158,14 @@ getGroceryListStorageItem storage id = do
   printedId = GroceryListId.print id
   toTuple list = Tuple id list
 
+setGroceryListStorageItem
+  :: Storage -> GroceryListId -> GroceryList -> Effect Unit
+setGroceryListStorageItem storage id list = do
+  Storage.setItem printedId encodedList storage
+  where
+  printedId = GroceryListId.print id
+  encodedList = encodeGroceryList list
+
 localStorageState :: forall a. (State -> Tuple a State) -> Aff a
 localStorageState f = liftEffect do
   storage <- Window.localStorage =<< HTML.window
@@ -183,14 +175,18 @@ localStorageState f = liftEffect do
   let
     idKeys = groceryListIdKeys $ Array.catMaybes keys
 
-  (groceryLists :: State) <- Map.fromFoldable <$>
-    ( Array.catMaybes <$>
-        ( for idKeys $ getGroceryListStorageItem
-            storage
-        )
-    )
+  groceryListMaybes <- for idKeys $ getGroceryListStorageItem storage
+  let
+    groceryLists =
+      groceryListMaybes
+        # Array.catMaybes
+        # Map.fromFoldable
 
-  pure ?h
+    result /\ updatedGroceryLists = f groceryLists
+
+  forWithIndex_ updatedGroceryLists $ setGroceryListStorageItem storage
+
+  pure result
 
 instance MonadState State AppM where
   state f = AppM $ localStorageState f

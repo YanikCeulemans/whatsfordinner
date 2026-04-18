@@ -16,6 +16,7 @@ newtype GroceryListId = MkGroceryListId ULID
 
 derive instance Eq GroceryListId
 derive newtype instance Show GroceryListId
+derive newtype instance Ord GroceryListId
 
 codec :: JsonCodec GroceryListId
 codec =
