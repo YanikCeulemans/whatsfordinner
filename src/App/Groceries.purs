@@ -6,52 +6,36 @@ import App.Data as Data
 import App.Layout as Layout
 import App.Shared (preventDefault)
 import App.Shared as S
-import Capabilities.Resource.ManageGroceryList (class ManageGroceryList, deleteGroceries, updateGroceries, upsertGrocery, upsertGroceryList)
-import Control.Alt ((<|>))
+import Capabilities.Resource.ManageGroceryList
+  ( class ManageGroceryList
+  , deleteGroceries
+  , updateGroceries
+  , upsertGrocery
+  , upsertGroceryList
+  )
 import Data.Array (elem, fold, mapWithIndex, (!!))
 import Data.Array as Array
-import Data.Either as Either
 import Data.Int as Int
 import Data.Maybe (Maybe(..))
 import Data.Maybe as Maybe
 import Data.Route (Route(..))
 import Data.Route as Route
-import Data.Traversable (traverse_)
-import Data.ULID as DULID
 import Domain.Amount (Amount)
 import Domain.Amount as Amount
 import Domain.Grocery (Grocery)
 import Domain.Grocery as Grocery
-import Domain.GroceryId (GroceryId(..))
 import Domain.GroceryId as GroceryId
 import Effect.Aff.Class (class MonadAff)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
-import Partial.Unsafe (unsafeCrashWith)
-import Simple.ULID (ULID)
-import Web.Event.Event (Event)
 import Web.HTML.Event.DragEvent (DragEvent)
-import Web.UIEvent.InputEvent as InputEvent
 import Web.UIEvent.MouseEvent (MouseEvent)
-
-eventInputData :: Event -> Maybe String
-eventInputData event = InputEvent.fromEvent event >>= InputEvent.data_
-
-type AmountCandidate =
-  { value :: String
-  , unit :: String
-  }
 
 type DragState a =
   { dragItem :: a
   , dragOverItem :: a
-  }
-
-type GroceryAddCandidate =
-  { description :: String
-  , amount :: AmountCandidate
   }
 
 type State =
@@ -86,26 +70,16 @@ endDrag state = Maybe.fromMaybe withoutDragState do
   where
   withoutDragState = state { dragState = Nothing }
 
-toggleGrocery :: Grocery -> State -> State
-toggleGrocery grocery state =
+updateGrocery :: (Grocery -> Grocery) -> State -> State
+updateGrocery f state =
   state
-    { unchecked = Array.filter (not <<< _.checked) groceries
-    , checked = Array.filter _.checked groceries
+    { checked = updatedChecked
+    , unchecked = updatedUnchecked
     }
   where
-  toggleChecked grocery'
-    | grocery == grocery' = grocery'
-        { checked = not grocery.checked }
-    | otherwise = grocery'
-  groceries = toggleChecked <$> allGroceries state
-
-getGrocery :: GroceryId -> State -> Maybe Grocery
-getGrocery id state =
-  checkedGrocery <|> uncheckedGrocery
-  where
-  hasId grocery = Grocery.id grocery == id
-  checkedGrocery = Array.find hasId state.checked
-  uncheckedGrocery = Array.find hasId state.unchecked
+  updated = f <$> (state.checked <> state.unchecked)
+  { yes: updatedChecked, no: updatedUnchecked } =
+    Array.partition Grocery.checked updated
 
 clearCompleted :: State -> State
 clearCompleted state = state { checked = [] }
@@ -115,45 +89,6 @@ uncheckCompleted state = state
   { unchecked = state.unchecked <> unchecked, checked = [] }
   where
   unchecked = _ { checked = false } <$> state.checked
-
-parseULID :: String -> ULID
-parseULID = DULID.parse >>> Either.either crash identity
-  where
-  crash e = unsafeCrashWith $ "invalid hardcoded ULID: " <> e
-
-dummyGroceries :: Array Grocery
-dummyGroceries =
-  [ { id: MkGroceryId $ parseULID "01KNEQ7KMSBM0Q4XP56C6YP3NG"
-    , description: "Onion"
-    , amount: Amount.unitless 3.0
-    , checked: false
-    }
-  , { id: MkGroceryId $ parseULID "01KNEQ7KMTPNHDW1X8N4P9G7WV"
-    , description: "Carrots"
-    , amount: Amount.create 1.0 "kg"
-    , checked: true
-    }
-  , { id: MkGroceryId $ parseULID "01KNEQ7KMTCC0KREZGB172ASD0"
-    , description: "Mushrooms"
-    , amount: Amount.create 250.0 "g"
-    , checked: false
-    }
-  , { id: MkGroceryId $ parseULID "01KNEQ7KMTP534FYCKA4ZCBEFS"
-    , description: "Bell peppers"
-    , amount: Amount.unitless 2.0
-    , checked: false
-    }
-  , { id: MkGroceryId $ parseULID "01KNEQ7KMTG18271MG7NEEBV05"
-    , description: "Zucchini"
-    , amount: Amount.unitless 1.0
-    , checked: false
-    }
-  , { id: MkGroceryId $ parseULID "01KNEQ7KMT0XDE57C3HJPE6GVQ"
-    , description: "Potatoes"
-    , amount: Amount.create 2.0 "kg"
-    , checked: false
-    }
-  ]
 
 data Action
   = Initialize
@@ -175,9 +110,6 @@ printAmount amount =
 data DragDirection = Above | Below
 
 derive instance Eq DragDirection
-
-dragDelta :: forall a. Ring a => DragState a -> a
-dragDelta { dragItem, dragOverItem } = dragItem - dragOverItem
 
 dragDirection :: Int -> DragState Int -> Maybe DragDirection
 dragDirection index { dragItem, dragOverItem }
@@ -322,11 +254,14 @@ component =
       H.modify_ $ endDrag
 
     ToggleGrocery grocery mouseEvent -> do
-      -- TODO: Or simply: toggle grocery from param, upsert in state, upsert in remote state?
       preventDefault mouseEvent
-      toggledGrocery <-
-        getGrocery grocery.id <$> (H.modify $ toggleGrocery grocery)
-      traverse_ (upsertGrocery Data.dummyListId) toggledGrocery
+      H.modify_ $ updateGrocery set
+      upsertGrocery Data.dummyListId toggledGrocery
+      where
+      toggledGrocery = Grocery.toggleChecked grocery
+      set g
+        | Grocery.id g == Grocery.id toggledGrocery = toggledGrocery
+        | otherwise = g
 
     ClearCompleted -> do
       completed <- H.gets _.checked

@@ -7,7 +7,9 @@ import Domain.GroceryList (GroceryList)
 import Domain.GroceryListId (GroceryListId)
 import Halogen as H
 
--- TODO: These signatures are lies, it should at least be -> m (Maybe GroceryList)
+{-- TODO: 
+    These signatures could be improved, it could be -> m (Maybe GroceryList)
+--}
 class Monad m <= ManageGroceryList m where
   upsertGroceryList :: GroceryListId -> m GroceryList
   upsertGrocery :: GroceryListId -> Grocery -> m Unit

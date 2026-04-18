@@ -10,6 +10,7 @@ import Domain.Amount as Amount
 import Domain.GroceryId (GroceryId)
 import Domain.GroceryId as GroceryId
 
+-- TODO: newtype with custom eq instance by id
 type Grocery =
   { id :: GroceryId
   , description :: String
@@ -29,6 +30,9 @@ codec =
 
 id :: Grocery -> GroceryId
 id grocery = grocery.id
+
+checked :: Grocery -> Boolean
+checked g = g.checked
 
 toggleChecked :: Grocery -> Grocery
 toggleChecked grocery = grocery { checked = not grocery.checked }
