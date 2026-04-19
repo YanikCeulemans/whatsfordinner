@@ -13,7 +13,7 @@ import Capabilities.Resource.ManageGroceryList
   , upsertGrocery
   , upsertGroceryList
   )
-import Data.Array (elem, fold, mapWithIndex)
+import Data.Array (fold, mapWithIndex)
 import Data.Array as Array
 import Data.Int as Int
 import Data.Maybe (Maybe(..))
