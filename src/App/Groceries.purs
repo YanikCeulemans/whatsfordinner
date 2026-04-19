@@ -13,11 +13,10 @@ import Capabilities.Resource.ManageGroceryList
   , upsertGrocery
   , upsertGroceryList
   )
-import Data.Array (elem, fold, mapWithIndex, (!!))
+import Data.Array (elem, fold, mapWithIndex)
 import Data.Array as Array
 import Data.Int as Int
 import Data.Maybe (Maybe(..))
-import Data.Maybe as Maybe
 import Data.Route (Route(..))
 import Data.Route as Route
 import Data.Tuple (Tuple(..))
@@ -37,40 +36,43 @@ import Halogen.HTML.Properties as HP
 import Web.HTML.Event.DragEvent (DragEvent)
 import Web.UIEvent.MouseEvent (MouseEvent)
 
-type DragState a =
-  { dragItem :: a
-  , dragOverItem :: a
+data DragState a
+  = NotDragging
+  | DraggingOverNonTarget a
+  | DraggingOverTarget { source :: a, target :: a }
+
+dragOverTarget :: forall a. a -> DragState a -> DragState a
+dragOverTarget target = case _ of
+  NotDragging -> NotDragging
+  DraggingOverNonTarget source -> go source
+  DraggingOverTarget { source } -> go source
+  where
+  go source = DraggingOverTarget { source, target }
+
+type DragEntry =
+  { index :: Int
+  , item :: Grocery
   }
 
 type State =
   { groceryList :: GroceryList
-  , dragState :: Maybe (DragState Int)
+  , dragState :: DragState DragEntry
   }
 
-allGroceries :: State -> GroceryList
-allGroceries { groceryList } = groceryList
-
-startDrag :: Int -> State -> State
-startDrag index state =
-  state
-    { dragState = Just { dragItem: index, dragOverItem: index } }
-
-overDrag :: Int -> State -> State
-overDrag index state =
-  state { dragState = _ { dragOverItem = index } <$> state.dragState }
-
 endDrag :: State -> State
-endDrag state = Maybe.fromMaybe withoutDragState do
-  { dragItem, dragOverItem } <- state.dragState
-  foundDragItem <- state.groceryList !! dragItem
-  let
-    updatedList =
-      GroceryList.insertAt dragOverItem foundDragItem
-        $ GroceryList.delete foundDragItem state.groceryList
-
-  pure $ withoutDragState { groceryList = updatedList }
-  where
-  withoutDragState = state { dragState = Nothing }
+endDrag state =
+  case state.dragState of
+    NotDragging -> state
+    DraggingOverNonTarget _ -> state { dragState = NotDragging }
+    DraggingOverTarget { source, target } ->
+      state
+        { dragState = NotDragging
+        , groceryList = shiftedList
+        }
+      where
+      shiftedList =
+        GroceryList.insertAt target.index source.item
+          $ GroceryList.delete source.item state.groceryList
 
 setGrocery :: Grocery -> State -> State
 setGrocery grocery s =
@@ -87,8 +89,8 @@ uncheckCompleted state = state
 data Action
   = Initialize
   | ToggleGrocery Grocery MouseEvent
-  | StartDrag Int DragEvent
-  | OverDrag Int DragEvent
+  | StartDrag DragEntry DragEvent
+  | OverDrag DragEntry DragEvent
   | EndDrag DragEvent
   -- TODO: implement drag leave to prevent dragging items out of lists
   | ClearCompleted
@@ -106,27 +108,32 @@ data DragDirection = Above | Below
 
 derive instance Eq DragDirection
 
-dragDirection :: Int -> DragState Int -> Maybe DragDirection
-dragDirection index { dragItem, dragOverItem }
-  | index /= dragOverItem = Nothing
-  | otherwise = help $ dragItem - dragOverItem
-      where
-      help n
-        | n == 0 = Nothing
-        | n > 0 = Just Above
-        | otherwise = Just Below
+dragDirection :: DragEntry -> DragState DragEntry -> Maybe DragDirection
+dragDirection dragEntry = case _ of
+  NotDragging -> Nothing
+  DraggingOverNonTarget _ -> Nothing
+  DraggingOverTarget { source, target }
+    | dragEntry /= target -> Nothing
+    | otherwise ->
+        help $ source.index - target.index
+        where
+        help n
+          | n == 0 = Nothing
+          | n > 0 = Just Above
+          | otherwise = Just Below
 
 groceryView
   :: forall m
    . MonadAff m
-  => Maybe (DragState Int)
+  => DragState DragEntry
   -> Tuple Int Grocery
   -> H.ComponentHTML Action () m
 groceryView dragState (Tuple index grocery) =
   let
+    dragEntry = { index, item: grocery }
     direction
       | grocery.checked = Nothing
-      | otherwise = dragDirection index =<< dragState
+      | otherwise = dragDirection dragEntry dragState
   in
     HH.li
       ( join
@@ -137,8 +144,8 @@ groceryView dragState (Tuple index grocery) =
           , case grocery.checked of
               false ->
                 [ HP.draggable true
-                , HE.onDragStart $ StartDrag index
-                , HE.onDragOver $ OverDrag index
+                , HE.onDragStart $ StartDrag dragEntry
+                , HE.onDragOver $ OverDrag dragEntry
                 ]
               true -> []
           ]
@@ -226,7 +233,7 @@ component =
   initialState :: input -> State
   initialState _ =
     { groceryList: mempty
-    , dragState: Nothing
+    , dragState: NotDragging
     }
 
   handleAction
@@ -238,12 +245,15 @@ component =
       groceryList <- upsertGroceryList Data.dummyListId
       H.modify_ _ { groceryList = groceryList }
 
-    StartDrag index _dragEvent ->
-      H.modify_ $ startDrag index
+    StartDrag dragEntry _dragEvent ->
+      H.modify_ $ _ { dragState = DraggingOverNonTarget dragEntry }
 
-    OverDrag index dragEvent -> do
+    OverDrag dragEntry dragEvent -> do
       preventDefault dragEvent
-      H.modify_ $ overDrag index
+      H.modify_ setDragOver
+      where
+      setDragOver state = state
+        { dragState = dragOverTarget dragEntry state.dragState }
 
     EndDrag _dragEvent -> do
       H.modify_ $ endDrag
@@ -265,17 +275,8 @@ component =
           # _.checked
 
     UncheckCompleted -> do
-      completed <- H.gets getCheckedGroceries
       H.modify_ uncheckCompleted
-      void $ updateGroceries Data.dummyListId
-        (uncheckWhenElem (Grocery.id <$> completed))
-      where
-      getCheckedGroceries s =
-        GroceryList.partitionGroceriesOnChecked s.groceryList
-          # _.checked
-      uncheckWhenElem ids grocery
-        | grocery.id `elem` ids = grocery { checked = false }
-        | otherwise = grocery
+      void $ updateGroceries Data.dummyListId Grocery.uncheck
 
   render :: State -> H.ComponentHTML Action () m
   render state =
@@ -290,7 +291,7 @@ component =
             ]
         , HH.button [ HP.class_ $ H.ClassName "secondary" ]
             [ HH.text "Edit" ]
-        , case allGroceries state of
+        , case state.groceryList of
             [] -> HH.text "No groceries have been added yet"
             _ -> groceriesView state
         ]
