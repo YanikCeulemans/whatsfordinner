@@ -42,12 +42,7 @@ parseJson = J.parseJson >>> Either.fromRight' crash
   crash _ = unsafeCrashWith "invalid hardcoded json"
 
 grocery :: Grocery
-grocery =
-  { id: groceryId
-  , description: "Tomatoes"
-  , amount: Amount.unitless 1.0
-  , checked: false
-  }
+grocery = Grocery.create groceryId "Tomatoes" $ Amount.unitless 1.0
 
 codecSpec :: Spec Unit
 codecSpec =

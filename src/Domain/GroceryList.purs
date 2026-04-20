@@ -72,4 +72,4 @@ insertAt index grocery list =
     # Maybe.fromMaybe list
 
 clearCompleted :: GroceryList -> GroceryList
-clearCompleted = Array.filter (not <<< _.checked)
+clearCompleted = Array.filter (not <<< Grocery.checked)

@@ -20,6 +20,7 @@ import Data.Traversable (for_)
 import Data.ULID as DULID
 import Domain.Amount as Amount
 import Domain.Grocery (Grocery)
+import Domain.Grocery as Grocery
 import Domain.GroceryId (GroceryId(..))
 import Domain.GroceryListId (GroceryListId(..))
 import Effect.Aff.Class (class MonadAff)
@@ -142,11 +143,7 @@ validateForm state =
 
 buildGrocery :: State -> Maybe Grocery
 buildGrocery state =
-  { id: _
-  , description: _
-  , amount: _
-  , checked: false
-  }
+  Grocery.create
     <$> id
     <*> description
     <*> amount

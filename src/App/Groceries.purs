@@ -132,16 +132,15 @@ groceryView dragState (Tuple index grocery) =
   let
     dragEntry = { index, item: grocery }
     direction
-      | grocery.checked = Nothing
+      | Grocery.checked grocery = Nothing
       | otherwise = dragDirection dragEntry dragState
   in
     HH.li
       ( join
           [ [ HP.class_ $ H.ClassName "no-list-style"
-            , HP.id $ GroceryId.print grocery.id
             , HE.onClick $ ToggleGrocery grocery
             ]
-          , case grocery.checked of
+          , case Grocery.checked grocery of
               false ->
                 [ HP.draggable true
                 , HE.onDragStart $ StartDrag dragEntry
@@ -161,18 +160,23 @@ groceryView dragState (Tuple index grocery) =
               [ HP.classes $ H.ClassName <$>
                   ( Array.catMaybes $
                       [ Just "grocery-description flex-1"
-                      , if grocery.checked then Just "checked" else Nothing
+                      , if Grocery.checked grocery then Just "checked"
+                        else Nothing
                       ]
                   )
-              , HP.for $ GroceryId.print grocery.id
+              , HP.for $ GroceryId.print $ Grocery.id grocery
               ]
               [ HH.input
                   [ HP.type_ HP.InputCheckbox
-                  , HP.id $ GroceryId.print grocery.id
-                  , HP.checked grocery.checked
+                  , HP.id $ GroceryId.print $ Grocery.id grocery
+                  , HP.checked $ Grocery.checked grocery
                   ]
               , HH.text $ fold
-                  [ grocery.description, " (", printAmount grocery.amount, ")" ]
+                  [ Grocery.description grocery
+                  , " ("
+                  , printAmount $ Grocery.amount grocery
+                  , ")"
+                  ]
               ]
           ]
       ]
