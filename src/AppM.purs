@@ -24,7 +24,7 @@ import Data.Traversable (for)
 import Data.Tuple (Tuple(..))
 import Data.Tuple.Nested ((/\))
 import Data.ULID as DULID
-import Domain.Grocery (Grocery)
+import Domain.GroceryEntry (GroceryEntry)
 import Domain.GroceryList (GroceryList)
 import Domain.GroceryList as GroceryList
 import Domain.GroceryListId (GroceryListId(..))

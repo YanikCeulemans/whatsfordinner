@@ -19,8 +19,8 @@ import Data.String.NonEmpty as NES
 import Data.Traversable (for_)
 import Data.ULID as DULID
 import Domain.Amount as Amount
-import Domain.Grocery (Grocery)
-import Domain.Grocery as Grocery
+import Domain.GroceryEntry (GroceryEntry)
+import Domain.GroceryEntry as GroceryEntry
 import Domain.GroceryId (GroceryId(..))
 import Domain.GroceryListId (GroceryListId(..))
 import Effect.Aff.Class (class MonadAff)

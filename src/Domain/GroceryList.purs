@@ -5,17 +5,17 @@ import Prelude
 import Data.Array as Array
 import Data.Codec.Argonaut as CA
 import Data.Maybe as Maybe
-import Domain.Grocery (Grocery)
-import Domain.Grocery as Grocery
-import Domain.GroceryId (GroceryId)
+import Domain.GroceryEntry (GroceryEntry)
+import Domain.GroceryEntry as GroceryEntry
+import Domain.GroceryEntryId (GroceryEntryId)
 
-type GroceryList = Array Grocery
+type GroceryList = Array GroceryEntry
 
 codec :: CA.JsonCodec GroceryList
 codec =
-  CA.array Grocery.codec
+  CA.array GroceryEntry.codec
 
-upsertGrocery :: Grocery -> GroceryList -> GroceryList
+upsertGrocery :: GroceryEntry -> GroceryList -> GroceryList
 upsertGrocery grocery groceryList =
   {--  
     TODO: what is the proper identity of a grocery? 
@@ -27,23 +27,23 @@ upsertGrocery grocery groceryList =
   (Array.findIndex hasId groceryList >>= update)
     # Maybe.fromMaybe' consGroceryList
   where
-  hasId x = Grocery.id x == Grocery.id grocery
+  hasId x = GroceryEntry.id x == GroceryEntry.id grocery
   update i = Array.updateAt i grocery groceryList
   consGroceryList _ = Array.cons grocery groceryList
 
-toggleGrocery :: GroceryId -> GroceryList -> GroceryList
+toggleGrocery :: GroceryEntryId -> GroceryList -> GroceryList
 toggleGrocery id groceryList =
   groceryList <#> toggle
   where
   toggle grocery
-    | Grocery.id grocery == id = Grocery.toggleChecked grocery
+    | GroceryEntry.id grocery == id = GroceryEntry.toggleChecked grocery
     | otherwise = grocery
 
-deleteGroceries :: Array Grocery -> GroceryList -> GroceryList
+deleteGroceries :: Array GroceryEntry -> GroceryList -> GroceryList
 deleteGroceries groceries groceryList =
   Array.difference groceryList groceries
 
-updateGroceries :: (Grocery -> Grocery) -> GroceryList -> GroceryList
+updateGroceries :: (GroceryEntry -> GroceryEntry) -> GroceryList -> GroceryList
 updateGroceries f groceryList =
   map f groceryList
 
@@ -54,22 +54,22 @@ partitionGroceriesOnChecked gs =
   , unchecked: partitioned.no
   }
   where
-  partitioned = Array.partition Grocery.checked gs
+  partitioned = Array.partition GroceryEntry.checked gs
 
-set :: Grocery -> GroceryList -> GroceryList
+set :: GroceryEntry -> GroceryList -> GroceryList
 set grocery list = help <$> list
   where
   help g
-    | Grocery.id g == Grocery.id grocery = grocery
+    | GroceryEntry.id g == GroceryEntry.id grocery = grocery
     | otherwise = g
 
-delete :: Grocery -> GroceryList -> GroceryList
+delete :: GroceryEntry -> GroceryList -> GroceryList
 delete grocery list = Array.delete grocery list
 
-insertAt :: Int -> Grocery -> GroceryList -> GroceryList
+insertAt :: Int -> GroceryEntry -> GroceryList -> GroceryList
 insertAt index grocery list =
   Array.insertAt index grocery list
     # Maybe.fromMaybe list
 
 clearCompleted :: GroceryList -> GroceryList
-clearCompleted = Array.filter (not <<< Grocery.checked)
+clearCompleted = Array.filter (not <<< GroceryEntry.checked)

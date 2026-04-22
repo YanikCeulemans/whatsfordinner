@@ -9,6 +9,7 @@ import Data.Enum (toEnum)
 import Data.Maybe as Maybe
 import Data.ULID as DULID
 import Domain.GroceryListId (GroceryListId(..))
+import Domain.Id as Id
 import Domain.Meal (Meal(..))
 import Domain.MealSchedule (Id(..), MealSchedule(..))
 import Domain.PlannedMeal (PlannedMeal(..))
@@ -147,7 +148,7 @@ dummyListId :: GroceryListId
 dummyListId =
   DULID.parse "01KNW48VB0PNCFC0KZ8SW289ZV"
     # Either.fromRight' crash
-    # MkGroceryListId
+    # Id.MkId
   where
   crash _ = unsafeCrashWith "invalid hardcoded dummy list id ULID"
 

@@ -9,10 +9,10 @@ import Data.Either (Either)
 import Data.Either as Either
 import Data.ULID as DULID
 import Domain.Amount as Amount
-import Domain.Grocery (Grocery)
-import Domain.Grocery as Grocery
-import Domain.GroceryId (GroceryId)
-import Domain.GroceryId as GroceryId
+import Domain.GroceryEntry (GroceryEntry)
+import Domain.GroceryEntry as GroceryEntry
+import Domain.GroceryEntryId (GroceryEntryId)
+import Domain.Id as Id
 import Partial.Unsafe (unsafeCrashWith)
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (shouldContain, shouldEqual)
@@ -20,8 +20,8 @@ import Test.Spec.Assertions (shouldContain, shouldEqual)
 rawGroceryId :: String
 rawGroceryId = "01KNEQ7KMSBM0Q4XP56C6YP3NG"
 
-groceryId :: GroceryId
-groceryId = GroceryId.MkGroceryId
+groceryId :: GroceryEntryId
+groceryId = Id.MkId
   $ Either.fromRight' crash
   $ DULID.parse rawGroceryId
   where
@@ -30,19 +30,19 @@ groceryId = GroceryId.MkGroceryId
 quoted :: String -> String
 quoted x = fold [ "\"", x, "\"" ]
 
-encode :: Grocery -> J.Json
-encode = CA.encode Grocery.codec
+encode :: GroceryEntry -> J.Json
+encode = CA.encode GroceryEntry.codec
 
-decode :: J.Json -> Either CA.JsonDecodeError Grocery
-decode = CA.decode Grocery.codec
+decode :: J.Json -> Either CA.JsonDecodeError GroceryEntry
+decode = CA.decode GroceryEntry.codec
 
 parseJson :: String -> J.Json
 parseJson = J.parseJson >>> Either.fromRight' crash
   where
   crash _ = unsafeCrashWith "invalid hardcoded json"
 
-grocery :: Grocery
-grocery = Grocery.create groceryId "Tomatoes" $ Amount.unitless 1.0
+grocery :: GroceryEntry
+grocery = GroceryEntry.create groceryId "Tomatoes" $ Amount.unitless 1.0
 
 codecSpec :: Spec Unit
 codecSpec =

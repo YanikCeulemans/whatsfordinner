@@ -23,8 +23,8 @@ import Data.Tuple (Tuple(..))
 import Data.Tuple as Tuple
 import Domain.Amount (Amount)
 import Domain.Amount as Amount
-import Domain.Grocery (Grocery)
-import Domain.Grocery as Grocery
+import Domain.GroceryEntry (GroceryEntry)
+import Domain.GroceryEntry as GroceryEntry
 import Domain.GroceryId as GroceryId
 import Domain.GroceryList (GroceryList)
 import Domain.GroceryList as GroceryList

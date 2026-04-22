@@ -2,7 +2,7 @@ module Capabilities.Resource.ManageGroceryList where
 
 import Prelude
 
-import Domain.Grocery (Grocery)
+import Domain.GroceryEntry (GroceryEntry)
 import Domain.GroceryList (GroceryList)
 import Domain.GroceryListId (GroceryListId)
 import Halogen as H
@@ -12,9 +12,10 @@ import Halogen as H
 --}
 class Monad m <= ManageGroceryList m where
   upsertGroceryList :: GroceryListId -> m GroceryList
-  upsertGrocery :: GroceryListId -> Grocery -> m Unit
-  deleteGroceries :: GroceryListId -> Array Grocery -> m GroceryList
-  updateGroceries :: GroceryListId -> (Grocery -> Grocery) -> m GroceryList
+  upsertGrocery :: GroceryListId -> GroceryEntry -> m Unit
+  deleteGroceries :: GroceryListId -> Array GroceryEntry -> m GroceryList
+  updateGroceries
+    :: GroceryListId -> (GroceryEntry -> GroceryEntry) -> m GroceryList
 
 instance
   ManageGroceryList m =>
