@@ -17,6 +17,7 @@ newtype Id a = MkId ULID
 
 derive instance Eq (Id a)
 derive newtype instance Show (Id a)
+derive newtype instance Ord (Id a)
 
 codec :: forall a. JsonCodec (Id a)
 codec =

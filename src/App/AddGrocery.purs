@@ -9,7 +9,6 @@ import App.Shared as S
 import Capabilities.Navigation (class Navigation, navigate)
 import Capabilities.Resource.ManageGroceryList (class ManageGroceryList, upsertGrocery)
 import Data.Array as Array
-import Data.Either as Either
 import Data.Maybe (Maybe(..))
 import Data.Maybe as Maybe
 import Data.Number as Number
@@ -17,12 +16,10 @@ import Data.Route as Route
 import Data.String as String
 import Data.String.NonEmpty as NES
 import Data.Traversable (for_)
-import Data.ULID as DULID
 import Domain.Amount as Amount
 import Domain.GroceryEntry (GroceryEntry)
 import Domain.GroceryEntry as GroceryEntry
-import Domain.GroceryId (GroceryId(..))
-import Domain.GroceryListId (GroceryListId(..))
+import Domain.Id as Id
 import Effect.Aff.Class (class MonadAff)
 import Halogen as H
 import Halogen.HTML as HH
@@ -31,7 +28,6 @@ import Halogen.HTML.Properties (ButtonType(..), InputType(..))
 import Halogen.HTML.Properties as HP
 import Halogen.HTML.Properties.ARIA as Aria
 import Halogen.HTML.Properties.ARIA as HPA
-import Partial.Unsafe (unsafeCrashWith)
 import Simple.ULID (ULID)
 import Simple.ULID as ULID
 import Simple.ULID.Window as ULIDW
@@ -141,14 +137,14 @@ validateForm state =
     , amountUnit: state.form.amountUnit
     }
 
-buildGrocery :: State -> Maybe Grocery
+buildGrocery :: State -> Maybe GroceryEntry
 buildGrocery state =
-  Grocery.create
+  GroceryEntry.create
     <$> id
     <*> description
     <*> amount
   where
-  id = MkGroceryId <$> state.id
+  id = Id.MkId <$> state.id
   description = validFieldValue state.form.description
   amountUnit =
     state.form.amountUnit

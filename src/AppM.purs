@@ -29,6 +29,7 @@ import Domain.GroceryList (GroceryList)
 import Domain.GroceryList as GroceryList
 import Domain.GroceryListId (GroceryListId(..))
 import Domain.GroceryListId as GroceryListId
+import Domain.Id as Id
 import Effect (Effect)
 import Effect.Aff (Aff, Milliseconds(..))
 import Effect.Aff as Aff
@@ -86,7 +87,7 @@ localStorageUpsertGroceryList id = do
   where
   createValue _ = mempty
 
-localStorageUpsertGrocery :: GroceryListId -> Grocery -> AppM Unit
+localStorageUpsertGrocery :: GroceryListId -> GroceryEntry -> AppM Unit
 localStorageUpsertGrocery id grocery = do
   liftAff $ Aff.delay $ Milliseconds 300.0
   MonadState.modify_ upsert
@@ -95,7 +96,7 @@ localStorageUpsertGrocery id grocery = do
   upsert = Map.alter (map go) id
 
 localStorageDeleteGroceries
-  :: GroceryListId -> Array Grocery -> AppM GroceryList
+  :: GroceryListId -> Array GroceryEntry -> AppM GroceryList
 localStorageDeleteGroceries id groceriesToDelete = do
   list <- localStorageUpsertGroceryList id
   let
@@ -104,7 +105,7 @@ localStorageDeleteGroceries id groceriesToDelete = do
   pure updatedList
 
 localStorageUpdateGroceries
-  :: GroceryListId -> (Grocery -> Grocery) -> AppM GroceryList
+  :: GroceryListId -> (GroceryEntry -> GroceryEntry) -> AppM GroceryList
 localStorageUpdateGroceries id f = do
   list <- localStorageUpsertGroceryList id
   let
@@ -135,7 +136,7 @@ groceryListIdKeys xs =
   xs
     # map DULID.parse
     # keepRights
-    # map MkGroceryListId
+    # map Id.MkId
   where
   go acc = case _ of
     Left _ -> acc
@@ -155,7 +156,7 @@ getGroceryListStorageItem storage id = do
         # join
   pure $ map toTuple decoded
   where
-  printedId = GroceryListId.print id
+  printedId = Id.print id
   toTuple list = Tuple id list
 
 setGroceryListStorageItem
@@ -163,7 +164,7 @@ setGroceryListStorageItem
 setGroceryListStorageItem storage id list = do
   Storage.setItem printedId encodedList storage
   where
-  printedId = GroceryListId.print id
+  printedId = Id.print id
   encodedList = encodeGroceryList list
 
 localStorageState :: forall a. (State -> Tuple a State) -> Aff a

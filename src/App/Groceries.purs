@@ -6,13 +6,7 @@ import App.Data as Data
 import App.Layout as Layout
 import App.Shared (preventDefault)
 import App.Shared as S
-import Capabilities.Resource.ManageGroceryList
-  ( class ManageGroceryList
-  , deleteGroceries
-  , updateGroceries
-  , upsertGrocery
-  , upsertGroceryList
-  )
+import Capabilities.Resource.ManageGroceryList (class ManageGroceryList, deleteGroceries, updateGroceries, upsertGrocery, upsertGroceryList)
 import Data.Array (fold, mapWithIndex)
 import Data.Array as Array
 import Data.Int as Int
@@ -28,6 +22,7 @@ import Domain.GroceryEntry as GroceryEntry
 import Domain.GroceryId as GroceryId
 import Domain.GroceryList (GroceryList)
 import Domain.GroceryList as GroceryList
+import Domain.Id as Id
 import Effect.Aff.Class (class MonadAff)
 import Halogen as H
 import Halogen.HTML as HH
@@ -51,7 +46,7 @@ dragOverTarget target = case _ of
 
 type DragEntry =
   { index :: Int
-  , item :: Grocery
+  , item :: GroceryEntry
   }
 
 type State =
@@ -74,8 +69,8 @@ endDrag state =
         GroceryList.insertAt target.index source.item
           $ GroceryList.delete source.item state.groceryList
 
-setGrocery :: Grocery -> State -> State
-setGrocery grocery s =
+setGroceryEntry :: GroceryEntry -> State -> State
+setGroceryEntry grocery s =
   s { groceryList = GroceryList.set grocery s.groceryList }
 
 clearCompleted :: State -> State
@@ -84,11 +79,11 @@ clearCompleted state = state
 
 uncheckCompleted :: State -> State
 uncheckCompleted state = state
-  { groceryList = map Grocery.uncheck state.groceryList }
+  { groceryList = map GroceryEntry.uncheck state.groceryList }
 
 data Action
   = Initialize
-  | ToggleGrocery Grocery MouseEvent
+  | ToggleGrocery GroceryEntry MouseEvent
   | StartDrag DragEntry DragEvent
   | OverDrag DragEntry DragEvent
   | EndDrag DragEvent
@@ -126,13 +121,13 @@ groceryView
   :: forall m
    . MonadAff m
   => DragState DragEntry
-  -> Tuple Int Grocery
+  -> Tuple Int GroceryEntry
   -> H.ComponentHTML Action () m
 groceryView dragState (Tuple index grocery) =
   let
     dragEntry = { index, item: grocery }
     direction
-      | Grocery.checked grocery = Nothing
+      | GroceryEntry.checked grocery = Nothing
       | otherwise = dragDirection dragEntry dragState
   in
     HH.li
@@ -140,7 +135,7 @@ groceryView dragState (Tuple index grocery) =
           [ [ HP.class_ $ H.ClassName "no-list-style"
             , HE.onClick $ ToggleGrocery grocery
             ]
-          , case Grocery.checked grocery of
+          , case GroceryEntry.checked grocery of
               false ->
                 [ HP.draggable true
                 , HE.onDragStart $ StartDrag dragEntry
@@ -160,21 +155,21 @@ groceryView dragState (Tuple index grocery) =
               [ HP.classes $ H.ClassName <$>
                   ( Array.catMaybes $
                       [ Just "grocery-description flex-1"
-                      , if Grocery.checked grocery then Just "checked"
+                      , if GroceryEntry.checked grocery then Just "checked"
                         else Nothing
                       ]
                   )
-              , HP.for $ GroceryId.print $ Grocery.id grocery
+              , HP.for $ Id.print $ GroceryEntry.id grocery
               ]
               [ HH.input
                   [ HP.type_ HP.InputCheckbox
-                  , HP.id $ GroceryId.print $ Grocery.id grocery
-                  , HP.checked $ Grocery.checked grocery
+                  , HP.id $ Id.print $ GroceryEntry.id grocery
+                  , HP.checked $ GroceryEntry.checked grocery
                   ]
               , HH.text $ fold
-                  [ Grocery.description grocery
+                  [ GroceryEntry.description grocery
                   , " ("
-                  , printAmount $ Grocery.amount grocery
+                  , printAmount $ GroceryEntry.amount grocery
                   , ")"
                   ]
               ]
@@ -216,7 +211,7 @@ groceriesView state =
   where
   { no: uncheckedGroceries, yes: checkedGroceries } =
     mapWithIndex Tuple state.groceryList
-      # Array.partition (Tuple.snd >>> Grocery.checked)
+      # Array.partition (Tuple.snd >>> GroceryEntry.checked)
 
 component
   :: forall query input output m
@@ -264,10 +259,10 @@ component =
 
     ToggleGrocery grocery mouseEvent -> do
       preventDefault mouseEvent
-      H.modify_ $ setGrocery toggledGrocery
+      H.modify_ $ setGroceryEntry toggledGrocery
       upsertGrocery Data.dummyListId toggledGrocery
       where
-      toggledGrocery = Grocery.toggleChecked grocery
+      toggledGrocery = GroceryEntry.toggleChecked grocery
 
     ClearCompleted -> do
       completed <- H.gets getCheckedGroceries
@@ -280,7 +275,7 @@ component =
 
     UncheckCompleted -> do
       H.modify_ uncheckCompleted
-      void $ updateGroceries Data.dummyListId Grocery.uncheck
+      void $ updateGroceries Data.dummyListId GroceryEntry.uncheck
 
   render :: State -> H.ComponentHTML Action () m
   render state =

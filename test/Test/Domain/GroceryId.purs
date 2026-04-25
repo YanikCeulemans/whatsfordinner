@@ -4,32 +4,31 @@ import Prelude
 
 import Data.Argonaut as J
 import Data.Array (fold)
-import Data.Bifunctor (lmap)
 import Data.Codec.Argonaut as CA
 import Data.Either (Either(..))
 import Data.Either as Either
 import Data.ULID as DULID
 import Domain.GroceryId (GroceryId)
-import Domain.GroceryId as GroceryId
+import Domain.Id as Id
 import Partial.Unsafe (unsafeCrashWith)
 import Test.Spec (Spec, describe, it)
-import Test.Spec.Assertions (shouldContain, shouldEqual, shouldSatisfy)
+import Test.Spec.Assertions (shouldContain, shouldEqual)
 
 rawGroceryId :: String
 rawGroceryId = "01KNEQ7KMSBM0Q4XP56C6YP3NG"
 
 groceryId :: GroceryId
-groceryId = GroceryId.MkGroceryId
+groceryId = Id.MkId
   $ Either.fromRight' crash
   $ DULID.parse rawGroceryId
   where
   crash _ = unsafeCrashWith "invalid hardcoded ulid"
 
 encode :: GroceryId -> J.Json
-encode = CA.encode GroceryId.codec
+encode = CA.encode Id.codec
 
 decode :: J.Json -> Either CA.JsonDecodeError GroceryId
-decode = CA.decode GroceryId.codec
+decode = CA.decode Id.codec
 
 quoted :: String -> String
 quoted x = fold [ "\"", x, "\"" ]
