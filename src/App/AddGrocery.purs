@@ -226,7 +226,18 @@ component =
             ]
         , HH.form [ HE.onSubmit SubmitForm ]
             [ HH.label_
-                [ HH.text "description"
+                [ HH.text "Description"
+                , HH.div [ HP.class_ $ H.ClassName "dropdown" ]
+                    [ HH.input []
+                    , HH.ul_
+                        [ HH.li_ [ HH.text "Tomatoes" ]
+                        , HH.li_ [ HH.text "Carrots" ]
+                        , HH.li_ [ HH.text "Onions" ]
+                        ]
+                    ]
+                ]
+            , HH.label_
+                [ HH.text "Description"
                 , HH.input
                     ( join $
                         [ [ HE.onInput SetDescriptionFormFieldState

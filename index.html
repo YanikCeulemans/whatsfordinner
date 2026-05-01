@@ -72,6 +72,48 @@
         flex: 0;
         margin: 0;
       }
+
+      .dropdown {
+        position: relative;
+        margin-bottom: var(--pico-spacing);
+
+        input {
+          margin-bottom: 0;
+        }
+
+        ul {
+          display: none;
+        }
+
+        &.open > ul {
+          position: absolute;
+          width: 100%;
+          display: flex;
+          flex-direction: column;
+          z-index: 99;
+          left: 0;
+          white-space: nowrap;
+          color: var(--pico-dropdown-color);
+          background-color: var(--pico-dropdown-background-color);
+          box-shadow: var(--pico-dropdown-box-shadow);
+          border: var(--pico-border-width) solid var(--pico-dropdown-border-color);
+          border-radius: var(--pico-border-radius);
+          margin-top: var(--pico-outline-width);
+          margin-bottom: 0;
+          padding: 0;
+
+          li {
+            list-style-type: none;
+            margin: 0;
+            padding: var(--pico-block-spacing-horizontal) var(--pico-block-spacing-vertical);
+            cursor: pointer;
+
+            &:hover {
+              background-color: var(--pico-dropdown-hover-background-color);
+            }
+          }
+        }
+      }
     </style>
   </head>
   <body id="app">

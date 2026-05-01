@@ -183,7 +183,9 @@ groceriesView
   -> H.ComponentHTML Action () m
 groceriesView state =
   HH.div_
-    [ HH.ul
+    [ HH.button [ HP.class_ $ H.ClassName "secondary" ]
+        [ HH.text "Edit" ]
+    , HH.ul
         [ HP.class_ $ H.ClassName "no-padding groceries-list"
         , HE.onDragEnd $ EndDrag
         ] $
@@ -288,8 +290,6 @@ component =
                 , S.link Route.AddGrocery [ HH.text "Add" ]
                 ]
             ]
-        , HH.button [ HP.class_ $ H.ClassName "secondary" ]
-            [ HH.text "Edit" ]
         , case state.groceryList of
             [] -> HH.text "No groceries have been added yet"
             _ -> groceriesView state
