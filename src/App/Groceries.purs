@@ -17,10 +17,8 @@ import Data.Tuple (Tuple(..))
 import Data.Tuple as Tuple
 import Domain.Amount (Amount)
 import Domain.Amount as Amount
-import Domain.GroceryEntry (GroceryEntry)
-import Domain.GroceryEntry as GroceryEntry
 import Domain.GroceryId as GroceryId
-import Domain.GroceryList (GroceryList)
+import Domain.GroceryList (GroceryEntry, GroceryList)
 import Domain.GroceryList as GroceryList
 import Domain.Id as Id
 import Effect.Aff.Class (class MonadAff)
