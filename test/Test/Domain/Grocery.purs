@@ -7,11 +7,12 @@ import Data.Array (fold)
 import Data.Codec.Argonaut as CA
 import Data.Either (Either)
 import Data.Either as Either
+import Data.Tuple (fst)
 import Data.ULID as DULID
 import Domain.Amount as Amount
-import Domain.GroceryEntry (GroceryEntry)
-import Domain.GroceryEntry as GroceryEntry
 import Domain.GroceryEntryId (GroceryEntryId)
+import Domain.GroceryList (GroceryEntry)
+import Domain.GroceryList as GroceryList
 import Domain.Id as Id
 import Partial.Unsafe (unsafeCrashWith)
 import Test.Spec (Spec, describe, it)
@@ -31,10 +32,10 @@ quoted :: String -> String
 quoted x = fold [ "\"", x, "\"" ]
 
 encode :: GroceryEntry -> J.Json
-encode = CA.encode GroceryEntry.codec
+encode = CA.encode GroceryList.entryCodec
 
 decode :: J.Json -> Either CA.JsonDecodeError GroceryEntry
-decode = CA.decode GroceryEntry.codec
+decode = CA.decode GroceryList.entryCodec
 
 parseJson :: String -> J.Json
 parseJson = J.parseJson >>> Either.fromRight' crash
@@ -42,7 +43,9 @@ parseJson = J.parseJson >>> Either.fromRight' crash
   crash _ = unsafeCrashWith "invalid hardcoded json"
 
 grocery :: GroceryEntry
-grocery = GroceryEntry.create groceryId "Tomatoes" $ Amount.unitless 1.0
+grocery =
+  GroceryList.upsertGrocery groceryId "Tomatoes" (Amount.unitless 1.0) mempty
+    # fst
 
 codecSpec :: Spec Unit
 codecSpec =

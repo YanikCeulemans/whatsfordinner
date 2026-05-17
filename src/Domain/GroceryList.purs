@@ -9,6 +9,7 @@ import Data.Codec.Argonaut.Record as CAR
 import Data.Foldable (maximum)
 import Data.Maybe as Maybe
 import Data.Profunctor (dimap)
+import Data.Tuple (Tuple(..))
 import Domain.Amount (Amount)
 import Domain.Amount as Amount
 import Domain.GroceryEntryId (GroceryEntryId)
@@ -41,27 +42,28 @@ entryCodec =
   unwrap (MkGroceryEntry grocery) = grocery
   wrap = MkGroceryEntry
 
-groceryEntryId :: GroceryEntry -> GroceryEntryId
-groceryEntryId (MkGroceryEntry grocery) = grocery.id
+entryId :: GroceryEntry -> GroceryEntryId
+entryId (MkGroceryEntry grocery) = grocery.id
 
-checked :: GroceryEntry -> Boolean
-checked (MkGroceryEntry grocery) = grocery.checked
+entryChecked :: GroceryEntry -> Boolean
+entryChecked (MkGroceryEntry grocery) = grocery.checked
 
-description :: GroceryEntry -> String
-description (MkGroceryEntry grocery) = grocery.description
+entryDescription :: GroceryEntry -> String
+entryDescription (MkGroceryEntry grocery) = grocery.description
 
-amount :: GroceryEntry -> Amount
-amount (MkGroceryEntry grocery) = grocery.amount
+entryAmount :: GroceryEntry -> Amount
+entryAmount (MkGroceryEntry grocery) = grocery.amount
 
-toggleChecked :: GroceryEntry -> GroceryEntry
-toggleChecked (MkGroceryEntry grocery) = MkGroceryEntry $ grocery
+toggleEntryChecked :: GroceryEntry -> GroceryEntry
+toggleEntryChecked (MkGroceryEntry grocery) = MkGroceryEntry $ grocery
   { checked = not grocery.checked }
 
-uncheck :: GroceryEntry -> GroceryEntry
-uncheck (MkGroceryEntry grocery) = MkGroceryEntry $ grocery { checked = false }
+uncheckEntry :: GroceryEntry -> GroceryEntry
+uncheckEntry (MkGroceryEntry grocery) = MkGroceryEntry $ grocery
+  { checked = false }
 
-sortIndex :: GroceryEntry -> Int
-sortIndex (MkGroceryEntry grocery) = grocery.sortIndex
+entrySortIndex :: GroceryEntry -> Int
+entrySortIndex (MkGroceryEntry grocery) = grocery.sortIndex
 
 type GroceryList = Array GroceryEntry
 
@@ -69,7 +71,11 @@ codec :: CA.JsonCodec GroceryList
 codec = CA.array entryCodec
 
 upsertGrocery
-  :: GroceryEntryId -> String -> Amount -> GroceryList -> GroceryList
+  :: GroceryEntryId
+  -> String
+  -> Amount
+  -> GroceryList
+  -> Tuple GroceryEntry GroceryList
 upsertGrocery id description amount groceryList =
   {--  
     TODO: what is the proper identity of a grocery? 
@@ -80,8 +86,9 @@ upsertGrocery id description amount groceryList =
   --}
   (Array.findIndex hasId groceryList >>= update)
     # Maybe.fromMaybe' consGroceryList
+    # Tuple newGrocery
   where
-  hasId x = groceryEntryId x == id
+  hasId x = entryId x == id
   upsert (MkGroceryEntry grocery) =
     pure $ MkGroceryEntry $ grocery
       { description = description
@@ -90,11 +97,11 @@ upsertGrocery id description amount groceryList =
   update i = Array.alterAt i upsert groceryList
   newEntrySortIndex =
     groceryList
-      # map sortIndex
+      # map entrySortIndex
       # maximum
       # map (_ + 1)
       # Maybe.fromMaybe 0
-  grocery =
+  newGrocery =
     MkGroceryEntry
       { id
       , description
@@ -102,14 +109,14 @@ upsertGrocery id description amount groceryList =
       , checked: false
       , sortIndex: newEntrySortIndex
       }
-  consGroceryList _ = Array.cons grocery groceryList
+  consGroceryList _ = Array.cons newGrocery groceryList
 
 toggleGrocery :: GroceryEntryId -> GroceryList -> GroceryList
 toggleGrocery id groceryList =
   groceryList <#> toggle
   where
   toggle grocery
-    | groceryEntryId grocery == id = toggleChecked grocery
+    | entryId grocery == id = toggleEntryChecked grocery
     | otherwise = grocery
 
 deleteGroceries :: Array GroceryEntry -> GroceryList -> GroceryList
@@ -127,7 +134,7 @@ partitionGroceriesOnChecked gs =
   , unchecked: partitioned.no
   }
   where
-  partitioned = Array.partition checked gs
+  partitioned = Array.partition entryChecked gs
 
 set :: GroceryEntry -> GroceryList -> GroceryList
 set grocery list = help <$> list
@@ -145,4 +152,4 @@ insertAt index grocery list =
     # Maybe.fromMaybe list
 
 clearCompleted :: GroceryList -> GroceryList
-clearCompleted = Array.filter (not <<< checked)
+clearCompleted = Array.filter (not <<< entryChecked)

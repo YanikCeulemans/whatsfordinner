@@ -2,8 +2,7 @@ module Capabilities.Resource.ManageGroceryList where
 
 import Prelude
 
-import Domain.GroceryEntry (GroceryEntry)
-import Domain.GroceryList (GroceryList)
+import Domain.GroceryList (GroceryList, GroceryEntry)
 import Domain.GroceryListId (GroceryListId)
 import Halogen as H
 

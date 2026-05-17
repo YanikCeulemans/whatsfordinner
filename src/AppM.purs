@@ -21,11 +21,10 @@ import Data.Maybe (Maybe(..))
 import Data.Route (Route)
 import Data.Route as Route
 import Data.Traversable (for)
-import Data.Tuple (Tuple(..))
+import Data.Tuple (Tuple(..), snd)
 import Data.Tuple.Nested ((/\))
 import Data.ULID as DULID
-import Domain.GroceryEntry (GroceryEntry)
-import Domain.GroceryList (GroceryList)
+import Domain.GroceryList (GroceryList, GroceryEntry)
 import Domain.GroceryList as GroceryList
 import Domain.GroceryListId (GroceryListId(..))
 import Domain.GroceryListId as GroceryListId
@@ -92,7 +91,11 @@ localStorageUpsertGrocery id grocery = do
   liftAff $ Aff.delay $ Milliseconds 300.0
   MonadState.modify_ upsert
   where
-  go = GroceryList.upsertGrocery grocery
+  eId /\ eDesc /\ eAmount =
+    GroceryList.entryId grocery
+      /\ GroceryList.entryDescription grocery
+      /\ GroceryList.entryAmount grocery
+  go = GroceryList.upsertGrocery eId eDesc eAmount >>> snd
   upsert = Map.alter (map go) id
 
 localStorageDeleteGroceries
