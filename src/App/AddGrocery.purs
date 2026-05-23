@@ -6,8 +6,14 @@ import App.Data as Data
 import App.Layout as Layout
 import App.Shared (preventDefault)
 import App.Shared as S
-import Capabilities.Navigation (class Navigation, navigate)
-import Capabilities.Resource.ManageGroceryList (class ManageGroceryList, upsertGrocery)
+import Capabilities.Navigation
+  ( class Navigation
+  , navigate
+  )
+import Capabilities.Resource.ManageGroceryList
+  ( class ManageGroceryList
+  , upsertGrocery
+  )
 import Data.Array as Array
 import Data.Maybe (Maybe(..))
 import Data.Maybe as Maybe
@@ -16,8 +22,10 @@ import Data.Route as Route
 import Data.String as String
 import Data.String.NonEmpty as NES
 import Data.Traversable (for_)
+import Data.Tuple as Tuple
 import Domain.Amount as Amount
-import Domain.GroceryList (GroceryEntry)
+import Domain.GroceryList (GroceryList, GroceryEntry)
+import Domain.GroceryList as GroceryList
 import Domain.Id as Id
 import Effect.Aff.Class (class MonadAff)
 import Halogen as H
@@ -117,7 +125,9 @@ isFormStateValid { description, amountValue, amountUnit } =
 type State =
   { id :: Maybe ULID
   , form :: FormState
+  -- TODO: reduce to waiting for response
   , remoteData :: RemoteData' Unit
+  , groceryList :: Maybe GroceryList
   }
 
 updateForm :: (FormState -> FormState) -> State -> State
@@ -137,12 +147,15 @@ validateForm state =
     }
 
 buildGrocery :: State -> Maybe GroceryEntry
-buildGrocery state =
-  GroceryEntry.create
-    <$> id
-    <*> description
-    <*> amount
+buildGrocery state = upsertedGroceryEntry
   where
+  upsertedGroceryEntry = Tuple.fst <$> upsertResult
+  upsertResult =
+    GroceryList.upsertGrocery
+      <$> id
+      <*> description
+      <*> amount
+      <*> state.groceryList
   id = Id.MkId <$> state.id
   description = validFieldValue state.form.description
   amountUnit =
@@ -185,6 +198,7 @@ component =
     { id: Nothing
     , form: pristineFormState
     , remoteData: NotRequested
+    , groceryList: Nothing
     }
 
   handleAction :: Action -> H.HalogenM State Action () output m Unit

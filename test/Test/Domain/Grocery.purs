@@ -58,7 +58,7 @@ codecSpec =
         ( fold
             [ """{"amount":{"value":1},"checked":false,"description":"Tomatoes","id":"""
             , quoted rawGroceryId
-            , "}"
+            , ""","sortIndex":0}"""
             ]
         )
 
@@ -68,7 +68,7 @@ codecSpec =
           ( fold
               [ """{"amount":{"value":1},"checked":false,"description":"Tomatoes","id":"""
               , quoted rawGroceryId
-              , "}"
+              , ""","sortIndex": 0}"""
               ]
           )
       actual `shouldContain` grocery

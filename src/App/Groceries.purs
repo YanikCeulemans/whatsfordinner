@@ -6,7 +6,13 @@ import App.Data as Data
 import App.Layout as Layout
 import App.Shared (preventDefault)
 import App.Shared as S
-import Capabilities.Resource.ManageGroceryList (class ManageGroceryList, deleteGroceries, updateGroceries, upsertGrocery, upsertGroceryList)
+import Capabilities.Resource.ManageGroceryList
+  ( class ManageGroceryList
+  , deleteGroceries
+  , updateGroceries
+  , upsertGrocery
+  , upsertGroceryList
+  )
 import Data.Array (fold, mapWithIndex)
 import Data.Array as Array
 import Data.Int as Int
@@ -17,7 +23,6 @@ import Data.Tuple (Tuple(..))
 import Data.Tuple as Tuple
 import Domain.Amount (Amount)
 import Domain.Amount as Amount
-import Domain.GroceryId as GroceryId
 import Domain.GroceryList (GroceryEntry, GroceryList)
 import Domain.GroceryList as GroceryList
 import Domain.Id as Id
@@ -77,7 +82,7 @@ clearCompleted state = state
 
 uncheckCompleted :: State -> State
 uncheckCompleted state = state
-  { groceryList = map GroceryEntry.uncheck state.groceryList }
+  { groceryList = map GroceryList.uncheckEntry state.groceryList }
 
 data Action
   = Initialize
@@ -125,7 +130,7 @@ groceryView dragState (Tuple index grocery) =
   let
     dragEntry = { index, item: grocery }
     direction
-      | GroceryEntry.checked grocery = Nothing
+      | GroceryList.entryChecked grocery = Nothing
       | otherwise = dragDirection dragEntry dragState
   in
     HH.li
@@ -133,7 +138,7 @@ groceryView dragState (Tuple index grocery) =
           [ [ HP.class_ $ H.ClassName "no-list-style"
             , HE.onClick $ ToggleGrocery grocery
             ]
-          , case GroceryEntry.checked grocery of
+          , case GroceryList.entryChecked grocery of
               false ->
                 [ HP.draggable true
                 , HE.onDragStart $ StartDrag dragEntry
@@ -153,21 +158,21 @@ groceryView dragState (Tuple index grocery) =
               [ HP.classes $ H.ClassName <$>
                   ( Array.catMaybes $
                       [ Just "grocery-description flex-1"
-                      , if GroceryEntry.checked grocery then Just "checked"
+                      , if GroceryList.entryChecked grocery then Just "checked"
                         else Nothing
                       ]
                   )
-              , HP.for $ Id.print $ GroceryEntry.id grocery
+              , HP.for $ Id.print $ GroceryList.entryId grocery
               ]
               [ HH.input
                   [ HP.type_ HP.InputCheckbox
-                  , HP.id $ Id.print $ GroceryEntry.id grocery
-                  , HP.checked $ GroceryEntry.checked grocery
+                  , HP.id $ Id.print $ GroceryList.entryId grocery
+                  , HP.checked $ GroceryList.entryChecked grocery
                   ]
               , HH.text $ fold
-                  [ GroceryEntry.description grocery
+                  [ GroceryList.entryDescription grocery
                   , " ("
-                  , printAmount $ GroceryEntry.amount grocery
+                  , printAmount $ GroceryList.entryAmount grocery
                   , ")"
                   ]
               ]
@@ -211,7 +216,7 @@ groceriesView state =
   where
   { no: uncheckedGroceries, yes: checkedGroceries } =
     mapWithIndex Tuple state.groceryList
-      # Array.partition (Tuple.snd >>> GroceryEntry.checked)
+      # Array.partition (Tuple.snd >>> GroceryList.entryChecked)
 
 component
   :: forall query input output m
@@ -262,7 +267,7 @@ component =
       H.modify_ $ setGroceryEntry toggledGrocery
       upsertGrocery Data.dummyListId toggledGrocery
       where
-      toggledGrocery = GroceryEntry.toggleChecked grocery
+      toggledGrocery = GroceryList.toggleEntryChecked grocery
 
     ClearCompleted -> do
       completed <- H.gets getCheckedGroceries
@@ -275,7 +280,7 @@ component =
 
     UncheckCompleted -> do
       H.modify_ uncheckCompleted
-      void $ updateGroceries Data.dummyListId GroceryEntry.uncheck
+      void $ updateGroceries Data.dummyListId GroceryList.uncheckEntry
 
   render :: State -> H.ComponentHTML Action () m
   render state =
