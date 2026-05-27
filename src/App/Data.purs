@@ -8,7 +8,8 @@ import Data.Either as Either
 import Data.Enum (toEnum)
 import Data.Maybe as Maybe
 import Data.ULID as DULID
-import Domain.GroceryListId (GroceryListId(..))
+import Domain.Amount as Amount
+import Domain.GroceryListId (GroceryListId)
 import Domain.Id as Id
 import Domain.Meal (Meal(..))
 import Domain.MealSchedule (Id(..), MealSchedule(..))
@@ -32,23 +33,121 @@ mealSchedule =
     , schedule: RingList.fromFoldable
         [ PlannedMeal
             ( MkMeal
-                { name: "Brussels sprouts with bacon and mashed potatoes" }
+                { name: "Brussels sprouts with bacon and mashed potatoes"
+                , ingredients:
+                    [ { name: "Brussels sprouts"
+                      , amount: Amount.withUnit 500.0 "g"
+                      }
+                    , { name: "Bacon"
+                      , amount: Amount.withUnit 125.0 "g"
+                      }
+                    , { name: "Butter"
+                      , amount: Amount.withUnit 0.5 "tbsp"
+                      }
+                    , { name: "Grated cheese"
+                      , amount: Amount.withUnit 100.0 "g"
+                      }
+                    , { name: "Salt"
+                      , amount: Amount.toTaste
+                      }
+                    , { name: "Pepper"
+                      , amount: Amount.toTaste
+                      }
+                    ]
+                }
             )
         , PlannedMeal
             ( MkMeal
-                { name: "Mac & Cheese" }
+                { name: "Mac & Cheese"
+                , ingredients:
+                    [ { name: "Macaroni"
+                      , amount: Amount.withUnit 250.0 "g"
+                      }
+                    , { name: "Flour"
+                      , amount: Amount.withUnit 32.0 "g"
+                      }
+                    , { name: "Butter"
+                      , amount: Amount.withUnit 32.0 "g"
+                      }
+                    , { name: "Chicken bouillon cube"
+                      , amount: Amount.unitless 1.0
+                      }
+                    , { name: "Milk"
+                      , amount: Amount.withUnit 475.0 "ml"
+                      }
+                    , { name: "Bacon cubes"
+                      , amount: Amount.withUnit 100.0 "g"
+                      }
+                    , { name: "Shredded cheddar cheese"
+                      , amount: Amount.withUnit 1.0 "cup"
+                      }
+                    , { name: "Pepper"
+                      , amount: Amount.toTaste
+                      }
+                    ]
+                }
             )
         , PlannedMeal
             ( MkMeal
-                { name: "Chili sin carne" }
+                { name: "Chili sin carne"
+                , ingredients:
+                    [ { name: "Bell pepper", amount: Amount.unitless 2.0 }
+                    , { name: "Garlic", amount: Amount.unitless 1.0 }
+                    , { name: "clove Onion", amount: Amount.unitless 1.0 }
+                    , { name: "Butter", amount: Amount.withUnit 1.0 "tbsp" }
+                    , { name: "Vegetable broth"
+                      , amount: Amount.withUnit 150.0 "ml"
+                      }
+                    , { name: "Kidney beans"
+                      , amount: Amount.withUnit 240.0 "g"
+                      }
+                    , { name: "Tomato paste"
+                      , amount: Amount.withUnit 140.0 "g"
+                      }
+                    , { name: "Rice (basmati)"
+                      , amount: Amount.withUnit 75.0 "g"
+                      }
+                    , { name: "Corn", amount: Amount.withUnit 140.0 "g" }
+                    , { name: "Tortilla (whole wheat, medium)"
+                      , amount: Amount.withUnit 8.0 ""
+                      }
+                    , { name: "Pepper (harisa if you like spicey)"
+                      , amount: Amount.toTaste
+                      }
+                    ]
+                }
             )
         , PlannedMeal
             ( MkMeal
-                { name: "Chicken wok with noodles" }
+                { name: "Chicken wok with noodles"
+                , ingredients:
+                    [ { name: "Pre-cut wok veggies"
+                      , amount: Amount.withUnit 1.0 "bag"
+                      }
+                    , { name: "Veggie chicken pieces"
+                      , amount: Amount.withUnit 200.0 "g"
+                      }
+                    , { name: "Noodles"
+                      , amount: Amount.withUnit 200.0 "g"
+                      }
+                    , { name: "Olive oil"
+                      , amount: Amount.toTaste
+                      }
+                    ]
+                }
             )
         , PlannedMeal
             ( MkMeal
-                { name: "Vol au vent" }
+                { name: "Vol au vent"
+                , ingredients:
+                    [ { name: "Vol au vent"
+                      , amount: Amount.withUnit 1.0 "bag"
+                      }
+                    , { name: "Prebaked fries"
+                      , amount: Amount.withUnit 1.0 "kg"
+                      }
+                    ]
+                }
             )
         , PlannedMeal
             ( MkMeal

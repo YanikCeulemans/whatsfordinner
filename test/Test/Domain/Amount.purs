@@ -34,7 +34,7 @@ codecSpec =
 
     it "serialisation works for amount with unit" do
       let
-        actual = J.stringify $ encode $ Amount.create 1.0 "kg"
+        actual = J.stringify $ encode $ Amount.withUnit 1.0 "kg"
 
       actual `shouldEqual` """{"unit":"kg","value":1}"""
 
@@ -51,7 +51,7 @@ codecSpec =
     it "deserialization works for amount with unit" do
       let
         actual = decode $ parseJson """{ "value": 2, "unit": "kg" }"""
-      actual `shouldContain` (Amount.create 2.0 "kg")
+      actual `shouldContain` (Amount.withUnit 2.0 "kg")
 
     deserializationOfTypeMismatchFails """[]"""
     deserializationOfTypeMismatchFails """{}"""

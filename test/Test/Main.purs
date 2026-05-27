@@ -32,13 +32,13 @@ import Test.Spec.Reporter (consoleReporter)
 import Test.Spec.Runner.Node (runSpecAndExitProcess)
 
 meal1 :: PlannedMeal
-meal1 = PlannedMeal (MkMeal { name: "Brussels sprouts" })
+meal1 = PlannedMeal (MkMeal { name: "Brussels sprouts", ingredients: [] })
 
 meal2 :: PlannedMeal
 meal2 = NoMealPlanned
 
 meal3 :: PlannedMeal
-meal3 = PlannedMeal (MkMeal { name: "Mac & Cheese" })
+meal3 = PlannedMeal (MkMeal { name: "Mac & Cheese", ingredients: [] })
 
 meals :: RingList PlannedMeal
 meals = RingList.fromFoldable [ meal1, meal2, meal3 ]

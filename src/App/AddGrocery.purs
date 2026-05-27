@@ -240,7 +240,7 @@ component =
         , HH.form [ HE.onSubmit SubmitForm ]
             [ HH.label_
                 [ HH.text "Description"
-                , HH.div [ HP.class_ $ H.ClassName "dropdown" ]
+                , HH.div [ HP.class_ $ H.ClassName "dropdown" ] -- open
                     [ HH.input []
                     , HH.ul_
                         [ HH.li_ [ HH.text "Tomatoes" ]

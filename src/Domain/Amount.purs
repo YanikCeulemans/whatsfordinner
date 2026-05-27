@@ -4,9 +4,10 @@ module Domain.Amount
   , increaseWith
   , setValue
   , value
-  , unit
+  , amountUnit
   , unitless
-  , create
+  , withUnit
+  , toTaste
   ) where
 
 import Prelude
@@ -14,54 +15,86 @@ import Prelude
 import Data.Codec.Argonaut (JsonCodec)
 import Data.Codec.Argonaut as CA
 import Data.Codec.Argonaut.Record as CAR
+import Data.Codec.Argonaut.Variant as CAV
+import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Data.Profunctor (dimap)
+import Data.Variant as V
+import Type.Proxy (Proxy(..))
 
-newtype Amount = MkAmount
-  { value :: Number
-  , unit :: Maybe String
-  }
+data Amount
+  = WithUnit { value :: Number, unit :: String }
+  | Unitless Number
+  | ToTaste
 
-derive newtype instance Show Amount
-derive newtype instance Eq Amount
+derive instance Eq Amount
+
+instance Show Amount where
+  show = case _ of
+    WithUnit x -> "WithUnit " <> show x
+    Unitless x -> "Unitless " <> show x
+    ToTaste -> "ToTaste"
 
 codec :: JsonCodec Amount
 codec =
-  dimap unwrap MkAmount $ CA.object "Amount"
-    ( CAR.record
-        { value: dimap identity sanitize CA.number
-        , unit: CAR.optional CA.string
-        }
-    )
+  dimap toVariant fromVariant $ CAV.variantMatch
+    { withUnit:
+        Right $ CA.object "withUnit" $
+          CAR.record
+            { value: dimap identity sanitize CA.number
+            , unit: CA.string
+            }
+    , unitless: Right $ dimap identity sanitize CA.number
+    , toTaste: Left unit
+    }
   where
-  unwrap (MkAmount x) = x
+  toVariant = case _ of
+    WithUnit x -> V.inj (Proxy :: _ "withUnit") x
+    Unitless x -> V.inj (Proxy :: _ "unitless") x
+    ToTaste -> V.inj (Proxy :: _ "toTaste") unit
+  fromVariant = V.match
+    { withUnit: WithUnit
+    , unitless: Unitless
+    , toTaste: \_ -> ToTaste
+    }
 
 sanitize :: Number -> Number
 sanitize = max 1.0
 
 unitless :: Number -> Amount
-unitless x = MkAmount
-  { value: sanitize x
-  , unit: Nothing
-  }
+unitless = Unitless <<< sanitize
 
-create :: Number -> String -> Amount
-create x unit' = MkAmount
-  { value: sanitize x
-  , unit: Just unit'
-  }
+withUnit :: Number -> String -> Amount
+withUnit x unit' =
+  WithUnit
+    { value: sanitize x
+    , unit: unit'
+    }
+
+toTaste :: Amount
+toTaste = ToTaste
 
 increaseWith :: Number -> Amount -> Amount
-increaseWith delta (MkAmount amount) = MkAmount $ amount
-  { value = max 1.0 $ amount.value + delta }
+increaseWith delta = case _ of
+  WithUnit x -> WithUnit $ x { value = sanitize $ x.value + delta }
+  Unitless x -> Unitless $ sanitize $ x + delta
+  ToTaste -> ToTaste
 
 setValue :: Number -> Amount -> Amount
-setValue amountVal (MkAmount amount) = MkAmount $ amount
-  { value = max 1.0 amountVal }
+setValue amountVal = case _ of
+  WithUnit x -> WithUnit $ x { value = sanitize amountVal }
+  Unitless _ -> Unitless $ sanitize amountVal
+  ToTaste -> ToTaste
 
-value :: Amount -> Number
-value (MkAmount x) = x.value
+value :: Amount -> Maybe Number
+value = case _ of
+  WithUnit x -> Just x.value
+  Unitless x -> Just x
+  ToTaste -> Nothing
 
-unit :: Amount -> Maybe String
-unit (MkAmount x) = x.unit
+amountUnit :: Amount -> Maybe String
+amountUnit = case _ of
+  WithUnit x -> Just x.unit
+  Unitless _ -> Nothing
+  ToTaste -> Nothing
 
