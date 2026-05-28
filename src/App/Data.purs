@@ -141,7 +141,7 @@ mealSchedule =
                 { name: "Vol au vent"
                 , ingredients:
                     [ { name: "Vol au vent"
-                      , amount: Amount.withUnit 1.0 "bag"
+                      , amount: Amount.withUnit 500.0 "g"
                       }
                     , { name: "Prebaked fries"
                       , amount: Amount.withUnit 1.0 "kg"
@@ -151,37 +151,203 @@ mealSchedule =
             )
         , PlannedMeal
             ( MkMeal
-                { name: "Leek, mashed potatoes and minced meat casserole" }
+                { name: "Leek, mashed potatoes and minced meat casserole"
+                , ingredients:
+                    [ { name: "Veggie minced meat"
+                      , amount: Amount.withUnit 250.0 "g"
+                      }
+                    , { name: "Potatoes"
+                      , amount: Amount.withUnit 500.0 "g"
+                      }
+                    , { name: "Frozen leek with cream"
+                      , amount: Amount.withUnit 500.0 "g"
+                      }
+                    , { name: "Salt"
+                      , amount: Amount.toTaste
+                      }
+                    ]
+                }
             )
         , PlannedMeal
             ( MkMeal
-                { name: "Fishsticks with broccoli and baby potatoes" }
+                { name: "Fishsticks with broccoli and baby potatoes"
+                , ingredients:
+                    [ { name: "Broccoli"
+                      , amount: Amount.withUnit 400.0 "g"
+                      }
+                    , { name: "Baby potatoes"
+                      , amount: Amount.withUnit 400.0 "g"
+                      }
+                    , { name: "Fishsticks"
+                      , amount: Amount.withUnit 400.0 "g"
+                      }
+                    , { name: "Salt"
+                      , amount: Amount.toTaste
+                      }
+                    ]
+                }
             )
         , PlannedMeal
             ( MkMeal
-                { name: "Scampi diabolique with bread" }
+                { name: "Scampi diabolique with bread"
+                , ingredients:
+                    [ { name: "Scampi"
+                      , amount: Amount.withUnit 500.0 "g"
+                      }
+                    , { name: "Canned cubed tomatoes"
+                      , amount: Amount.withUnit 200.0 "g"
+                      }
+                    , { name: "Onion"
+                      , amount: Amount.unitless 1.0
+                      }
+                    , { name: "Garlic"
+                      , amount: Amount.withUnit 2.0 "clove"
+                      }
+                    , { name: "Artisanal baguette"
+                      , amount: Amount.unitless 2.0
+                      }
+                    , { name: "Butter"
+                      , amount: Amount.toTaste
+                      }
+                    , { name: "Pepper"
+                      , amount: Amount.toTaste
+                      }
+                    , { name: "Salt"
+                      , amount: Amount.toTaste
+                      }
+                    ]
+                }
             )
         , PlannedMeal
             ( MkMeal
-                { name: "Cordon blue with carrots and potatoes" }
+                { name: "Cordon blue with carrots and potatoes"
+                , ingredients:
+                    [ { name: "Carrots"
+                      , amount: Amount.withUnit 500.0 "g"
+                      }
+                    , { name: "Veggie Cordon blue"
+                      , amount: Amount.unitless 1.0
+                      }
+                    , { name: "Cordon blue"
+                      , amount: Amount.unitless 1.0
+                      }
+                    , { name: "Potatoes"
+                      , amount: Amount.withUnit 400.0 "g"
+                      }
+                    , { name: "Butter"
+                      , amount: Amount.toTaste
+                      }
+                    , { name: "Pepper"
+                      , amount: Amount.toTaste
+                      }
+                    , { name: "Salt"
+                      , amount: Amount.toTaste
+                      }
+                    ]
+                }
             )
         , PlannedMeal
             ( MkMeal
                 { name:
                     "Veggie Snitzel with bell peppers, zucchini and baby potatoes"
+                , ingredients:
+                    [ { name: "Veggie Snitzel"
+                      , amount: Amount.unitless 2.0
+                      }
+                    , { name: "Bell pepper"
+                      , amount: Amount.unitless 2.0
+                      }
+                    , { name: "Zucchini"
+                      , amount: Amount.unitless 1.0
+                      }
+                    , { name: "Baby potatoes"
+                      , amount: Amount.withUnit 400.0 "g"
+                      }
+                    , { name: "Garlic"
+                      , amount: Amount.withUnit 1.0 "clove"
+                      }
+                    , { name: "Baby potatoes"
+                      , amount: Amount.withUnit 400.0 "g"
+                      }
+                    , { name: "Butter"
+                      , amount: Amount.toTaste
+                      }
+                    ]
                 }
             )
         , PlannedMeal
             ( MkMeal
-                { name: "Chicken with curry and pineapple" }
+                { name: "Chicken with curry and pineapple"
+                , ingredients:
+                    [ { name: "Veggie Chicken"
+                      , amount: Amount.unitless 2.0
+                      }
+                    , { name: "Curry sauce"
+                      , amount: Amount.unitless 1.0
+                      }
+                    , { name: "Rice"
+                      , amount: Amount.withUnit 125.0 "g"
+                      }
+                    , { name: "Canned pineapple slices"
+                      , amount: Amount.withUnit 400.0 "g"
+                      }
+                    , { name: "Butter"
+                      , amount: Amount.toTaste
+                      }
+                    ]
+                }
             )
         , PlannedMeal
             ( MkMeal
-                { name: "Pita" }
+                { name: "Pita"
+                , ingredients:
+                    [ { name: "Veggie Pita"
+                      , amount: Amount.withUnit 400.0 "g"
+                      }
+                    , { name: "Pita buns"
+                      , amount: Amount.unitless 4.0
+                      }
+                    , { name: "Pita sauce"
+                      , amount: Amount.unitless 1.0
+                      }
+                    , { name: "Lettuce"
+                      , amount: Amount.withUnit 125.0 "g"
+                      }
+                    , { name: "Tomatoes"
+                      , amount: Amount.unitless 2.0
+                      }
+                    , { name: "Butter"
+                      , amount: Amount.toTaste
+                      }
+                    ]
+                }
             )
         , PlannedMeal
             ( MkMeal
-                { name: "Chicory ham rolls with mashed potatoes" }
+                { name: "Chicory ham rolls with mashed potatoes"
+                , ingredients:
+                    [ { name: "Endive", amount: Amount.unitless 4.0 }
+                    , { name: "Cooked ham"
+                      , amount: Amount.unitless 4.0
+                      }
+                    , { name: "Butter", amount: Amount.withUnit 32.0 "g" }
+                    , { name: "Flour", amount: Amount.withUnit 32.0 "g" }
+                    , { name: "Milk"
+                      , amount: Amount.withUnit 475.0 "ml"
+                      }
+                    , { name: "Emmentaler cheese"
+                      , amount: Amount.withUnit 200.0 "g"
+                      }
+                    , { name: "Potatoes", amount: Amount.withUnit 1.0 "kg" }
+                    , { name: "Butter", amount: Amount.toTaste }
+                    , { name: "Nutmeg", amount: Amount.toTaste }
+                    , { name: "Pepper", amount: Amount.toTaste }
+                    , { name: "Salt", amount: Amount.toTaste }
+                    , { name: "Emmentaler cheese", amount: Amount.toTaste }
+                    , { name: "Butter", amount: Amount.toTaste }
+                    , { name: "Milk", amount: Amount.toTaste }
+                    ]
+                }
             )
         , PlannedMeal
             ( MkMeal
