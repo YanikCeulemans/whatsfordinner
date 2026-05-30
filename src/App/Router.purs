@@ -3,6 +3,7 @@ module App.Route where
 import Prelude
 
 import App.AddGrocery as AddGrocery
+import App.GenerateGroceries as GenerateGroceries
 import App.Groceries as Groceries
 import App.Next7Days as Next7Days
 import Capabilities.Navigation (class Navigation)
@@ -17,12 +18,14 @@ import Type.Proxy (Proxy(..))
 type Slots =
   ( next7Days :: forall query. H.Slot query Void Int
   , groceries :: forall query. H.Slot query Void Int
+  , generateGroceries :: forall query. H.Slot query Void Int
   , addGrocery :: forall query. H.Slot query Void Int
   )
 
 _next7Days = Proxy :: Proxy "next7Days"
 _groceries = Proxy :: Proxy "groceries"
 _addGrocery = Proxy :: Proxy "addGrocery"
+_generateGroceries = Proxy :: Proxy "generateGroceries"
 
 data Query a = Navigate Route a
 
@@ -59,7 +62,8 @@ component =
     case route of
       Just Home -> HH.slot_ _next7Days 0 Next7Days.component unit
       Just Groceries -> HH.slot_ _groceries 0 Groceries.component unit
-      Just GroceriesGenerate -> HH.text "TODO"
+      Just GroceriesGenerate ->
+        HH.slot_ _generateGroceries 0 GenerateGroceries.component unit
       Just AddGrocery -> HH.slot_ _addGrocery 0 AddGrocery.component unit
       Nothing -> HH.h1_ [ HH.text "Not found" ]
 
