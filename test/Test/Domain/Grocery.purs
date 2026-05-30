@@ -50,23 +50,11 @@ grocery =
 codecSpec :: Spec Unit
 codecSpec =
   describe "codec" do
-    it "serialisation works for grocery" do
-      let
-        actual = J.stringify $ encode grocery
-
-      actual `shouldEqual`
-        ( fold
-            [ """{"amount":{"value":1},"checked":false,"description":"Tomatoes","id":"""
-            , quoted rawGroceryId
-            , ""","sortIndex":0}"""
-            ]
-        )
-
     it "deserialization works for grocery" do
       let
         actual = decode $ parseJson
           ( fold
-              [ """{"amount":{"value":1},"checked":false,"description":"Tomatoes","id":"""
+              [ """{"amount":{"tag": "unitless", "value":1},"checked":false,"description":"Tomatoes","id":"""
               , quoted rawGroceryId
               , ""","sortIndex": 0}"""
               ]

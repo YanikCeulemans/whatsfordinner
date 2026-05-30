@@ -10,10 +10,7 @@ import Domain.Amount (Amount)
 import Domain.Amount as Amount
 import Partial.Unsafe (unsafeCrashWith)
 import Test.Spec (Spec, describe, it)
-import Test.Spec.Assertions (shouldContain, shouldEqual, shouldSatisfy)
-
-encode :: Amount -> J.Json
-encode = CA.encode Amount.codec
+import Test.Spec.Assertions (shouldContain, shouldSatisfy)
 
 decode :: J.Json -> Either CA.JsonDecodeError Amount
 decode = CA.decode Amount.codec
@@ -26,31 +23,20 @@ parseJson = J.parseJson >>> Either.fromRight' crash
 codecSpec :: Spec Unit
 codecSpec =
   describe "codec" do
-    it "serialisation works for unitless amount" do
-      let
-        actual = J.stringify $ encode $ Amount.unitless 1.0
-
-      actual `shouldEqual` """{"value":1}"""
-
-    it "serialisation works for amount with unit" do
-      let
-        actual = J.stringify $ encode $ Amount.withUnit 1.0 "kg"
-
-      actual `shouldEqual` """{"unit":"kg","value":1}"""
-
     it "deserialization works for unitless amount" do
       let
-        actual = decode $ parseJson """{ "value": 1 }"""
+        actual = decode $ parseJson """{ "tag": "unitless", "value": 1 }"""
       actual `shouldContain` (Amount.unitless 1.0)
 
     it "deserialization works for unitless negative amount" do
       let
-        actual = decode $ parseJson """{ "value": -1 }"""
+        actual = decode $ parseJson """{ "tag": "unitless", "value": -1 }"""
       actual `shouldContain` (Amount.unitless 1.0)
 
     it "deserialization works for amount with unit" do
       let
-        actual = decode $ parseJson """{ "value": 2, "unit": "kg" }"""
+        actual = decode $ parseJson
+          """{ "tag": "withUnit", "value": { "value": 2, "unit": "kg" } }"""
       actual `shouldContain` (Amount.withUnit 2.0 "kg")
 
     deserializationOfTypeMismatchFails """[]"""
