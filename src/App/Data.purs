@@ -349,62 +349,250 @@ mealSchedule =
                     ]
                 }
             )
+        , NoMealPlanned
         , PlannedMeal
             ( MkMeal
-                { name: "Pasta bolognese" }
+                { name: "Chipolata with carrot patato mash"
+                , ingredients:
+                    [ { name: "Chipolata", amount: Amount.withUnit 250.0 "g" }
+                    , { name: "Potatoes", amount: Amount.withUnit 300.0 "g" }
+                    , { name: "Carrots", amount: Amount.withUnit 400.0 "g" }
+                    , { name: "Onion", amount: Amount.unitless 1.0 }
+                    , { name: "Bay leaves", amount: Amount.toTaste }
+                    , { name: "Butter", amount: Amount.toTaste }
+                    , { name: "Milk", amount: Amount.toTaste }
+                    , { name: "Salt", amount: Amount.toTaste }
+                    , { name: "Pepper", amount: Amount.toTaste }
+                    ]
+                }
             )
         , PlannedMeal
             ( MkMeal
-                { name: "Sausage with carrot mash" }
+                { name: "Pasta with broccoli, leek and herb cheese"
+                , ingredients:
+                    [ { name: "Pasta", amount: Amount.withUnit 250.0 "g" }
+                    , { name: "Broccoli", amount: Amount.withUnit 400.0 "g" }
+                    , { name: "Leek", amount: Amount.unitless 1.0 }
+                    , { name: "Herb cheese", amount: Amount.withUnit 100.0 "g" }
+                    , { name: "Onion", amount: Amount.unitless 1.0 }
+                    , { name: "Vegetable stock"
+                      , amount: Amount.withUnit 1.0 "cube"
+                      }
+                    , { name: "Olive oil", amount: Amount.withUnit 2.0 "tbsp" }
+                    , { name: "Salt", amount: Amount.toTaste }
+                    , { name: "Pepper", amount: Amount.toTaste }
+                    ]
+                }
             )
         , PlannedMeal
             ( MkMeal
-                { name: "Pasta with broccoli, leek and herbcheese" }
+                { name: "Veggie Snitzel with beans and potatoes"
+                , ingredients:
+                    [ { name: "Veggie schnitzel", amount: Amount.unitless 2.0 }
+                    , { name: "Potatoes", amount: Amount.withUnit 400.0 "g" }
+                    , { name: "Green beans (frozen)"
+                      , amount: Amount.withUnit 500.0 "g"
+                      }
+                    , { name: "Onion", amount: Amount.unitless 1.0 }
+                    , { name: "Butter", amount: Amount.toTaste }
+                    , { name: "Salt", amount: Amount.toTaste }
+                    , { name: "Pepper", amount: Amount.toTaste }
+                    ]
+                }
             )
         , PlannedMeal
             ( MkMeal
-                { name: "Veggie Snitzel with beans and potatoes" }
+                { name: "Chicken wrap"
+                , ingredients:
+                    [ { name: "Veggie Chicken pieces"
+                      , amount: Amount.withUnit 400.0 "g"
+                      }
+                    , { name: "Tortilla wraps", amount: Amount.unitless 4.0 }
+                    , { name: "Lettuce", amount: Amount.unitless 1.0 }
+                    , { name: "Tomato", amount: Amount.unitless 2.0 }
+                    , { name: "Canned corn", amount: Amount.unitless 1.0 }
+                    , { name: "Sour cream", amount: Amount.withUnit 100.0 "ml" }
+                    , { name: "Guacamole", amount: Amount.withUnit 200.0 "g" }
+                    , { name: "Butter", amount: Amount.toTaste }
+                    ]
+                }
             )
         , PlannedMeal
             ( MkMeal
-                { name: "Chicken wrap" }
-            )
-        , PlannedMeal
-            ( MkMeal
-                { name: "Lasagne" }
+                { name: "Lasagne"
+                , ingredients:
+                    [ { name: "Prepared Lasagne", amount: Amount.unitless 1.0 }
+                    ]
+                }
             )
         , NoMealPlanned
         , PlannedMeal
             ( MkMeal
-                { name: "Codloin with basilicum mash and vine tomatoes" }
+                { name: "Codloin with basilicum mash and vine tomatoes"
+                , ingredients:
+                    [ { name: "Cod loin", amount: Amount.withUnit 400.0 "g" }
+                    , { name: "Potatoes", amount: Amount.withUnit 400.0 "g" }
+                    , { name: "Vine tomatoes"
+                      , amount: Amount.withUnit 200.0 "g"
+                      }
+                    , { name: "Fresh basil", amount: Amount.withUnit 20.0 "g" }
+                    , { name: "Butter", amount: Amount.withUnit 25.0 "g" }
+                    , { name: "Milk", amount: Amount.withUnit 100.0 "ml" }
+                    , { name: "Pine nuts", amount: Amount.withUnit 50.0 "tbsp" }
+                    , { name: "Garlic", amount: Amount.unitless 2.0 }
+                    , { name: "Milk", amount: Amount.toTaste }
+                    , { name: "Olive oil", amount: Amount.toTaste }
+                    , { name: "Salt", amount: Amount.toTaste }
+                    , { name: "Pepper", amount: Amount.toTaste }
+                    ]
+                }
             )
         , PlannedMeal
             ( MkMeal
-                { name: "Orzo with olives and feta" }
+                { name: "Orzo with olives and feta"
+                , ingredients:
+                    [ { name: "Orzo", amount: Amount.withUnit 150.0 "g" }
+                    , { name: "Feta cheese", amount: Amount.withUnit 100.0 "g" }
+                    , { name: "Olives"
+                      , amount: Amount.withUnit 100.0 "g"
+                      }
+                    , { name: "Bell pepper", amount: Amount.unitless 1.0 }
+                    , { name: "Eggplant", amount: Amount.unitless 1.0 }
+                    , { name: "Garlic", amount: Amount.withUnit 1.0 "clove" }
+                    , { name: "Shallot", amount: Amount.unitless 1.0 }
+                    , { name: "Breadcrumbs", amount: Amount.withUnit 140.0 "g" }
+                    , { name: "Olive oil", amount: Amount.toTaste }
+                    , { name: "Mediterranean herbs", amount: Amount.toTaste }
+                    , { name: "Salt", amount: Amount.toTaste }
+                    , { name: "Pepper", amount: Amount.toTaste }
+                    ]
+                }
             )
         , PlannedMeal
             ( MkMeal
-                { name: "Pasta with mushroom cream sauce" }
+                { name: "Pasta with mushroom cream sauce"
+                , ingredients:
+                    [ { name: "Pasta", amount: Amount.withUnit 200.0 "g" }
+                    , { name: "Mushrooms (frozen)"
+                      , amount: Amount.withUnit 250.0 "g"
+                      }
+                    , { name: "Cooking cream"
+                      , amount: Amount.withUnit 100.0 "ml"
+                      }
+                    , { name: "Flour"
+                      , amount: Amount.withUnit 1.0 "tbsp"
+                      }
+                    , { name: "Vegetable stock"
+                      , amount: Amount.withUnit 100.0 "ml"
+                      }
+                    , { name: "Onion", amount: Amount.unitless 1.0 }
+                    , { name: "Olive oil", amount: Amount.toTaste }
+                    , { name: "Salt", amount: Amount.toTaste }
+                    , { name: "Pepper", amount: Amount.toTaste }
+                    ]
+                }
             )
         , PlannedMeal
             ( MkMeal
-                { name: "Chicken, apple mash and fried potatoes" }
+                { name: "Chicken, apple mash and fried potatoes"
+                , ingredients:
+                    [ { name: "Veggie chicken", amount: Amount.unitless 2.0 }
+                    , { name: "Potatoes", amount: Amount.withUnit 600.0 "g" }
+                    , { name: "Apple mash", amount: Amount.withUnit 400.0 "g" }
+                    , { name: "Butter", amount: Amount.toTaste }
+                    ]
+                }
             )
         , PlannedMeal
             ( MkMeal
-                { name: "Veggie burger with spinach mash" }
+                { name: "Veggie burger with spinach mash"
+                , ingredients:
+                    [ { name: "Veggie burger"
+                      , amount: Amount.unitless 2.0
+                      }
+                    , { name: "Potatoes", amount: Amount.withUnit 400.0 "g" }
+                    , { name: "Spinach with cream (frozen)"
+                      , amount: Amount.withUnit 300.0 "g"
+                      }
+                    , { name: "Butter", amount: Amount.withUnit 40.0 "g" }
+                    , { name: "Salt", amount: Amount.toTaste }
+                    , { name: "Pepper", amount: Amount.toTaste }
+                    ]
+                }
             )
         , PlannedMeal
             ( MkMeal
-                { name: "Sandwiches" }
+                { name: "Sandwiches"
+                , ingredients:
+                    [ { name: "Artisanal bread", amount: Amount.unitless 2.0 }
+                    , { name: "Sliced cheese"
+                      , amount: Amount.withUnit 200.0 "g"
+                      }
+                    , { name: "Eggs", amount: Amount.unitless 2.0 }
+                    , { name: "Tomatoes", amount: Amount.unitless 2.0 }
+                    , { name: "Mayonaise", amount: Amount.toTaste }
+                    , { name: "Pickles", amount: Amount.toTaste }
+                    , { name: "Lettuce", amount: Amount.unitless 1.0 }
+                    , { name: "Tomato", amount: Amount.unitless 2.0 }
+                    ]
+                }
             )
         , PlannedMeal
             ( MkMeal
-                { name: "Zucchini, minced meat and potato slices casserole" }
+                { name: "Zucchini, minced meat and potato slices casserole"
+                , ingredients:
+                    [ { name: "Zucchini", amount: Amount.unitless 2.0 }
+                    , { name: "Minced beef", amount: Amount.withUnit 500.0 "g" }
+                    , { name: "Potatoes", amount: Amount.withUnit 500.0 "g" }
+                    , { name: "Onion", amount: Amount.unitless 2.0 }
+                    , { name: "Garlic", amount: Amount.unitless 3.0 }
+                    , { name: "Tomato paste"
+                      , amount: Amount.withUnit 2.0 "tbsp"
+                      }
+                    , { name: "Canned diced tomatoes"
+                      , amount: Amount.withUnit 400.0 "g"
+                      }
+                    , { name: "Grated cheese"
+                      , amount: Amount.withUnit 150.0 "g"
+                      }
+                    , { name: "Olive oil", amount: Amount.toTaste }
+                    , { name: "Dried basil", amount: Amount.toTaste }
+                    , { name: "Dried oregano", amount: Amount.toTaste }
+                    , { name: "Paprika powder", amount: Amount.toTaste }
+                    , { name: "Salt", amount: Amount.toTaste }
+                    , { name: "Pepper", amount: Amount.toTaste }
+                    ]
+                }
             )
         , PlannedMeal
             ( MkMeal
-                { name: "Salmon with pesto crust, greens and baby potatoes" }
+                { name: "Salmon with pesto crust, greens and baby potatoes"
+                , ingredients:
+                    [ { name: "Salmon fillet"
+                      , amount: Amount.unitless 2.0
+                      }
+                    , { name: "Baby potatoes"
+                      , amount: Amount.withUnit 250.0 "g"
+                      }
+                    , { name: "Broad beans (frozen)"
+                      , amount: Amount.withUnit 125.0 "g"
+                      }
+                    , { name: "Green beans (frozen)"
+                      , amount: Amount.withUnit 250.0 "g"
+                      }
+                    , { name: "Pesto", amount: Amount.withUnit 80.0 "g" }
+                    , { name: "Parmesan", amount: Amount.withUnit 1.5 "tbsp" }
+                    , { name: "Breadcrumbs"
+                      , amount: Amount.withUnit 1.5 "tbsp"
+                      }
+                    , { name: "Parmesan", amount: Amount.withUnit 1.5 "tbsp" }
+                    , { name: "Olives", amount: Amount.withUnit 2.0 "tbsp" }
+                    , { name: "Hazelnuts", amount: Amount.withUnit 1.0 "tbsp" }
+                    , { name: "Olive oil", amount: Amount.toTaste }
+                    , { name: "Salt", amount: Amount.toTaste }
+                    , { name: "Pepper", amount: Amount.toTaste }
+                    ]
+                }
             )
         ]
     }
