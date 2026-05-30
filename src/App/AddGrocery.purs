@@ -169,7 +169,7 @@ buildGrocery state = upsertedGroceryEntry
   amount =
     case amountUnit of
       Nothing -> Amount.unitless <$> amountValue
-      Just unit' -> Amount.create <$> amountValue <*> pure unit'
+      Just unit' -> Amount.withUnit <$> amountValue <*> pure unit'
 
 data Action
   = Initialize

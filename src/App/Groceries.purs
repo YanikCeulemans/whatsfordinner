@@ -6,13 +6,7 @@ import App.Data as Data
 import App.Layout as Layout
 import App.Shared (preventDefault)
 import App.Shared as S
-import Capabilities.Resource.ManageGroceryList
-  ( class ManageGroceryList
-  , deleteGroceries
-  , updateGroceries
-  , upsertGrocery
-  , upsertGroceryList
-  )
+import Capabilities.Resource.ManageGroceryList (class ManageGroceryList, deleteGroceries, updateGroceries, upsertGrocery, upsertGroceryList)
 import Data.Array (fold, mapWithIndex)
 import Data.Array as Array
 import Data.Int as Int
@@ -21,7 +15,7 @@ import Data.Route (Route(..))
 import Data.Route as Route
 import Data.Tuple (Tuple(..))
 import Data.Tuple as Tuple
-import Domain.Amount (Amount)
+import Domain.Amount (Amount(..))
 import Domain.Amount as Amount
 import Domain.GroceryList (GroceryEntry, GroceryList)
 import Domain.GroceryList as GroceryList
@@ -95,12 +89,10 @@ data Action
   | UncheckCompleted
 
 printAmount :: Amount -> String
-printAmount amount =
-  case Amount.unit amount of
-    Nothing -> show $ Int.ceil value
-    Just unit' -> show value <> unit'
-  where
-  value = Amount.value amount
+printAmount = case _ of
+  WithUnit x -> show x.value <> x.unit
+  Unitless x -> show x
+  ToTaste -> "to taste"
 
 data DragDirection = Above | Below
 

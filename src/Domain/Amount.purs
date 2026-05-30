@@ -1,5 +1,5 @@
 module Domain.Amount
-  ( Amount
+  ( Amount(..)
   , codec
   , increaseWith
   , setValue
