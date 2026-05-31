@@ -6,13 +6,19 @@ import App.Data as Data
 import App.FormField (FormField)
 import App.FormField as FormField
 import App.Layout as Layout
-import App.Shared (preventDefault)
+import App.Shared (eventTargetInputValue, preventDefault)
 import App.Shared as S
 import Capabilities.Resource.ManageGroceryList (class ManageGroceryList, upsertGroceryList)
+import Data.Date (Date)
+import Data.Date as Date
+import Data.Enum (toEnum)
+import Data.Int as Int
 import Data.Maybe (Maybe(..))
 import Data.Route as Route
+import Data.String as String
 import Domain.GroceryList (GroceryList)
 import Effect.Aff.Class (class MonadAff)
+import Effect.Class.Console as Console
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -32,6 +38,21 @@ data Action
   | SetFromFormFieldState Event
   | SetToFormFieldState Event
   | SubmitForm Event
+
+parseDate :: String -> Maybe Date
+parseDate candidate = -- "2027-05-02"
+
+  case String.split (String.Pattern "-") candidate of
+    [ yearText, monthText, dayText ] ->
+      Date.canonicalDate
+        <$> year
+        <*> month
+        <*> day
+      where
+      year = Int.fromString yearText >>= toEnum
+      month = Int.fromString monthText >>= toEnum
+      day = Int.fromString dayText >>= toEnum
+    _ -> Nothing
 
 component
   :: forall query input output m
@@ -70,8 +91,9 @@ component =
       preventDefault event
       -- TODO: implement 
       pure unit
-    SetFromFormFieldState _e ->
+    SetFromFormFieldState event -> do
       -- TODO: implement
+      Console.logShow =<< eventTargetInputValue event
       pure unit
     SetToFormFieldState _e ->
       -- TODO: implement
