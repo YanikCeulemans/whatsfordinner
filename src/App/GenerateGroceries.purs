@@ -9,21 +9,59 @@ import App.Layout as Layout
 import App.Shared (eventTargetInputValue, preventDefault)
 import App.Shared as S
 import Capabilities.Resource.ManageGroceryList (class ManageGroceryList, upsertGroceryList)
+import Control.Bind (bindFlipped)
+import Data.Array as Array
 import Data.Date (Date)
 import Data.Date as Date
+import Data.DateTime (DateTime(..))
 import Data.Enum (toEnum)
+import Data.Formatter.DateTime (FormatterCommand(..), format)
 import Data.Int as Int
+import Data.List as List
 import Data.Maybe (Maybe(..))
+import Data.Maybe as Maybe
 import Data.Route as Route
 import Data.String as String
+import Data.Time.Duration (Days(..))
 import Domain.GroceryList (GroceryList)
+import Domain.Range (Range)
+import Domain.Range as Range
 import Effect.Aff.Class (class MonadAff)
-import Effect.Class.Console as Console
+import Effect.Now (nowDate)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
+import Partial.Unsafe (unsafeCrashWith)
 import Web.Event.Event (Event)
+
+data Selection
+  = Incomplete { from :: Maybe Date, to :: Maybe Date }
+  | Complete (Range Date)
+
+instance Show Selection where
+  show = case _ of
+    Incomplete x -> "Incomplete " <> show x
+    Complete x -> "Complete " <> show x
+
+updateSelectionFrom :: Maybe Date -> Selection -> Selection
+updateSelectionFrom from selection = case from, selection of
+  Just from', Complete x -> Complete $ Range.create from' (Range.end x)
+  from', Complete x -> Incomplete { from: from', to: Just $ Range.end x }
+  Just from', Incomplete { to: Just to' } -> Complete $ Range.create from' to'
+  from', Incomplete x -> Incomplete $ x { from = from' }
+
+updateSelectionTo :: Maybe Date -> Selection -> Selection
+updateSelectionTo to selection = case to, selection of
+  Just to', Complete x -> Complete $ Range.create (Range.start x) to'
+  to', Complete x -> Incomplete { from: Just $ Range.start x, to: to' }
+  Just to', Incomplete { from: Just from' } -> Complete $ Range.create from' to'
+  to', Incomplete x -> Incomplete $ x { to = to' }
+
+isComplete :: Selection -> Boolean
+isComplete = case _ of
+  Complete _ -> true
+  _ -> false
 
 type State =
   { groceryList :: GroceryList
@@ -31,6 +69,7 @@ type State =
       { from :: FormField
       , to :: FormField
       }
+  , selection :: Selection
   }
 
 data Action
@@ -40,9 +79,8 @@ data Action
   | SubmitForm Event
 
 parseDate :: String -> Maybe Date
-parseDate candidate = -- "2027-05-02"
-
-  case String.split (String.Pattern "-") candidate of
+parseDate candidate =
+  case String.split (String.Pattern "-") candidate of -- "2027-05-02"
     [ yearText, monthText, dayText ] ->
       Date.canonicalDate
         <$> year
@@ -53,6 +91,47 @@ parseDate candidate = -- "2027-05-02"
       month = Int.fromString monthText >>= toEnum
       day = Int.fromString dayText >>= toEnum
     _ -> Nothing
+
+data SelectionTarget
+  = To
+  | From
+
+modifyDate
+  :: forall action childslots output m
+   . MonadAff m
+  => SelectionTarget
+  -> Event
+  -> H.HalogenM State action childslots output m Unit
+modifyDate modifyTarget event = do
+  date <- parsedDate
+  H.modify_ $ modify date
+  where
+  parsedDate = eventTargetInputValue event <#> bindFlipped parseDate
+  updateSelection = case modifyTarget of
+    From -> updateSelectionFrom
+    To -> updateSelectionTo
+  modify date s = s { selection = updateSelection date s.selection }
+
+toInputDateText :: Date -> String
+toInputDateText d =
+  format formatter dateTime
+  where
+  formatter =
+    List.fromFoldable $
+      Array.intersperse (Placeholder "-")
+        [ YearFull, MonthTwoDigits, DayOfMonthTwoDigits ]
+  dateTime = DateTime d bottom
+
+toInputDateText' :: SelectionTarget -> Selection -> String
+toInputDateText' selectionTarget selection =
+  date <#> toInputDateText # Maybe.fromMaybe ""
+  where
+  date =
+    case selectionTarget, selection of
+      From, Incomplete x -> x.from
+      From, Complete x -> Just $ Range.start x
+      To, Incomplete x -> x.to
+      To, Complete x -> Just $ Range.end x
 
 component
   :: forall query input output m
@@ -77,6 +156,7 @@ component =
         { from: FormField.Pristine
         , to: FormField.Pristine
         }
+    , selection: Incomplete { from: Nothing, to: Nothing }
     }
 
   handleAction
@@ -86,21 +166,23 @@ component =
   handleAction = case _ of
     Initialize -> do
       groceryList <- upsertGroceryList Data.dummyListId
-      H.modify_ _ { groceryList = groceryList }
+      today <- H.liftEffect nowDate
+      H.modify_ _ { groceryList = groceryList, selection = selection today }
+      where
+      crash _ = unsafeCrashWith "invalid amount of hardcoded days"
+      nextWeekFrom = Date.adjust (Days 7.0) >>> Maybe.fromMaybe' crash
+      selection today = Complete $ Range.create today $ nextWeekFrom today
     SubmitForm event -> do
       preventDefault event
-      -- TODO: implement 
+      -- TODO: implement
       pure unit
     SetFromFormFieldState event -> do
-      -- TODO: implement
-      Console.logShow =<< eventTargetInputValue event
-      pure unit
-    SetToFormFieldState _e ->
-      -- TODO: implement
-      pure unit
+      modifyDate From event
+    SetToFormFieldState event -> do
+      modifyDate To event
 
   render :: State -> H.ComponentHTML Action () m
-  render { form } =
+  render { form, selection } =
     Layout.main $
       HH.div [ HP.class_ $ H.ClassName "flex column spaced" ]
         [ HH.div [ HP.class_ $ H.ClassName "flex justify-space-between" ]
@@ -115,7 +197,7 @@ component =
                 , HH.input
                     ( join $
                         [ [ HE.onInput SetFromFormFieldState
-                          , HP.value $ FormField.fieldValue form.from
+                          , HP.value $ toInputDateText' From selection
                           , HP.type_ HP.InputDate
                           ]
                         , FormField.ariaValidity form.from
@@ -127,12 +209,20 @@ component =
                 , HH.input
                     ( join $
                         [ [ HE.onInput SetToFormFieldState
-                          , HP.value $ FormField.fieldValue form.to
+                          , HP.value $ toInputDateText' To selection
                           , HP.type_ HP.InputDate
                           ]
                         , FormField.ariaValidity form.to
                         ]
                     )
                 ]
+            ]
+        , HH.input
+            [ HP.type_ HP.InputSubmit
+            , HP.value "Generate"
+            , HP.disabled $ not $ isComplete selection
+            ]
+        , HH.code_
+            [ HH.text $ show selection
             ]
         ]

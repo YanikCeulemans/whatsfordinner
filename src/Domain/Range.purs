@@ -28,9 +28,9 @@ newtype Range a = MkRange { start :: a, end :: a }
 instance Functor Range where
   map f (MkRange { start: s, end: e }) = MkRange { start: f s, end: f e }
 
-instance Show (Range String) where
+instance Show a => Show (Range a) where
   show (MkRange { start: s, end: e }) = intercalate " "
-    [ "start: ", s, " , end: ", e ]
+    [ "start: ", show s, " , end: ", show e ]
 
 create :: forall a. a -> a -> Range a
 create s e = MkRange { start: s, end: e }
