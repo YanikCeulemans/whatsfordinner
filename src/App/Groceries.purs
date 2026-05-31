@@ -9,14 +9,12 @@ import App.Shared as S
 import Capabilities.Resource.ManageGroceryList (class ManageGroceryList, deleteGroceries, updateGroceries, upsertGrocery, upsertGroceryList)
 import Data.Array (fold, mapWithIndex)
 import Data.Array as Array
-import Data.Int as Int
 import Data.Maybe (Maybe(..))
 import Data.Route (Route(..))
 import Data.Route as Route
 import Data.Tuple (Tuple(..))
 import Data.Tuple as Tuple
 import Domain.Amount (Amount(..))
-import Domain.Amount as Amount
 import Domain.GroceryList (GroceryEntry, GroceryList)
 import Domain.GroceryList as GroceryList
 import Domain.Id as Id

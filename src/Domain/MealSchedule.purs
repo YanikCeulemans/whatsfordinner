@@ -5,7 +5,7 @@ import Prelude
 import Data.Date (Date)
 import Data.Date as Date
 import Data.Int as Int
-import Data.List (List(..))
+import Data.List (List)
 import Data.Time.Duration (Days(..))
 import Domain.PlannedMeal (PlannedMeal)
 import Domain.Range (Range)

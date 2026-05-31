@@ -15,9 +15,6 @@ import Prelude
 import Data.Foldable (class Foldable)
 import Data.List (List(..))
 import Data.List as List
-import Data.Number as Number
-import Data.Ord as Ord
-import Debug as Debug
 import Domain.Range (Range)
 import Domain.Range as Range
 

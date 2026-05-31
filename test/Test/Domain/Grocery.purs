@@ -16,7 +16,7 @@ import Domain.GroceryList as GroceryList
 import Domain.Id as Id
 import Partial.Unsafe (unsafeCrashWith)
 import Test.Spec (Spec, describe, it)
-import Test.Spec.Assertions (shouldContain, shouldEqual)
+import Test.Spec.Assertions (shouldContain)
 
 rawGroceryId :: String
 rawGroceryId = "01KNEQ7KMSBM0Q4XP56C6YP3NG"
@@ -30,9 +30,6 @@ groceryId = Id.MkId
 
 quoted :: String -> String
 quoted x = fold [ "\"", x, "\"" ]
-
-encode :: GroceryEntry -> J.Json
-encode = CA.encode GroceryList.entryCodec
 
 decode :: J.Json -> Either CA.JsonDecodeError GroceryEntry
 decode = CA.decode GroceryList.entryCodec

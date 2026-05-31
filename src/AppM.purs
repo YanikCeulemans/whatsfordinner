@@ -26,8 +26,7 @@ import Data.Tuple.Nested ((/\))
 import Data.ULID as DULID
 import Domain.GroceryList (GroceryList, GroceryEntry)
 import Domain.GroceryList as GroceryList
-import Domain.GroceryListId (GroceryListId(..))
-import Domain.GroceryListId as GroceryListId
+import Domain.GroceryListId (GroceryListId)
 import Domain.Id as Id
 import Effect (Effect)
 import Effect.Aff (Aff, Milliseconds(..))
