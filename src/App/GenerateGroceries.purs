@@ -16,14 +16,20 @@ import Data.Date as Date
 import Data.DateTime (DateTime(..))
 import Data.Enum (toEnum)
 import Data.Formatter.DateTime (FormatterCommand(..), format)
+import Data.Function (on)
 import Data.Int as Int
+import Data.List (List)
 import Data.List as List
+import Data.List.NonEmpty as NEL
 import Data.Maybe (Maybe(..))
 import Data.Maybe as Maybe
 import Data.Route as Route
 import Data.String as String
 import Data.Time.Duration (Days(..))
 import Domain.GroceryList (GroceryList)
+import Domain.Ingredient (Ingredient)
+import Domain.MealSchedule as MealSchedule
+import Domain.PlannedMeal as PlannedMeal
 import Domain.Range (Range)
 import Domain.Range as Range
 import Effect.Aff.Class (class MonadAff)
@@ -133,6 +139,17 @@ toInputDateText' selectionTarget selection =
       To, Incomplete x -> x.to
       To, Complete x -> Just $ Range.end x
 
+mergeIngredients :: List Ingredient -> List Ingredient
+mergeIngredients ingredients =
+  ingredients
+    # List.groupAllBy nameMatches
+    # map foldIngredients
+  where
+  nameMatches = compare `on` _.name
+  -- TODO: for now, let's just try to append amounts matching the state ingredient's amount
+  help ingredient curr = unsafeCrashWith "TODO"
+  foldIngredients xs = NEL.foldl help (NEL.head xs) xs
+
 component
   :: forall query input output m
    . MonadAff m
@@ -172,12 +189,26 @@ component =
       crash _ = unsafeCrashWith "invalid amount of hardcoded days"
       nextWeekFrom = Date.adjust (Days 7.0) >>> Maybe.fromMaybe' crash
       selection today = Complete $ Range.create today $ nextWeekFrom today
+
     SubmitForm event -> do
       preventDefault event
-      -- TODO: implement
-      pure unit
+      selection <- H.gets _.selection
+      case selection of
+        Complete dateRange -> do
+          -- TODO: implement
+          pure unit
+          where
+          meals =
+            MealSchedule.toList dateRange Data.mealSchedule
+              >>= (PlannedMeal.ingredients >>> List.fromFoldable)
+              # mergeIngredients
+
+        Incomplete _ ->
+          pure unit
+
     SetFromFormFieldState event -> do
       modifyDate From event
+
     SetToFormFieldState event -> do
       modifyDate To event
 
