@@ -1,5 +1,7 @@
 module App.FormField where
 
+import Prelude
+
 import Data.Maybe (Maybe(..))
 import Halogen as H
 import Halogen.HTML.Properties as HP
@@ -36,4 +38,10 @@ ariaInvalid = case _ of
   Pristine -> []
   Invalid _ -> [ HP.attr (H.AttrName "aria-invalid") "true" ]
   Valid _ -> [ HP.attr (H.AttrName "aria-invalid") "false" ]
+
+ariaValidity :: forall r i. FormField -> Array (HP.IProp r i)
+ariaValidity formField = append valid invalid
+  where
+  valid = ariaValid formField
+  invalid = ariaInvalid formField
 
