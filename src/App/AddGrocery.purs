@@ -9,7 +9,11 @@ import App.Layout as Layout
 import App.Shared (preventDefault)
 import App.Shared as S
 import Capabilities.Navigation (class Navigation, navigate)
-import Capabilities.Resource.ManageGroceryList (class ManageGroceryList, upsertGrocery)
+import Capabilities.Resource.ManageGroceryList
+  ( class ManageGroceryList
+  , upsertGrocery
+  , upsertGroceryList
+  )
 import Data.Array as Array
 import Data.Maybe (Maybe(..))
 import Data.Maybe as Maybe
@@ -172,7 +176,8 @@ component =
   handleAction = case _ of
     Initialize -> do
       id <- H.liftEffect $ ULID.genULID ULIDW.prng
-      H.modify_ _ { id = Just id }
+      groceryList <- upsertGroceryList Data.dummyListId
+      H.modify_ _ { id = Just id, groceryList = Just groceryList }
 
     SetDescriptionFormFieldState event -> do
       value <- S.eventTargetInputValueOrEmpty event
