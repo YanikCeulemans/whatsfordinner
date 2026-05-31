@@ -72,6 +72,5 @@ toList range rs
       offset start rs # take rangeDiff # asList
       where
       start = Range.start range
-      end = Range.end range
       rangeDiff = Range.diff range
 
