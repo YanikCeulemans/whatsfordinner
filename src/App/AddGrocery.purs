@@ -3,17 +3,13 @@ module App.AddGrocery where
 import Prelude
 
 import App.Data as Data
+import App.FormField (FormField)
+import App.FormField as FormField
 import App.Layout as Layout
 import App.Shared (preventDefault)
 import App.Shared as S
-import Capabilities.Navigation
-  ( class Navigation
-  , navigate
-  )
-import Capabilities.Resource.ManageGroceryList
-  ( class ManageGroceryList
-  , upsertGrocery
-  )
+import Capabilities.Navigation (class Navigation, navigate)
+import Capabilities.Resource.ManageGroceryList (class ManageGroceryList, upsertGrocery)
 import Data.Array as Array
 import Data.Maybe (Maybe(..))
 import Data.Maybe as Maybe
@@ -53,39 +49,6 @@ isLoading = case _ of
   Loading -> true
   _ -> false
 
-data FormField
-  = Pristine
-  | Invalid String
-  | Valid String
-
-fieldValue :: FormField -> String
-fieldValue = case _ of
-  Pristine -> ""
-  Invalid v -> v
-  Valid v -> v
-
-isFieldValid :: FormField -> Boolean
-isFieldValid = case _ of
-  Valid _ -> true
-  _ -> false
-
-validFieldValue :: FormField -> Maybe String
-validFieldValue = case _ of
-  Valid v -> Just v
-  _ -> Nothing
-
-ariaValid :: forall r i. FormField -> Array (HP.IProp r i)
-ariaValid = case _ of
-  Pristine -> []
-  Invalid _ -> [ HP.attr (H.AttrName "aria-valid") "false" ]
-  Valid _ -> [ HP.attr (H.AttrName "aria-valid") "true" ]
-
-ariaInvalid :: forall r i. FormField -> Array (HP.IProp r i)
-ariaInvalid = case _ of
-  Pristine -> []
-  Invalid _ -> [ HP.attr (H.AttrName "aria-invalid") "true" ]
-  Valid _ -> [ HP.attr (H.AttrName "aria-invalid") "false" ]
-
 type FormState =
   { description :: FormField
   , amountValue :: FormField
@@ -94,33 +57,34 @@ type FormState =
 
 pristineFormState :: FormState
 pristineFormState =
-  { description: Pristine
-  , amountValue: Pristine
-  , amountUnit: Pristine
+  { description: FormField.Pristine
+  , amountValue: FormField.Pristine
+  , amountUnit: FormField.Pristine
   }
 
 parseNonEmptyString :: String -> FormField
 parseNonEmptyString candidate =
   String.trim candidate
     # NES.fromString
-    # Maybe.maybe (Invalid "") (NES.toString >>> Valid)
+    # Maybe.maybe (FormField.Invalid "") (NES.toString >>> FormField.Valid)
 
 parseAmountValue :: String -> FormField
 parseAmountValue candidate =
   String.trim candidate
     # NES.fromString
     >>= validateNumber
-    # Maybe.maybe (Invalid candidate) (NES.toString >>> Valid)
+    # Maybe.maybe (FormField.Invalid candidate)
+        (NES.toString >>> FormField.Valid)
   where
   validateNumber v = (NES.toString v # Number.fromString) $> v
 
 parseAmountUnit :: String -> FormField
-parseAmountUnit = String.trim >>> Valid
+parseAmountUnit = String.trim >>> FormField.Valid
 
 isFormStateValid :: FormState -> Boolean
 isFormStateValid { description, amountValue, amountUnit } =
   [ description, amountValue, amountUnit ]
-    # Array.all isFieldValid
+    # Array.all FormField.isFieldValid
 
 type State =
   { id :: Maybe ULID
@@ -138,7 +102,7 @@ validateForm state =
   state { form = validatedForm }
   where
   touchField = case _ of
-    Pristine -> Invalid ""
+    FormField.Pristine -> FormField.Invalid ""
     other -> other
   validatedForm =
     { description: touchField state.form.description
@@ -157,15 +121,18 @@ buildGrocery state = upsertedGroceryEntry
       <*> amount
       <*> state.groceryList
   id = Id.MkId <$> state.id
-  description = validFieldValue state.form.description
+  description = FormField.validFieldValue state.form.description
   amountUnit =
     state.form.amountUnit
-      # validFieldValue
+      # FormField.validFieldValue
       # map String.trim
       >>= case _ of
         "" -> Nothing
         other -> Just other
-  amountValue = state.form.amountValue # validFieldValue >>= Number.fromString
+  amountValue =
+    state.form.amountValue
+      # FormField.validFieldValue
+      >>= Number.fromString
   amount =
     case amountUnit of
       Nothing -> Amount.unitless <$> amountValue
@@ -254,11 +221,11 @@ component =
                 , HH.input
                     ( join $
                         [ [ HE.onInput SetDescriptionFormFieldState
-                          , HP.value $ fieldValue form.description
+                          , HP.value $ FormField.fieldValue form.description
                           , HP.autofocus true
                           ]
-                        , ariaValid form.description
-                        , ariaInvalid form.description
+                        , FormField.ariaValid form.description
+                        , FormField.ariaInvalid form.description
                         ]
                     )
                 ]
@@ -269,11 +236,11 @@ component =
                         ( join
                             [ [ HP.type_ InputNumber
                               , HE.onInput SetAmountValueFormFieldState
-                              , HP.value $ fieldValue form.amountValue
+                              , HP.value $ FormField.fieldValue form.amountValue
                               , HP.min 1.0
                               ]
-                            , ariaValid form.amountValue
-                            , ariaInvalid form.amountValue
+                            , FormField.ariaValid form.amountValue
+                            , FormField.ariaInvalid form.amountValue
                             ]
                         )
                     ]
@@ -282,10 +249,10 @@ component =
                     , HH.input
                         ( join
                             [ [ HE.onInput SetAmountUnitFormFieldState
-                              , HP.value $ fieldValue form.amountUnit
+                              , HP.value $ FormField.fieldValue form.amountUnit
                               ]
-                            , ariaValid form.amountUnit
-                            , ariaInvalid form.amountUnit
+                            , FormField.ariaValid form.amountUnit
+                            , FormField.ariaInvalid form.amountUnit
                             ]
                         )
                     ]
