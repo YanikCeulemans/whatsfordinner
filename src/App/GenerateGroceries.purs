@@ -222,7 +222,4 @@ component =
             , HP.value "Generate"
             , HP.disabled $ not $ isComplete selection
             ]
-        , HH.code_
-            [ HH.text $ show selection
-            ]
         ]
