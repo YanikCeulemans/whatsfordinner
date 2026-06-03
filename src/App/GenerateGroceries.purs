@@ -8,6 +8,7 @@ import App.FormField as FormField
 import App.Layout as Layout
 import App.Shared (eventTargetInputValue, preventDefault)
 import App.Shared as S
+import Capabilities.Resource.Grocery (upsertGrocery)
 import Capabilities.Resource.ManageGroceryList (class ManageGroceryList, upsertGroceryList)
 import Control.Bind (bindFlipped)
 import Data.Array as Array
@@ -15,6 +16,7 @@ import Data.Date (Date)
 import Data.Date as Date
 import Data.DateTime (DateTime(..))
 import Data.Enum (toEnum)
+import Data.Foldable (foldl)
 import Data.Formatter.DateTime (FormatterCommand(..), format)
 import Data.Function (on)
 import Data.Int as Int
@@ -26,7 +28,11 @@ import Data.Maybe as Maybe
 import Data.Route as Route
 import Data.String as String
 import Data.Time.Duration (Days(..))
-import Domain.GroceryList (GroceryList)
+import Data.Tuple (Tuple)
+import Domain.Amount as Amount
+import Domain.GroceryList (GroceryEntry, GroceryList)
+import Domain.GroceryList as GroceryList
+import Domain.Id as Id
 import Domain.Ingredient (Ingredient)
 import Domain.MealSchedule as MealSchedule
 import Domain.PlannedMeal as PlannedMeal
@@ -39,6 +45,8 @@ import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Partial.Unsafe (unsafeCrashWith)
+import Simple.ULID as ULID
+import Simple.ULID.Window as ULIDW
 import Web.Event.Event (Event)
 
 data Selection
@@ -146,9 +154,32 @@ mergeIngredients ingredients =
     # map foldIngredients
   where
   nameMatches = compare `on` _.name
-  -- TODO: for now, let's just try to append amounts matching the state ingredient's amount
-  help ingredient curr = unsafeCrashWith "TODO"
+  help ingredient curr =
+    case ingredient.amount, curr.amount of
+      Amount.WithUnit a, Amount.WithUnit b
+        | a.unit == b.unit ->
+            ingredient
+              { amount = Amount.WithUnit $ a
+                  { value = a.value + b.value }
+              }
+      Amount.Unitless a, Amount.Unitless b -> ingredient
+        { amount = Amount.Unitless $ a + b }
+
+      _, _ -> ingredient
+
   foldIngredients xs = NEL.foldl help (NEL.head xs) xs
+
+-- TODO: use this to gen groceries from ingredients
+toGrocery
+  :: forall m
+   . ManageGroceryList m
+  => MonadAff m
+  -> GroceryList
+  -> Ingredient
+  -> m (Tuple GroceryEntry GroceryList)
+toGrocery groceryList { name, amount } = do
+  ulid <- H.liftEffect $ ULID.genULID ULIDW.prng
+  pure $ GroceryList.upsertGrocery (Id.MkId ulid) name amount groceryList
 
 component
   :: forall query input output m
@@ -192,13 +223,13 @@ component =
 
     SubmitForm event -> do
       preventDefault event
-      selection <- H.gets _.selection
+      { groceryList, selection } <- H.get
       case selection of
         Complete dateRange -> do
           -- TODO: implement
           pure unit
           where
-          meals =
+          ingredients =
             MealSchedule.toList dateRange Data.mealSchedule
               >>= (PlannedMeal.ingredients >>> List.fromFoldable)
               # mergeIngredients
