@@ -8,19 +8,22 @@ import App.FormField as FormField
 import App.Layout as Layout
 import App.Shared (eventTargetInputValue, preventDefault)
 import App.Shared as S
-import Capabilities.Resource.Grocery (upsertGrocery)
-import Capabilities.Resource.ManageGroceryList (class ManageGroceryList, upsertGroceryList)
+import Capabilities.Navigation (class Navigation, navigate)
+import Capabilities.Resource.ManageGroceryList
+  ( class ManageGroceryList
+  , upsertGrocery
+  , upsertGroceryList
+  )
 import Control.Bind (bindFlipped)
 import Data.Array as Array
 import Data.Date (Date)
 import Data.Date as Date
 import Data.DateTime (DateTime(..))
 import Data.Enum (toEnum)
-import Data.Foldable (foldl)
 import Data.Formatter.DateTime (FormatterCommand(..), format)
 import Data.Function (on)
 import Data.Int as Int
-import Data.List (List)
+import Data.List (List(..))
 import Data.List as List
 import Data.List.NonEmpty as NEL
 import Data.Maybe (Maybe(..))
@@ -28,7 +31,7 @@ import Data.Maybe as Maybe
 import Data.Route as Route
 import Data.String as String
 import Data.Time.Duration (Days(..))
-import Data.Tuple (Tuple)
+import Data.Tuple (Tuple(..))
 import Domain.Amount as Amount
 import Domain.GroceryList (GroceryEntry, GroceryList)
 import Domain.GroceryList as GroceryList
@@ -39,6 +42,7 @@ import Domain.PlannedMeal as PlannedMeal
 import Domain.Range (Range)
 import Domain.Range as Range
 import Effect.Aff.Class (class MonadAff)
+import Effect.Class (class MonadEffect)
 import Effect.Now (nowDate)
 import Halogen as H
 import Halogen.HTML as HH
@@ -155,6 +159,7 @@ mergeIngredients ingredients =
   where
   nameMatches = compare `on` _.name
   help ingredient curr =
+    -- TODO: we end up with double the amount of groceries with need in the amount part, does that mistake happen here?
     case ingredient.amount, curr.amount of
       Amount.WithUnit a, Amount.WithUnit b
         | a.unit == b.unit ->
@@ -169,22 +174,30 @@ mergeIngredients ingredients =
 
   foldIngredients xs = NEL.foldl help (NEL.head xs) xs
 
--- TODO: use this to gen groceries from ingredients
-toGrocery
+traverseGroceries
   :: forall m
-   . ManageGroceryList m
-  => MonadAff m
-  -> GroceryList
-  -> Ingredient
-  -> m (Tuple GroceryEntry GroceryList)
-toGrocery groceryList { name, amount } = do
-  ulid <- H.liftEffect $ ULID.genULID ULIDW.prng
-  pure $ GroceryList.upsertGrocery (Id.MkId ulid) name amount groceryList
+   . MonadEffect m
+  => ManageGroceryList m
+  => GroceryList
+  -> List GroceryEntry
+  -> List Ingredient
+  -> m (List GroceryEntry)
+traverseGroceries theList acc =
+  case _ of
+    Nil -> pure acc
+    Cons { name, amount } rest -> do
+      ulid <- H.liftEffect $ ULID.genULID ULIDW.prng
+      let
+        Tuple entry newList =
+          GroceryList.upsertGrocery (Id.MkId ulid) name amount theList
+      upsertGrocery Data.dummyListId entry
+      traverseGroceries newList (Cons entry acc) rest
 
 component
   :: forall query input output m
    . MonadAff m
   => ManageGroceryList m
+  => Navigation m
   => H.Component query input output m
 component =
   H.mkComponent
@@ -226,8 +239,8 @@ component =
       { groceryList, selection } <- H.get
       case selection of
         Complete dateRange -> do
-          -- TODO: implement
-          pure unit
+          void $ traverseGroceries groceryList Nil ingredients
+          navigate Route.Groceries
           where
           ingredients =
             MealSchedule.toList dateRange Data.mealSchedule
@@ -278,10 +291,10 @@ component =
                         ]
                     )
                 ]
-            ]
-        , HH.input
-            [ HP.type_ HP.InputSubmit
-            , HP.value "Generate"
-            , HP.disabled $ not $ isComplete selection
+            , HH.input
+                [ HP.type_ HP.InputSubmit
+                , HP.value "Generate"
+                , HP.disabled $ not $ isComplete selection
+                ]
             ]
         ]
