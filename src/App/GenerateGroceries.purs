@@ -3,8 +3,6 @@ module App.GenerateGroceries where
 import Prelude
 
 import App.Data as Data
-import App.FormField (FormField)
-import App.FormField as FormField
 import App.Layout as Layout
 import App.Shared (eventTargetInputValue, preventDefault)
 import App.Shared as S
@@ -21,6 +19,7 @@ import Data.Date as Date
 import Data.DateTime (DateTime(..))
 import Data.Enum (toEnum)
 import Data.Foldable (foldl)
+import Data.Foldable as Foldable
 import Data.Formatter.DateTime (FormatterCommand(..), format)
 import Data.Function (on)
 import Data.Int as Int
@@ -84,11 +83,8 @@ isComplete = case _ of
 
 type State =
   { groceryList :: GroceryList
-  , form ::
-      { from :: FormField
-      , to :: FormField
-      }
   , selection :: Selection
+  , loading :: Boolean
   }
 
 data Action
@@ -215,11 +211,8 @@ component =
   initialState :: input -> State
   initialState _ =
     { groceryList: mempty
-    , form:
-        { from: FormField.Pristine
-        , to: FormField.Pristine
-        }
     , selection: Incomplete { from: Nothing, to: Nothing }
+    , loading: false
     }
 
   handleAction
@@ -241,6 +234,7 @@ component =
       { groceryList, selection } <- H.get
       case selection of
         Complete dateRange -> do
+          H.modify_ _ { loading = true }
           void $ traverseGroceries groceryList Nil ingredients
           navigate Route.Groceries
           where
@@ -259,7 +253,7 @@ component =
       modifyDate To event
 
   render :: State -> H.ComponentHTML Action () m
-  render { form, selection } =
+  render { loading, selection } =
     Layout.main $
       HH.div [ HP.class_ $ H.ClassName "flex column spaced" ]
         [ HH.div [ HP.class_ $ H.ClassName "flex justify-space-between" ]
@@ -277,7 +271,6 @@ component =
                           , HP.value $ toInputDateText' From selection
                           , HP.type_ HP.InputDate
                           ]
-                        , FormField.ariaValidity form.from
                         ]
                     )
                 ]
@@ -289,14 +282,21 @@ component =
                           , HP.value $ toInputDateText' To selection
                           , HP.type_ HP.InputDate
                           ]
-                        , FormField.ariaValidity form.to
                         ]
                     )
                 ]
-            , HH.input
-                [ HP.type_ HP.InputSubmit
-                , HP.value "Generate"
-                , HP.disabled $ not $ isComplete selection
+            , HH.button
+                [ HP.type_ HP.ButtonSubmit
+                , HP.disabled $
+                    Foldable.or
+                      [ not $ isComplete selection
+                      , loading
+                      ]
+                , HP.attr (H.AttrName "aria-busy") $ show loading
+                ]
+                [ case loading of
+                    true -> HH.text "Generating..."
+                    false -> HH.text "Generate"
                 ]
             ]
         ]
