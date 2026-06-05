@@ -20,6 +20,7 @@ import Data.Date (Date)
 import Data.Date as Date
 import Data.DateTime (DateTime(..))
 import Data.Enum (toEnum)
+import Data.Foldable (foldl)
 import Data.Formatter.DateTime (FormatterCommand(..), format)
 import Data.Function (on)
 import Data.Int as Int
@@ -159,7 +160,6 @@ mergeIngredients ingredients =
   where
   nameMatches = compare `on` _.name
   help ingredient curr =
-    -- TODO: we end up with double the amount of groceries with need in the amount part, does that mistake happen here?
     case ingredient.amount, curr.amount of
       Amount.WithUnit a, Amount.WithUnit b
         | a.unit == b.unit ->
@@ -172,7 +172,9 @@ mergeIngredients ingredients =
 
       _, _ -> ingredient
 
-  foldIngredients xs = NEL.foldl help (NEL.head xs) xs
+  foldIngredients xs =
+    case NEL.uncons xs of
+      { head, tail } -> foldl help head tail
 
 traverseGroceries
   :: forall m

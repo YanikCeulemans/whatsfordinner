@@ -326,7 +326,7 @@ mealSchedule =
             ( MkMeal
                 { name: "Chicory ham rolls with mashed potatoes"
                 , ingredients:
-                    [ { name: "Endive", amount: Amount.unitless 4.0 }
+                    [ { name: "Chicory", amount: Amount.unitless 4.0 }
                     , { name: "Cooked ham"
                       , amount: Amount.unitless 4.0
                       }
