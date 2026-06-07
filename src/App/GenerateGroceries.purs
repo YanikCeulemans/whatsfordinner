@@ -9,10 +9,13 @@ import App.Shared as S
 import Capabilities.Navigation (class Navigation, navigate)
 import Capabilities.Resource.ManageGroceryList
   ( class ManageGroceryList
+  , upsertGroceries
   , upsertGrocery
   , upsertGroceryList
   )
 import Control.Bind (bindFlipped)
+import Control.Monad.State (StateT, evalStateT)
+import Control.Monad.State as MonadState
 import Data.Array as Array
 import Data.Date (Date)
 import Data.Date as Date
@@ -31,6 +34,7 @@ import Data.Maybe as Maybe
 import Data.Route as Route
 import Data.String as String
 import Data.Time.Duration (Days(..))
+import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Domain.Amount as Amount
 import Domain.GroceryList (GroceryEntry, GroceryList)
@@ -191,6 +195,28 @@ traverseGroceries theList acc =
       upsertGrocery Data.dummyListId entry
       traverseGroceries newList (Cons entry acc) rest
 
+upsertIngredient
+  :: forall m
+   . MonadEffect m
+  => Ingredient
+  -> StateT GroceryList m GroceryEntry
+upsertIngredient { name, amount } = do
+  groceryId <- H.liftEffect $ (Id.MkId <$> ULID.genULID ULIDW.prng)
+  groceryList <- MonadState.get
+  case GroceryList.upsertGrocery groceryId name amount groceryList of
+    Tuple groceryEntry updatedList -> do
+      MonadState.put updatedList
+      pure groceryEntry
+
+upsertIngredients
+  :: forall m
+   . MonadAff m
+  => Array Ingredient
+  -> GroceryList
+  -> m (Array GroceryEntry)
+upsertIngredients ingredients groceryList =
+  evalStateT (traverse upsertIngredient ingredients) groceryList
+
 component
   :: forall query input output m
    . MonadAff m
@@ -235,7 +261,8 @@ component =
       case selection of
         Complete dateRange -> do
           H.modify_ _ { loading = true }
-          void $ traverseGroceries groceryList Nil ingredients
+          groceries <- upsertIngredients ingredients groceryList
+          void $ upsertGroceries Data.dummyListId groceries
           H.modify_ _ { loading = false }
           navigate Route.Groceries
           where
@@ -243,6 +270,7 @@ component =
             MealSchedule.toList dateRange Data.mealSchedule
               >>= (PlannedMeal.ingredients >>> List.fromFoldable)
               # mergeIngredients
+              # Array.fromFoldable
 
         Incomplete _ ->
           pure unit

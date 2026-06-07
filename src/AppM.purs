@@ -6,6 +6,7 @@ import Capabilities.Navigation (class Navigation)
 import Capabilities.Resource.ManageGroceryList (class ManageGroceryList)
 import Control.Monad.State (class MonadState)
 import Control.Monad.State as MonadState
+import Control.Parallel.Class (parallel, sequential)
 import Data.Argonaut as A
 import Data.Argonaut.Parser as AP
 import Data.Array (foldl, (..))
@@ -18,9 +19,10 @@ import Data.FoldableWithIndex (forWithIndex_)
 import Data.Map (Map)
 import Data.Map as Map
 import Data.Maybe (Maybe(..))
+import Data.Maybe as Maybe
 import Data.Route (Route)
 import Data.Route as Route
-import Data.Traversable (for)
+import Data.Traversable (for, for_)
 import Data.Tuple (Tuple(..), snd)
 import Data.Tuple.Nested ((/\))
 import Data.ULID as DULID
@@ -34,6 +36,7 @@ import Effect.Aff as Aff
 import Effect.Aff.Class (class MonadAff, liftAff)
 import Effect.Class (class MonadEffect, liftEffect)
 import FFI.Navigation as Nav
+import Partial.Unsafe (unsafeCrashWith)
 import Web.HTML as HTML
 import Web.HTML.Window as Window
 import Web.Storage.Storage (Storage)
@@ -86,16 +89,26 @@ localStorageUpsertGroceryList id = do
   createValue _ = mempty
 
 localStorageUpsertGrocery :: GroceryListId -> GroceryEntry -> AppM Unit
-localStorageUpsertGrocery id grocery = do
+localStorageUpsertGrocery groceryListId grocery = do
   liftAff $ Aff.delay $ Milliseconds 300.0
   MonadState.modify_ upsert
   where
-  eId /\ eDesc /\ eAmount =
-    GroceryList.entryId grocery
-      /\ GroceryList.entryDescription grocery
-      /\ GroceryList.entryAmount grocery
-  go = GroceryList.upsertGrocery eId eDesc eAmount >>> snd
-  upsert = Map.alter (map go) id
+  entryId = GroceryList.entryId grocery
+  entryDescription = GroceryList.entryDescription grocery
+  entryAmount = GroceryList.entryAmount grocery
+  go = GroceryList.upsertGrocery entryId entryDescription entryAmount >>> snd
+  upsert = Map.alter (map go) groceryListId
+
+localStorageUpsertGroceries
+  :: GroceryListId -> Array GroceryEntry -> AppM GroceryList
+localStorageUpsertGroceries groceryListId groceries = do
+  void $ localStorageUpsertGroceryList groceryListId
+  AppM $ sequential $ for_ groceries $ parallel
+    <<< runAppM
+    <<< localStorageUpsertGrocery groceryListId
+  MonadState.gets $ Maybe.fromMaybe' crash <<< Map.lookup groceryListId
+  where
+  crash _ = unsafeCrashWith "could not find just upserted grocery list?!"
 
 localStorageDeleteGroceries
   :: GroceryListId -> Array GroceryEntry -> AppM GroceryList
@@ -118,6 +131,7 @@ localStorageUpdateGroceries id f = do
 instance ManageGroceryList AppM where
   upsertGroceryList id = localStorageUpsertGroceryList id
   upsertGrocery id grocery = localStorageUpsertGrocery id grocery
+  upsertGroceries id groceries = localStorageUpsertGroceries id groceries
   deleteGroceries id groceries = localStorageDeleteGroceries id groceries
   updateGroceries id f = localStorageUpdateGroceries id f
 
