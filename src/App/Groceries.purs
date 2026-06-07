@@ -9,6 +9,7 @@ import App.Shared as S
 import Capabilities.Resource.ManageGroceryList (class ManageGroceryList, deleteGroceries, updateGroceries, upsertGrocery, upsertGroceryList)
 import Data.Array (fold, mapWithIndex)
 import Data.Array as Array
+import Data.Function (on)
 import Data.Maybe (Maybe(..))
 import Data.Route (Route(..))
 import Data.Route as Route
@@ -176,9 +177,7 @@ groceriesView
   -> H.ComponentHTML Action () m
 groceriesView state =
   HH.div_
-    [ HH.button [ HP.class_ $ H.ClassName "secondary" ]
-        [ HH.text "Edit" ]
-    , HH.ul
+    [ HH.ul
         [ HP.class_ $ H.ClassName "no-padding groceries-list"
         , HE.onDragEnd $ EndDrag
         ] $
@@ -205,7 +204,9 @@ groceriesView state =
 
   where
   { no: uncheckedGroceries, yes: checkedGroceries } =
-    mapWithIndex Tuple state.groceryList
+    state.groceryList
+      # Array.sortBy (compare `on` GroceryList.entrySortIndex)
+      # mapWithIndex Tuple
       # Array.partition (Tuple.snd >>> GroceryList.entryChecked)
 
 component
