@@ -236,6 +236,7 @@ component =
         Complete dateRange -> do
           H.modify_ _ { loading = true }
           void $ traverseGroceries groceryList Nil ingredients
+          H.modify_ _ { loading = false }
           navigate Route.Groceries
           where
           ingredients =
