@@ -22,6 +22,9 @@ import Data.Maybe (Maybe(..))
 import Data.Maybe as Maybe
 import Data.Route (Route)
 import Data.Route as Route
+import Data.Set as Set
+import Data.String.Regex as StrRegex
+import Data.String.Regex.Flags as Flags
 import Data.Traversable (for, for_)
 import Data.Tuple (Tuple(..), snd)
 import Data.Tuple.Nested ((/\))
@@ -54,8 +57,6 @@ derive newtype instance Bind AppM
 derive newtype instance Monad AppM
 derive newtype instance MonadEffect AppM
 derive newtype instance MonadAff AppM
-
--- TODO: Id types with phantom type instead of bespoke ids?
 
 decodeGroceryList :: String -> Either String GroceryList
 decodeGroceryList candidate =
@@ -119,6 +120,23 @@ localStorageDeleteGroceries id groceriesToDelete = do
   MonadState.modify_ (Map.insert id updatedList)
   pure updatedList
 
+localStorageSuggestGroceries :: String -> AppM (Array String)
+localStorageSuggestGroceries suggestionBase = do
+  state <- MonadState.get
+  Map.values state
+    # Array.fromFoldable
+    # join
+    # map GroceryList.entryDescription
+    # Set.fromFoldable
+    # Array.fromFoldable
+    # Array.filter (StrRegex.test suggestionBaseRegex)
+    # pure
+  where
+  crash err = unsafeCrashWith $ "could not create regex due to: " <> err
+  suggestionBaseRegex =
+    StrRegex.regex suggestionBase Flags.ignoreCase
+      # Either.either crash identity
+
 localStorageUpdateGroceries
   :: GroceryListId -> (GroceryEntry -> GroceryEntry) -> AppM GroceryList
 localStorageUpdateGroceries id f = do
@@ -134,6 +152,7 @@ instance ManageGroceryList AppM where
   upsertGroceries id groceries = localStorageUpsertGroceries id groceries
   deleteGroceries id groceries = localStorageDeleteGroceries id groceries
   updateGroceries id f = localStorageUpdateGroceries id f
+  suggestGroceries = localStorageSuggestGroceries
 
 setLocation :: Route -> Aff Unit
 setLocation route = do

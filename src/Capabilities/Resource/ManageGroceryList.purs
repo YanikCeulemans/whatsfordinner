@@ -16,6 +16,7 @@ class Monad m <= ManageGroceryList m where
   deleteGroceries :: GroceryListId -> Array GroceryEntry -> m GroceryList
   updateGroceries
     :: GroceryListId -> (GroceryEntry -> GroceryEntry) -> m GroceryList
+  suggestGroceries :: String -> m (Array String)
 
 instance
   ManageGroceryList m =>
@@ -25,3 +26,4 @@ instance
   upsertGroceries id = H.lift <<< upsertGroceries id
   deleteGroceries id = H.lift <<< deleteGroceries id
   updateGroceries id = H.lift <<< updateGroceries id
+  suggestGroceries = H.lift <<< suggestGroceries

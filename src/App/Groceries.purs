@@ -6,7 +6,13 @@ import App.Data as Data
 import App.Layout as Layout
 import App.Shared (preventDefault)
 import App.Shared as S
-import Capabilities.Resource.ManageGroceryList (class ManageGroceryList, deleteGroceries, updateGroceries, upsertGrocery, upsertGroceryList)
+import Capabilities.Resource.ManageGroceryList
+  ( class ManageGroceryList
+  , deleteGroceries
+  , updateGroceries
+  , upsertGrocery
+  , upsertGroceryList
+  )
 import Data.Array (fold, mapWithIndex)
 import Data.Array as Array
 import Data.Function (on)
