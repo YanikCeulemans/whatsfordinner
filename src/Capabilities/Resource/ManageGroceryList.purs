@@ -6,6 +6,11 @@ import Domain.GroceryList (GroceryList, GroceryEntry)
 import Domain.GroceryListId (GroceryListId)
 import Halogen as H
 
+type SortedGrocery =
+  { description :: String
+  , sortIndex :: Int
+  }
+
 {-- TODO: 
     These signatures could be improved, it could be -> m (Either RemoteError GroceryList)
 --}
@@ -16,7 +21,7 @@ class Monad m <= ManageGroceryList m where
   deleteGroceries :: GroceryListId -> Array GroceryEntry -> m GroceryList
   updateGroceries
     :: GroceryListId -> (GroceryEntry -> GroceryEntry) -> m GroceryList
-  suggestGroceries :: String -> m (Array String)
+  suggestGroceries :: String -> m (Array SortedGrocery)
 
 instance
   ManageGroceryList m =>

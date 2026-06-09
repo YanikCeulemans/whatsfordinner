@@ -3,7 +3,7 @@ module AppM (AppM, runAppM) where
 import Prelude
 
 import Capabilities.Navigation (class Navigation)
-import Capabilities.Resource.ManageGroceryList (class ManageGroceryList)
+import Capabilities.Resource.ManageGroceryList (class ManageGroceryList, SortedGrocery)
 import Control.Monad.State (class MonadState)
 import Control.Monad.State as MonadState
 import Control.Parallel.Class (parallel, sequential)
@@ -83,8 +83,8 @@ localStorageUpsertGroceryList :: GroceryListId -> AppM GroceryList
 localStorageUpsertGroceryList id = do
   state <- MonadState.get
   let
-    list /\ newState = getOrInsert id createValue state
-  MonadState.put newState
+    list /\ newState = getOrInsert id createValue state.groceryLists
+  MonadState.put $ state { groceryLists = newState }
   pure list
   where
   createValue _ = mempty
@@ -98,7 +98,8 @@ localStorageUpsertGrocery groceryListId grocery = do
   entryDescription = GroceryList.entryDescription grocery
   entryAmount = GroceryList.entryAmount grocery
   go = GroceryList.upsertGrocery entryId entryDescription entryAmount >>> snd
-  upsert = Map.alter (map go) groceryListId
+  upsert s = s
+    { groceryLists = Map.alter (map go) groceryListId s.groceryLists }
 
 localStorageUpsertGroceries
   :: GroceryListId -> Array GroceryEntry -> AppM GroceryList
@@ -107,7 +108,8 @@ localStorageUpsertGroceries groceryListId groceries = do
   AppM $ sequential $ for_ groceries $ parallel
     <<< runAppM
     <<< localStorageUpsertGrocery groceryListId
-  MonadState.gets $ Maybe.fromMaybe' crash <<< Map.lookup groceryListId
+  MonadState.gets $
+    Maybe.fromMaybe' crash <<< Map.lookup groceryListId <<< _.groceryLists
   where
   crash _ = unsafeCrashWith "could not find just upserted grocery list?!"
 
@@ -117,25 +119,26 @@ localStorageDeleteGroceries id groceriesToDelete = do
   list <- localStorageUpsertGroceryList id
   let
     updatedList = GroceryList.deleteGroceries groceriesToDelete list
-  MonadState.modify_ (Map.insert id updatedList)
+  MonadState.modify_ $ modify updatedList
   pure updatedList
+  where
+  modify updatedList s = s
+    { groceryLists = Map.insert id updatedList s.groceryLists }
 
-localStorageSuggestGroceries :: String -> AppM (Array String)
+localStorageSuggestGroceries :: String -> AppM (Array SortedGrocery)
 localStorageSuggestGroceries suggestionBase = do
-  state <- MonadState.get
-  Map.values state
-    # Array.fromFoldable
-    # join
-    # map GroceryList.entryDescription
-    # Set.fromFoldable
-    # Array.fromFoldable
-    # Array.filter (StrRegex.test suggestionBaseRegex)
+  liftAff $ Aff.delay $ Milliseconds 500.0
+  state <- MonadState.gets _.groceries
+  state
+    # Array.filter descriptionMatches
     # pure
   where
   crash err = unsafeCrashWith $ "could not create regex due to: " <> err
   suggestionBaseRegex =
-    StrRegex.regex suggestionBase Flags.ignoreCase
+    StrRegex.regex ("^" <> suggestionBase) Flags.ignoreCase
       # Either.either crash identity
+  descriptionMatches { description } =
+    StrRegex.test suggestionBaseRegex description
 
 localStorageUpdateGroceries
   :: GroceryListId -> (GroceryEntry -> GroceryEntry) -> AppM GroceryList
@@ -143,8 +146,11 @@ localStorageUpdateGroceries id f = do
   list <- localStorageUpsertGroceryList id
   let
     updatedList = map f list
-  MonadState.modify_ (Map.insert id updatedList)
+  MonadState.modify_ $ modify updatedList
   pure updatedList
+  where
+  modify updatedList s = s
+    { groceryLists = Map.insert id updatedList s.groceryLists }
 
 instance ManageGroceryList AppM where
   upsertGroceryList id = localStorageUpsertGroceryList id
@@ -164,7 +170,10 @@ setLocation route = do
 instance Navigation AppM where
   navigate route = AppM $ setLocation route
 
-type State = Map GroceryListId GroceryList
+type State =
+  { groceryLists :: Map GroceryListId GroceryList
+  , groceries :: Array SortedGrocery
+  }
 
 groceryListIdKeys :: Array String -> Array GroceryListId
 groceryListIdKeys xs =
@@ -205,6 +214,8 @@ setGroceryListStorageItem storage id list = do
 localStorageState :: forall a. (State -> Tuple a State) -> Aff a
 localStorageState f = liftEffect do
   storage <- Window.localStorage =<< HTML.window
+  -- TODO: implement new state deserialization and serialization
+  serializedState <- Storage.getItem "AppState" storage
   length <- Storage.length storage
   keys <- for (0 .. length) (\i -> Storage.key i storage)
 
