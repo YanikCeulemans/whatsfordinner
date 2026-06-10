@@ -9,35 +9,34 @@ import Control.Monad.State as MonadState
 import Control.Parallel.Class (parallel, sequential)
 import Data.Argonaut as A
 import Data.Argonaut.Parser as AP
-import Data.Array (foldl, (..))
+import Data.Array (intercalate)
 import Data.Array as Array
 import Data.Bifunctor (lmap)
 import Data.Codec.Argonaut as CA
+import Data.Codec.Argonaut.Common as CAC
+import Data.Codec.Argonaut.Record as CAR
 import Data.Either (Either(..))
 import Data.Either as Either
-import Data.FoldableWithIndex (forWithIndex_)
 import Data.Map (Map)
 import Data.Map as Map
 import Data.Maybe (Maybe(..))
 import Data.Maybe as Maybe
 import Data.Route (Route)
 import Data.Route as Route
-import Data.Set as Set
 import Data.String.Regex as StrRegex
 import Data.String.Regex.Flags as Flags
-import Data.Traversable (for, for_)
-import Data.Tuple (Tuple(..), snd)
+import Data.Traversable (for_)
+import Data.Tuple (Tuple, snd)
 import Data.Tuple.Nested ((/\))
-import Data.ULID as DULID
 import Domain.GroceryList (GroceryList, GroceryEntry)
 import Domain.GroceryList as GroceryList
 import Domain.GroceryListId (GroceryListId)
 import Domain.Id as Id
-import Effect (Effect)
 import Effect.Aff (Aff, Milliseconds(..))
 import Effect.Aff as Aff
 import Effect.Aff.Class (class MonadAff, liftAff)
 import Effect.Class (class MonadEffect, liftEffect)
+import Effect.Class.Console as Console
 import FFI.Navigation as Nav
 import Partial.Unsafe (unsafeCrashWith)
 import Web.HTML as HTML
@@ -57,16 +56,6 @@ derive newtype instance Bind AppM
 derive newtype instance Monad AppM
 derive newtype instance MonadEffect AppM
 derive newtype instance MonadAff AppM
-
-decodeGroceryList :: String -> Either String GroceryList
-decodeGroceryList candidate =
-  AP.jsonParser candidate >>=
-    ( CA.decode GroceryList.codec >>> lmap
-        CA.printJsonDecodeError
-    )
-
-encodeGroceryList :: GroceryList -> String
-encodeGroceryList = CA.encode GroceryList.codec >>> A.stringify
 
 getOrInsert
   :: forall k v. Ord k => k -> (Unit -> v) -> Map k v -> Tuple v (Map k v)
@@ -125,6 +114,7 @@ localStorageDeleteGroceries id groceriesToDelete = do
   modify updatedList s = s
     { groceryLists = Map.insert id updatedList s.groceryLists }
 
+-- TODO: YC fix upserting groceries also upserting to the sorted groceries in the State
 localStorageSuggestGroceries :: String -> AppM (Array SortedGrocery)
 localStorageSuggestGroceries suggestionBase = do
   liftAff $ Aff.delay $ Milliseconds 500.0
@@ -172,67 +162,83 @@ instance Navigation AppM where
 
 type State =
   { groceryLists :: Map GroceryListId GroceryList
+  -- TODO: YC this should be a set
   , groceries :: Array SortedGrocery
   }
 
-groceryListIdKeys :: Array String -> Array GroceryListId
-groceryListIdKeys xs =
-  xs
-    # map DULID.parse
-    # keepRights
-    # map Id.MkId
-  where
-  go acc = case _ of
-    Left _ -> acc
-    Right x -> acc <> [ x ]
-  keepRights = foldl go []
+emptyState :: State
+emptyState =
+  { groceryLists: Map.empty
+  , groceries: mempty
+  }
 
-getGroceryListStorageItem
-  :: Storage
-  -> GroceryListId
-  -> Effect (Maybe (Tuple GroceryListId GroceryList))
-getGroceryListStorageItem storage id = do
-  foundItem <- Storage.getItem printedId storage
-  let
-    decoded =
-      for foundItem decodeGroceryList
-        # Either.hush
-        # join
-  pure $ map toTuple decoded
-  where
-  printedId = Id.print id
-  toTuple list = Tuple id list
+sortedGroceryCodec :: CA.JsonCodec SortedGrocery
+sortedGroceryCodec =
+  CA.object "SortedGrocery" $ CAR.record
+    { description: CA.string
+    , sortIndex: CA.int
+    }
 
-setGroceryListStorageItem
-  :: Storage -> GroceryListId -> GroceryList -> Effect Unit
-setGroceryListStorageItem storage id list = do
-  Storage.setItem printedId encodedList storage
+stateCodec :: CA.JsonCodec State
+stateCodec =
+  CAR.object "State"
+    { groceryLists: CAC.map Id.codec GroceryList.codec
+    , groceries: CA.array sortedGroceryCodec
+    }
+
+decodeState :: String -> Either CA.JsonDecodeError State
+decodeState candidate =
+  AP.jsonParser candidate
+    # lmap CA.TypeMismatch
+    >>= CA.decode stateCodec
+
+encodeState :: State -> String
+encodeState = CA.encode stateCodec >>> A.stringify
+
+deserializeState :: Maybe String -> Either String State
+deserializeState = case _ of
+  Nothing -> Left "no saved state found"
+  Just candidate ->
+    decodeState candidate # lmap toReadableError
   where
-  printedId = Id.print id
-  encodedList = encodeGroceryList list
+  toReadableError decodeErr =
+    intercalate ": "
+      [ "could not parse saved state due to error"
+      , CA.printJsonDecodeError decodeErr
+      ]
+
+reportError :: forall m. MonadEffect m => Either String State -> m State
+reportError = case _ of
+  Left err -> do
+    Console.log $
+      "could not load state from local storage due to error: " <> err
+    pure emptyState
+
+  Right s -> pure s
+
+loadState :: forall m. MonadEffect m => String -> Storage -> m State
+loadState key storage = do
+  deserializedState <- liftEffect $ Storage.getItem key storage
+  reportError $ deserializeState deserializedState
+
+saveState :: forall m. MonadEffect m => String -> Storage -> State -> m Unit
+saveState key storage state =
+  liftEffect $ Storage.setItem key serializedState storage
+  where
+  serializedState = encodeState state
+
+stateKey :: String
+stateKey = "AppState"
 
 localStorageState :: forall a. (State -> Tuple a State) -> Aff a
 localStorageState f = liftEffect do
   storage <- Window.localStorage =<< HTML.window
-  -- TODO: implement new state deserialization and serialization
-  serializedState <- Storage.getItem "AppState" storage
-  length <- Storage.length storage
-  keys <- for (0 .. length) (\i -> Storage.key i storage)
+  state <- loadState stateKey storage
 
   let
-    idKeys = groceryListIdKeys $ Array.catMaybes keys
+    result /\ updatedState = f state
 
-  groceryListMaybes <- for idKeys $ getGroceryListStorageItem storage
-  let
-    groceryLists =
-      groceryListMaybes
-        # Array.catMaybes
-        # Map.fromFoldable
-
-    result /\ updatedGroceryLists = f groceryLists
-
-  forWithIndex_ updatedGroceryLists $ setGroceryListStorageItem storage
-
+  saveState stateKey storage updatedState
   pure result
 
 instance MonadState State AppM where
