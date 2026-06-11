@@ -9,11 +9,7 @@ import App.Layout as Layout
 import App.Shared (preventDefault)
 import App.Shared as S
 import Capabilities.Navigation (class Navigation, navigate)
-import Capabilities.Resource.ManageGroceryList
-  ( class ManageGroceryList
-  , upsertGrocery
-  , upsertGroceryList
-  )
+import Capabilities.Resource.ManageGroceryList (class ManageGroceryList, SortedGrocery, suggestGroceries, upsertGrocery, upsertGroceryList)
 import Data.Array as Array
 import Data.Maybe (Maybe(..))
 import Data.Maybe as Maybe
@@ -95,6 +91,7 @@ type State =
   , form :: FormState
   -- TODO: reduce to waiting for response
   , remoteData :: RemoteData' Unit
+  , grocerySuggestions :: RemoteData' (Array SortedGrocery)
   , groceryList :: Maybe GroceryList
   }
 
@@ -169,6 +166,7 @@ component =
     { id: Nothing
     , form: pristineFormState
     , remoteData: NotRequested
+    , grocerySuggestions: NotRequested
     , groceryList: Nothing
     }
 
@@ -181,7 +179,10 @@ component =
 
     SetDescriptionFormFieldState event -> do
       value <- S.eventTargetInputValueOrEmpty event
+      suggestions <- suggestGroceries value
+      -- TODO: This behaves weirdly when typing text into the field, it lags
       H.modify_ $ updateForm _ { description = parseNonEmptyString value }
+      H.modify_ _ { grocerySuggestions = Success suggestions }
 
     SetAmountValueFormFieldState event -> do
       value <- S.eventTargetInputValueOrEmpty event
@@ -202,7 +203,7 @@ component =
       upsertGroceryForDummyList = upsertGrocery Data.dummyListId
 
   render :: State -> H.ComponentHTML Action () m
-  render { form, remoteData } =
+  render { form, remoteData, grocerySuggestions } =
     Layout.main $
       HH.div [ HP.class_ $ H.ClassName "flex column" ]
         [ HH.div [ HP.class_ $ H.ClassName "flex justify-space-between" ]
@@ -212,27 +213,29 @@ component =
         , HH.form [ HE.onSubmit SubmitForm ]
             [ HH.label_
                 [ HH.text "Description"
-                , HH.div [ HP.class_ $ H.ClassName "dropdown" ] -- open
-                    [ HH.input []
-                    , HH.ul_
-                        [ HH.li_ [ HH.text "Tomatoes" ]
-                        , HH.li_ [ HH.text "Carrots" ]
-                        , HH.li_ [ HH.text "Onions" ]
-                        ]
+                , HH.div
+                    [ S.classes'
+                        { dropdown: true
+                        , open: case grocerySuggestions of
+                            Success [] -> false
+                            Success _ -> true
+                            _ -> false
+                        }
                     ]
-                ]
-            , HH.label_
-                [ HH.text "Description"
-                , HH.input
-                    ( join $
-                        [ [ HE.onInput SetDescriptionFormFieldState
-                          , HP.value $ FormField.fieldValue form.description
-                          , HP.autofocus true
-                          ]
-                        , FormField.ariaValid form.description
-                        , FormField.ariaInvalid form.description
+                    [ HH.input
+                        [ HE.onInput SetDescriptionFormFieldState
+                        , HP.value $ FormField.fieldValue form.description
                         ]
-                    )
+                    , case grocerySuggestions of
+                        NotRequested -> HH.text ""
+                        Loading -> HH.text ""
+                        Error _ -> HH.text ""
+                        Success [] -> HH.text ""
+                        Success suggestions ->
+                          HH.ul_ $
+                            map (\s -> HH.li_ [ HH.text s.description ])
+                              suggestions
+                    ]
                 ]
             , HH.fieldset [ HPA.role "group" ]
                 [ HH.label_

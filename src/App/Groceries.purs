@@ -67,6 +67,7 @@ endDrag state =
         , groceryList = shiftedList
         }
       where
+      -- TODO: This no longer shifts groceries for some reason
       shiftedList =
         GroceryList.insertAt target.index source.item
           $ GroceryList.delete source.item state.groceryList
