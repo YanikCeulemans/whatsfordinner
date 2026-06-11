@@ -17,12 +17,18 @@ import Data.Codec.Argonaut.Common as CAC
 import Data.Codec.Argonaut.Record as CAR
 import Data.Either (Either(..))
 import Data.Either as Either
+import Data.FoldableWithIndex (foldlWithIndex)
+import Data.List ((:))
+import Data.List as List
 import Data.Map (Map)
 import Data.Map as Map
 import Data.Maybe (Maybe(..))
 import Data.Maybe as Maybe
+import Data.Newtype (unwrap, wrap)
+import Data.Profunctor (dimap)
 import Data.Route (Route)
 import Data.Route as Route
+import Data.String.CaseInsensitive (CaseInsensitiveString)
 import Data.String.Regex as StrRegex
 import Data.String.Regex.Flags as Flags
 import Data.Traversable (for_)
@@ -86,9 +92,12 @@ localStorageUpsertGrocery groceryListId grocery = do
   entryId = GroceryList.entryId grocery
   entryDescription = GroceryList.entryDescription grocery
   entryAmount = GroceryList.entryAmount grocery
+  entrySortIndex = GroceryList.entrySortIndex grocery
   go = GroceryList.upsertGrocery entryId entryDescription entryAmount >>> snd
   upsert s = s
-    { groceryLists = Map.alter (map go) groceryListId s.groceryLists }
+    { groceryLists = Map.alter (map go) groceryListId s.groceryLists
+    , groceries = Map.insert (wrap entryDescription) entrySortIndex s.groceries
+    }
 
 localStorageUpsertGroceries
   :: GroceryListId -> Array GroceryEntry -> AppM GroceryList
@@ -114,21 +123,24 @@ localStorageDeleteGroceries id groceriesToDelete = do
   modify updatedList s = s
     { groceryLists = Map.insert id updatedList s.groceryLists }
 
--- TODO: YC fix upserting groceries also upserting to the sorted groceries in the State
 localStorageSuggestGroceries :: String -> AppM (Array SortedGrocery)
 localStorageSuggestGroceries suggestionBase = do
   liftAff $ Aff.delay $ Milliseconds 500.0
   state <- MonadState.gets _.groceries
   state
-    # Array.filter descriptionMatches
+    # Map.filterKeys (unwrap >>> textMatchesSuggestion)
+    # foldlWithIndex reduce List.Nil
+    # Array.fromFoldable
     # pure
   where
   crash err = unsafeCrashWith $ "could not create regex due to: " <> err
   suggestionBaseRegex =
     StrRegex.regex ("^" <> suggestionBase) Flags.ignoreCase
       # Either.either crash identity
-  descriptionMatches { description } =
-    StrRegex.test suggestionBaseRegex description
+  textMatchesSuggestion text =
+    StrRegex.test suggestionBaseRegex text
+  reduce key acc sortIndex =
+    { description: unwrap key, sortIndex } : acc
 
 localStorageUpdateGroceries
   :: GroceryListId -> (GroceryEntry -> GroceryEntry) -> AppM GroceryList
@@ -160,30 +172,30 @@ setLocation route = do
 instance Navigation AppM where
   navigate route = AppM $ setLocation route
 
+type GroceryDescription = CaseInsensitiveString
+
+groceryDescriptionCodec :: CA.JsonCodec GroceryDescription
+groceryDescriptionCodec = dimap unwrap wrap CA.string
+
+type SortIndex = Int
+
 type State =
   { groceryLists :: Map GroceryListId GroceryList
-  -- TODO: YC this should be a set
-  , groceries :: Array SortedGrocery
+  -- TODO: should be moved into the groceryLists map as added groceries are grocerylist specific?
+  , groceries :: Map GroceryDescription SortIndex
   }
 
 emptyState :: State
 emptyState =
   { groceryLists: Map.empty
-  , groceries: mempty
+  , groceries: Map.empty
   }
-
-sortedGroceryCodec :: CA.JsonCodec SortedGrocery
-sortedGroceryCodec =
-  CA.object "SortedGrocery" $ CAR.record
-    { description: CA.string
-    , sortIndex: CA.int
-    }
 
 stateCodec :: CA.JsonCodec State
 stateCodec =
   CAR.object "State"
     { groceryLists: CAC.map Id.codec GroceryList.codec
-    , groceries: CA.array sortedGroceryCodec
+    , groceries: CAC.map groceryDescriptionCodec CA.int
     }
 
 decodeState :: String -> Either CA.JsonDecodeError State
