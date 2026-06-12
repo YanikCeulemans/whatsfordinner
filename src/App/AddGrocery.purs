@@ -35,6 +35,7 @@ import Simple.ULID (ULID)
 import Simple.ULID as ULID
 import Simple.ULID.Window as ULIDW
 import Web.Event.Event (Event)
+import Web.UIEvent.MouseEvent (MouseEvent)
 
 data RemoteData e a
   = NotRequested
@@ -144,6 +145,7 @@ data Action
   | SetDescriptionFormFieldState Event
   | SetAmountValueFormFieldState Event
   | SetAmountUnitFormFieldState Event
+  | SelectSuggestion SortedGrocery MouseEvent
   | SubmitForm Event
 
 component
@@ -179,9 +181,8 @@ component =
 
     SetDescriptionFormFieldState event -> do
       value <- S.eventTargetInputValueOrEmpty event
-      suggestions <- suggestGroceries value
-      -- TODO: This behaves weirdly when typing text into the field, it lags
       H.modify_ $ updateForm _ { description = parseNonEmptyString value }
+      suggestions <- suggestGroceries value
       H.modify_ _ { grocerySuggestions = Success suggestions }
 
     SetAmountValueFormFieldState event -> do
@@ -191,6 +192,15 @@ component =
     SetAmountUnitFormFieldState event -> do
       value <- S.eventTargetInputValueOrEmpty event
       H.modify_ $ updateForm _ { amountUnit = parseAmountUnit value }
+
+    SelectSuggestion sortedGrocery _ -> do
+      H.modify_ $ \state ->
+        state
+          { form = state.form
+              { description = parseNonEmptyString sortedGrocery.description
+              }
+          , grocerySuggestions = NotRequested
+          }
 
     SubmitForm event -> do
       preventDefault event
@@ -232,8 +242,14 @@ component =
                         Error _ -> HH.text ""
                         Success [] -> HH.text ""
                         Success suggestions ->
-                          HH.ul_ $
-                            map (\s -> HH.li_ [ HH.text s.description ])
+                          HH.ul
+                            [ HP.style "max-height: 50vh;"
+                            , S.classes' { "overflow-auto": true }
+                            ] $
+                            map
+                              ( \s -> HH.li [ HE.onClick $ SelectSuggestion s ]
+                                  [ HH.text s.description ]
+                              )
                               suggestions
                     ]
                 ]
