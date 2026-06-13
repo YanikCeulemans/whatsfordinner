@@ -2,14 +2,16 @@ module Domain.GroceryList where
 
 import Prelude
 
+import Data.Array ((:))
 import Data.Array as Array
 import Data.Codec.Argonaut (JsonCodec)
 import Data.Codec.Argonaut as CA
 import Data.Codec.Argonaut.Record as CAR
-import Data.Foldable (maximum)
+import Data.Foldable (foldl, foldr, maximum)
 import Data.Maybe as Maybe
 import Data.Profunctor (dimap)
 import Data.Tuple (Tuple(..))
+import Data.Tuple.Nested ((/\))
 import Domain.Amount (Amount)
 import Domain.Amount as Amount
 import Domain.GroceryEntryId (GroceryEntryId)
@@ -130,6 +132,18 @@ deleteGroceries groceries groceryList =
 updateGroceries :: (GroceryEntry -> GroceryEntry) -> GroceryList -> GroceryList
 updateGroceries f groceryList =
   map f groceryList
+
+updateGroceries'
+  :: (GroceryEntry -> Tuple Boolean GroceryEntry)
+  -> GroceryList
+  -> Tuple (Array GroceryEntry) GroceryList
+updateGroceries' f =
+  foldr go ([] /\ [])
+  where
+  go curr (modified /\ groceryList) =
+    case f curr of
+      true /\ updated -> (updated : modified) /\ updated : groceryList
+      false /\ _ -> modified /\ curr : groceryList
 
 partitionGroceriesOnChecked
   :: GroceryList -> { checked :: GroceryList, unchecked :: GroceryList }

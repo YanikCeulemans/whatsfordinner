@@ -11,15 +11,18 @@ import Data.Array (fold, mapWithIndex)
 import Data.Array as Array
 import Data.Function (on)
 import Data.Maybe (Maybe(..))
+import Data.Maybe as Maybe
 import Data.Route (Route(..))
 import Data.Route as Route
 import Data.Tuple (Tuple(..))
 import Data.Tuple as Tuple
+import Data.Tuple.Nested ((/\))
 import Domain.Amount (Amount(..))
 import Domain.GroceryList (GroceryEntry, GroceryList)
 import Domain.GroceryList as GroceryList
 import Domain.Id as Id
 import Effect.Aff.Class (class MonadAff)
+import Effect.Class.Console as Console
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -63,38 +66,45 @@ direction == above:
  - source exclusive to target inclusive -> index + 1
  - source's index gets the value of the target's index
 --}
-shiftEntry :: DragOverState DragEntry -> GroceryEntry -> GroceryEntry
+shiftEntry
+  :: DragOverState DragEntry -> GroceryEntry -> Tuple Boolean GroceryEntry
 shiftEntry dos@{ source, target } entry =
   case direction of
-    Nothing -> entry
+    Nothing -> false /\ entry
     Just Below
-      | entry == source.item -> GroceryList.setEntrySortIndex targetIndex entry
+      | entry == source.item -> true /\ GroceryList.setEntrySortIndex
+          targetIndex
+          entry
       | entryIndex > sourceIndex && entryIndex <= targetIndex ->
-          GroceryList.setEntrySortIndex (entryIndex - 1) entry
-      | otherwise -> entry
+          true /\ GroceryList.setEntrySortIndex (entryIndex - 1) entry
+      | otherwise -> false /\ entry
     Just Above
-      | entry == source.item -> GroceryList.setEntrySortIndex targetIndex entry
+      | entry == source.item -> true /\ GroceryList.setEntrySortIndex
+          targetIndex
+          entry
       | entryIndex < sourceIndex && entryIndex >= targetIndex ->
-          GroceryList.setEntrySortIndex (entryIndex + 1) entry
-      | otherwise -> entry
+          true /\ GroceryList.setEntrySortIndex (entryIndex + 1) entry
+      | otherwise -> false /\ entry
   where
   direction = draggingOverDirection dos
   entryIndex = GroceryList.entrySortIndex entry
   sourceIndex = GroceryList.entrySortIndex source.item
   targetIndex = GroceryList.entrySortIndex target.item
 
-endDrag :: State -> State
+endDrag :: State -> Tuple (Array GroceryEntry) State
 endDrag state =
   case state.dragState of
-    NotDragging -> state
-    DraggingOverNonTarget _ -> state { dragState = NotDragging }
+    NotDragging -> [] /\ state
+    DraggingOverNonTarget _ -> [] /\ state { dragState = NotDragging }
     DraggingOverTarget dos ->
-      state
+      modifiedGroceries /\ state
         { dragState = NotDragging
         , groceryList = shifted
         }
       where
-      shifted = GroceryList.updateGroceries (shiftEntry dos) state.groceryList
+      modifiedGroceries /\ shifted = GroceryList.updateGroceries'
+        (shiftEntry dos)
+        state.groceryList
 
 setGroceryEntry :: GroceryEntry -> State -> State
 setGroceryEntry grocery s =
@@ -284,7 +294,17 @@ component =
         { dragState = dragOverTarget dragEntry state.dragState }
 
     EndDrag _dragEvent -> do
-      H.modify_ $ endDrag
+      state <- H.get
+      let
+        modifiedGroceries /\ newState = endDrag state
+
+      H.put newState
+      void $ updateGroceries Data.dummyListId $ syncWith modifiedGroceries
+
+      where
+      syncWith modifiedGroceries grocery =
+        Array.find (eq grocery) modifiedGroceries
+          # Maybe.fromMaybe grocery
 
     ToggleGrocery grocery mouseEvent -> do
       preventDefault mouseEvent
