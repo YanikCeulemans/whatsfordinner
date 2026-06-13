@@ -65,6 +65,10 @@ uncheckEntry (MkGroceryEntry grocery) = MkGroceryEntry $ grocery
 entrySortIndex :: GroceryEntry -> Int
 entrySortIndex (MkGroceryEntry grocery) = grocery.sortIndex
 
+setEntrySortIndex :: Int -> GroceryEntry -> GroceryEntry
+setEntrySortIndex sortIndex (MkGroceryEntry entry) =
+  MkGroceryEntry $ entry { sortIndex = sortIndex }
+
 type GroceryList = Array GroceryEntry
 
 codec :: CA.JsonCodec GroceryList

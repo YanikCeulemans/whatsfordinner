@@ -6,13 +6,7 @@ import App.Data as Data
 import App.Layout as Layout
 import App.Shared (preventDefault)
 import App.Shared as S
-import Capabilities.Resource.ManageGroceryList
-  ( class ManageGroceryList
-  , deleteGroceries
-  , updateGroceries
-  , upsertGrocery
-  , upsertGroceryList
-  )
+import Capabilities.Resource.ManageGroceryList (class ManageGroceryList, deleteGroceries, updateGroceries, upsertGrocery, upsertGroceryList)
 import Data.Array (fold, mapWithIndex)
 import Data.Array as Array
 import Data.Function (on)
@@ -64,9 +58,18 @@ endDrag state =
     DraggingOverTarget { source, target } ->
       state
         { dragState = NotDragging
-        , groceryList = shiftedList
+        , groceryList = shifted
         }
       where
+      swap entry
+        | entry == target.item = GroceryList.setEntrySortIndex
+            (GroceryList.entrySortIndex source.item)
+            entry
+        | entry == source.item = GroceryList.setEntrySortIndex
+            (GroceryList.entrySortIndex target.item)
+            entry
+        | otherwise = entry
+      shifted = GroceryList.updateGroceries swap state.groceryList
       -- TODO: This no longer shifts groceries for some reason
       shiftedList =
         GroceryList.insertAt target.index source.item
