@@ -52,49 +52,36 @@ type State =
   , dragState :: DragState DragEntry
   }
 
--- direction == nothing: untouched
--- direction == below:
---  - anything smaller than source || higher than target -> untouched
---  - souce exlusive to target inclusive -> index - 1
---  - source's index gets the value of the target's index
--- direction == above:
---  - anything smaller than target || higher than source -> untouched
---  - source exclusive to target inclusive -> index + 1
---  - source's index gets the value of the target's index
+{--
+direction == nothing: untouched
+direction == below:
+ - anything smaller than source || higher than target -> untouched
+ - souce exlusive to target inclusive -> index - 1
+ - source's index gets the value of the target's index
+direction == above:
+ - anything smaller than target || higher than source -> untouched
+ - source exclusive to target inclusive -> index + 1
+ - source's index gets the value of the target's index
+--}
 shiftEntry :: DragOverState DragEntry -> GroceryEntry -> GroceryEntry
-shiftEntry dos@{ source, target } entry
-  | entry == source.item =
-      case draggingOverDirection dos of
-        Nothing -> entry
-
-        Just Below ->
-          GroceryList.setEntrySortIndex
-            (GroceryList.entrySortIndex target.item + 1)
-            entry
-
-        Just Above ->
-          GroceryList.setEntrySortIndex
-            (GroceryList.entrySortIndex target.item - 1)
-            entry
-  | entry == target.item = entry
-  | otherwise =
-      case draggingOverDirection dos of
-        Nothing -> entry
-        Just Below
-          | GroceryList.entrySortIndex entry > GroceryList.entrySortIndex
-              source.item ->
-              GroceryList.setEntrySortIndex
-                (GroceryList.entrySortIndex entry - 1)
-                entry
-
-          | otherwise -> entry
-
-        Just Above
-          | GroceryList.entrySortIndex entry > GroceryList.entrySortIndex
-              source.item -> GroceryList.setEntrySortIndex
-              (GroceryList.entrySortIndex entry - 1)
-              entry
-          | otherwise -> entry
+shiftEntry dos@{ source, target } entry =
+  case direction of
+    Nothing -> entry
+    Just Below
+      | entry == source.item -> GroceryList.setEntrySortIndex targetIndex entry
+      | entryIndex > sourceIndex && entryIndex <= targetIndex ->
+          GroceryList.setEntrySortIndex (entryIndex - 1) entry
+      | otherwise -> entry
+    Just Above
+      | entry == source.item -> GroceryList.setEntrySortIndex targetIndex entry
+      | entryIndex < sourceIndex && entryIndex >= targetIndex ->
+          GroceryList.setEntrySortIndex (entryIndex + 1) entry
+      | otherwise -> entry
+  where
+  direction = draggingOverDirection dos
+  entryIndex = GroceryList.entrySortIndex entry
+  sourceIndex = GroceryList.entrySortIndex source.item
+  targetIndex = GroceryList.entrySortIndex target.item
 
 endDrag :: State -> State
 endDrag state =
@@ -153,7 +140,7 @@ dragDirection :: DragEntry -> DragState DragEntry -> Maybe DragDirection
 dragDirection dragEntry = case _ of
   NotDragging -> Nothing
   DraggingOverNonTarget _ -> Nothing
-  DraggingOverTarget dos@{ source, target }
+  DraggingOverTarget dos@{ target }
     | dragEntry /= target -> Nothing
     | otherwise -> draggingOverDirection dos
 
