@@ -27,10 +27,12 @@ import Halogen.HTML.Properties as HP
 import Web.HTML.Event.DragEvent (DragEvent)
 import Web.UIEvent.MouseEvent (MouseEvent)
 
+type DragOverState a = { source :: a, target :: a }
+
 data DragState a
   = NotDragging
   | DraggingOverNonTarget a
-  | DraggingOverTarget { source :: a, target :: a }
+  | DraggingOverTarget (DragOverState a)
 
 dragOverTarget :: forall a. a -> DragState a -> DragState a
 dragOverTarget target = case _ of
@@ -50,30 +52,62 @@ type State =
   , dragState :: DragState DragEntry
   }
 
+-- direction == nothing: untouched
+-- direction == below:
+--  - anything smaller than source || higher than target -> untouched
+--  - souce exlusive to target inclusive -> index - 1
+--  - source's index gets the value of the target's index
+-- direction == above:
+--  - anything smaller than target || higher than source -> untouched
+--  - source exclusive to target inclusive -> index + 1
+--  - source's index gets the value of the target's index
+shiftEntry :: DragOverState DragEntry -> GroceryEntry -> GroceryEntry
+shiftEntry dos@{ source, target } entry
+  | entry == source.item =
+      case draggingOverDirection dos of
+        Nothing -> entry
+
+        Just Below ->
+          GroceryList.setEntrySortIndex
+            (GroceryList.entrySortIndex target.item + 1)
+            entry
+
+        Just Above ->
+          GroceryList.setEntrySortIndex
+            (GroceryList.entrySortIndex target.item - 1)
+            entry
+  | entry == target.item = entry
+  | otherwise =
+      case draggingOverDirection dos of
+        Nothing -> entry
+        Just Below
+          | GroceryList.entrySortIndex entry > GroceryList.entrySortIndex
+              source.item ->
+              GroceryList.setEntrySortIndex
+                (GroceryList.entrySortIndex entry - 1)
+                entry
+
+          | otherwise -> entry
+
+        Just Above
+          | GroceryList.entrySortIndex entry > GroceryList.entrySortIndex
+              source.item -> GroceryList.setEntrySortIndex
+              (GroceryList.entrySortIndex entry - 1)
+              entry
+          | otherwise -> entry
+
 endDrag :: State -> State
 endDrag state =
   case state.dragState of
     NotDragging -> state
     DraggingOverNonTarget _ -> state { dragState = NotDragging }
-    DraggingOverTarget { source, target } ->
+    DraggingOverTarget dos ->
       state
         { dragState = NotDragging
         , groceryList = shifted
         }
       where
-      swap entry
-        | entry == target.item = GroceryList.setEntrySortIndex
-            (GroceryList.entrySortIndex source.item)
-            entry
-        | entry == source.item = GroceryList.setEntrySortIndex
-            (GroceryList.entrySortIndex target.item)
-            entry
-        | otherwise = entry
-      shifted = GroceryList.updateGroceries swap state.groceryList
-      -- TODO: This no longer shifts groceries for some reason
-      shiftedList =
-        GroceryList.insertAt target.index source.item
-          $ GroceryList.delete source.item state.groceryList
+      shifted = GroceryList.updateGroceries (shiftEntry dos) state.groceryList
 
 setGroceryEntry :: GroceryEntry -> State -> State
 setGroceryEntry grocery s =
@@ -107,19 +141,21 @@ data DragDirection = Above | Below
 
 derive instance Eq DragDirection
 
+draggingOverDirection :: DragOverState DragEntry -> Maybe DragDirection
+draggingOverDirection { target, source } = help $ source.index - target.index
+  where
+  help n
+    | n == 0 = Nothing
+    | n > 0 = Just Above
+    | otherwise = Just Below
+
 dragDirection :: DragEntry -> DragState DragEntry -> Maybe DragDirection
 dragDirection dragEntry = case _ of
   NotDragging -> Nothing
   DraggingOverNonTarget _ -> Nothing
-  DraggingOverTarget { source, target }
+  DraggingOverTarget dos@{ source, target }
     | dragEntry /= target -> Nothing
-    | otherwise ->
-        help $ source.index - target.index
-        where
-        help n
-          | n == 0 = Nothing
-          | n > 0 = Just Above
-          | otherwise = Just Below
+    | otherwise -> draggingOverDirection dos
 
 groceryView
   :: forall m
