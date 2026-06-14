@@ -90,6 +90,7 @@ isFormStateValid { description, amountValue, amountUnit } =
 type State =
   { id :: Maybe ULID
   , form :: FormState
+  , suggestionSortIndex :: Maybe Int
   -- TODO: reduce to waiting for response
   , remoteData :: RemoteData' Unit
   , grocerySuggestions :: RemoteData' (Array SortedGrocery)
@@ -113,11 +114,10 @@ validateForm state =
     }
 
 buildGrocery :: State -> Maybe GroceryEntry
-buildGrocery state = upsertedGroceryEntry
+buildGrocery state = Tuple.fst <$> upsertResult
   where
-  upsertedGroceryEntry = Tuple.fst <$> upsertResult
   upsertResult =
-    GroceryList.upsertGrocery
+    GroceryList.upsertGrocery' state.suggestionSortIndex
       <$> id
       <*> description
       <*> amount
@@ -167,6 +167,7 @@ component =
   initialState _ =
     { id: Nothing
     , form: pristineFormState
+    , suggestionSortIndex: Nothing
     , remoteData: NotRequested
     , grocerySuggestions: NotRequested
     , groceryList: Nothing
@@ -181,7 +182,15 @@ component =
 
     SetDescriptionFormFieldState event -> do
       value <- S.eventTargetInputValueOrEmpty event
-      H.modify_ $ updateForm _ { description = parseNonEmptyString value }
+      H.modify_ $ \state ->
+        state
+          { form = state.form
+              { description = parseNonEmptyString value
+              }
+          , suggestionSortIndex = Nothing
+          , grocerySuggestions = Loading
+          }
+      -- TODO: debounce suggestGroceries
       suggestions <- suggestGroceries value
       H.modify_ _ { grocerySuggestions = Success suggestions }
 
@@ -199,6 +208,7 @@ component =
           { form = state.form
               { description = parseNonEmptyString sortedGrocery.description
               }
+          , suggestionSortIndex = Just sortedGrocery.sortIndex
           , grocerySuggestions = NotRequested
           }
 

@@ -1,0 +1,2 @@
+- [ ] minify js output
+- [ ] get it deployed

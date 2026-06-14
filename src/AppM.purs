@@ -3,7 +3,10 @@ module AppM (AppM, runAppM) where
 import Prelude
 
 import Capabilities.Navigation (class Navigation)
-import Capabilities.Resource.ManageGroceryList (class ManageGroceryList, SortedGrocery)
+import Capabilities.Resource.ManageGroceryList
+  ( class ManageGroceryList
+  , SortedGrocery
+  )
 import Control.Monad.State (class MonadState)
 import Control.Monad.State as MonadState
 import Control.Parallel.Class (parallel, sequential)
@@ -32,9 +35,9 @@ import Data.String.CaseInsensitive (CaseInsensitiveString)
 import Data.String.Regex as StrRegex
 import Data.String.Regex.Flags as Flags
 import Data.Traversable (for_)
-import Data.Tuple (Tuple, snd)
+import Data.Tuple (Tuple)
 import Data.Tuple.Nested ((/\))
-import Domain.GroceryList (GroceryList, GroceryEntry)
+import Domain.GroceryList (GroceryEntry, GroceryList)
 import Domain.GroceryList as GroceryList
 import Domain.GroceryListId (GroceryListId)
 import Domain.Id as Id
@@ -89,11 +92,9 @@ localStorageUpsertGrocery groceryListId grocery = do
   liftAff $ Aff.delay $ Milliseconds 300.0
   MonadState.modify_ upsert
   where
-  entryId = GroceryList.entryId grocery
   entryDescription = GroceryList.entryDescription grocery
-  entryAmount = GroceryList.entryAmount grocery
   entrySortIndex = GroceryList.entrySortIndex grocery
-  go = GroceryList.upsertGrocery entryId entryDescription entryAmount >>> snd
+  go = GroceryList.upsertEntry grocery
   upsert s = s
     { groceryLists = Map.alter (map go) groceryListId s.groceryLists
     , groceries = Map.insert (wrap entryDescription) entrySortIndex s.groceries

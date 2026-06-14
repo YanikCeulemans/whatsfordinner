@@ -7,7 +7,8 @@ import Data.Array as Array
 import Data.Codec.Argonaut (JsonCodec)
 import Data.Codec.Argonaut as CA
 import Data.Codec.Argonaut.Record as CAR
-import Data.Foldable (foldl, foldr, maximum)
+import Data.Foldable (foldr, maximum)
+import Data.Maybe (Maybe(..))
 import Data.Maybe as Maybe
 import Data.Profunctor (dimap)
 import Data.Tuple (Tuple(..))
@@ -57,8 +58,8 @@ entryAmount :: GroceryEntry -> Amount
 entryAmount (MkGroceryEntry grocery) = grocery.amount
 
 toggleEntryChecked :: GroceryEntry -> GroceryEntry
-toggleEntryChecked (MkGroceryEntry grocery) = MkGroceryEntry $ grocery
-  { checked = not grocery.checked }
+toggleEntryChecked (MkGroceryEntry grocery) =
+  MkGroceryEntry $ grocery { checked = not grocery.checked }
 
 uncheckEntry :: GroceryEntry -> GroceryEntry
 uncheckEntry (MkGroceryEntry grocery) = MkGroceryEntry $ grocery
@@ -76,20 +77,14 @@ type GroceryList = Array GroceryEntry
 codec :: CA.JsonCodec GroceryList
 codec = CA.array entryCodec
 
-upsertGrocery
-  :: GroceryEntryId
+upsertGrocery'
+  :: Maybe Int
+  -> GroceryEntryId
   -> String
   -> Amount
   -> GroceryList
   -> Tuple GroceryEntry GroceryList
-upsertGrocery id description amount groceryList =
-  {--  
-    TODO: what is the proper identity of a grocery? 
-    An arbitrary ULID id field doesn't seem to be the answer. What is the
-    desired behaviour of adding multiple groceries to the grocery list?
-      - Do we want the possiblity to have multiple lines with the same description
-      - What happens when someone enters Carrots x5 when there is already Carrots 1kg on the list?
-  --}
+upsertGrocery' sortIndex id description amount groceryList =
   (Array.findIndex hasId groceryList >>= update)
     # Maybe.fromMaybe' consGroceryList
     # Tuple newGrocery
@@ -99,9 +94,10 @@ upsertGrocery id description amount groceryList =
     pure $ MkGroceryEntry $ grocery
       { description = description
       , amount = amount
+      , sortIndex = sortIndex # Maybe.fromMaybe grocery.sortIndex
       }
   update i = Array.alterAt i upsert groceryList
-  newEntrySortIndex =
+  newEntrySortIndex _ =
     groceryList
       # map entrySortIndex
       # maximum
@@ -113,9 +109,34 @@ upsertGrocery id description amount groceryList =
       , description
       , amount
       , checked: false
-      , sortIndex: newEntrySortIndex
+      , sortIndex: sortIndex # Maybe.fromMaybe' newEntrySortIndex
       }
   consGroceryList _ = Array.cons newGrocery groceryList
+
+upsertGrocery
+  :: GroceryEntryId
+  -> String
+  -> Amount
+  -> GroceryList
+  -> Tuple GroceryEntry GroceryList
+upsertGrocery =
+  {--  
+    TODO: what is the proper identity of a grocery? 
+    An arbitrary ULID id field doesn't seem to be the answer. What is the
+    desired behaviour of adding multiple groceries to the grocery list?
+      - Do we want the possiblity to have multiple lines with the same description
+      - What happens when someone enters Carrots x5 when there is already Carrots 1kg on the list?
+  --}
+  upsertGrocery' Nothing
+
+-- TODO: join groceries when every prop matches but amount value?
+upsertEntry :: GroceryEntry -> GroceryList -> GroceryList
+upsertEntry entry groceryList =
+  (Array.findIndex (eq entry) groceryList >>= update)
+    # Maybe.fromMaybe' insert
+  where
+  update i = Array.alterAt i (const $ Just entry) groceryList
+  insert _ = Array.cons entry groceryList
 
 toggleGrocery :: GroceryEntryId -> GroceryList -> GroceryList
 toggleGrocery id groceryList =
