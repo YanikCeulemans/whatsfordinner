@@ -58,6 +58,7 @@ type DragEntry =
 type State =
   { groceryList :: GroceryList
   , dragState :: DragState DragEntry
+  , allowDragging :: Boolean
   }
 
 {--
@@ -132,6 +133,7 @@ data Action
   -- TODO: implement drag leave to prevent dragging items out of lists
   | ClearCompleted
   | UncheckCompleted
+  | HandleMouseDown
 
 printAmount :: Amount -> String
 printAmount = case _ of
@@ -162,10 +164,10 @@ dragDirection dragEntry = case _ of
 groceryView
   :: forall m
    . MonadAff m
-  => DragState DragEntry
+  => State
   -> Tuple Int GroceryEntry
   -> H.ComponentHTML Action () m
-groceryView dragState (Tuple index grocery) =
+groceryView { dragState, allowDragging } (Tuple index grocery) =
   let
     dragEntry = { index, item: grocery }
     direction
@@ -179,7 +181,7 @@ groceryView dragState (Tuple index grocery) =
             ]
           , case GroceryList.entryChecked grocery of
               false ->
-                [ HP.draggable true
+                [ HP.draggable $ allowDragging
                 , HE.onDragStart $ StartDrag dragEntry
                 , HE.onDragOver $ OverDrag dragEntry
                 ]
@@ -203,7 +205,13 @@ groceryView dragState (Tuple index grocery) =
                   )
               , HP.for $ Id.print $ GroceryList.entryId grocery
               ]
-              [ HH.input
+              [ HH.span
+                  [ HP.style "margin-right: 10px; cursor: grab;"
+                  , HE.onMouseDown $ const HandleMouseDown
+                  , HE.onTouchStart $ const HandleMouseDown
+                  ]
+                  [ HH.text "\x283F" ]
+              , HH.input
                   [ HP.type_ HP.InputCheckbox
                   , HP.id $ Id.print $ GroceryList.entryId grocery
                   , HP.checked $ GroceryList.entryChecked grocery
@@ -229,10 +237,10 @@ groceriesView state =
         [ HP.class_ $ H.ClassName "no-padding groceries-list"
         , HE.onDragEnd $ EndDrag
         ] $
-        map (groceryView state.dragState) uncheckedGroceries
+        map (groceryView state) uncheckedGroceries
     , HH.h2_ [ HH.text "Done" ]
     , HH.ul [ HP.class_ $ H.ClassName "no-padding groceries-list" ] $
-        map (groceryView state.dragState) checkedGroceries
+        map (groceryView state) checkedGroceries
     , case checkedGroceries of
         [] -> HH.text ""
         _ ->
@@ -277,6 +285,7 @@ component =
   initialState _ =
     { groceryList: mempty
     , dragState: NotDragging
+    , allowDragging: false
     }
 
   handleAction
@@ -303,7 +312,7 @@ component =
       let
         modifiedGroceries /\ newState = endDrag state
 
-      H.put newState
+      H.put $ newState { allowDragging = false }
       void $ updateGroceries Data.dummyListId $ syncWith modifiedGroceries
 
       where
@@ -330,6 +339,9 @@ component =
     UncheckCompleted -> do
       H.modify_ uncheckCompleted
       void $ updateGroceries Data.dummyListId GroceryList.uncheckEntry
+
+    HandleMouseDown ->
+      H.modify_ _ { allowDragging = true }
 
   render :: State -> H.ComponentHTML Action () m
   render state =
