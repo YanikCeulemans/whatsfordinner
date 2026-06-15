@@ -1,6 +1,9 @@
 [tasks.dev]
 run = 'watchexec -e .purs,.js -i output spago bundle --platform browser --bundle-type app'
 
+[tasks.build]
+run = 'spago bundle --platform browser --bundle-type app --minify'
+
 [tasks.serve]
 run = 'parcel index.html'
 
