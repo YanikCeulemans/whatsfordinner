@@ -9,7 +9,13 @@ import App.Layout as Layout
 import App.Shared (preventDefault)
 import App.Shared as S
 import Capabilities.Navigation (class Navigation, navigate)
-import Capabilities.Resource.ManageGroceryList (class ManageGroceryList, SortedGrocery, suggestGroceries, upsertGrocery, upsertGroceryList)
+import Capabilities.Resource.ManageGroceryList
+  ( class ManageGroceryList
+  , SortedGrocery
+  , suggestGroceries
+  , upsertGrocery
+  , upsertGroceryList
+  )
 import Data.Array as Array
 import Data.Maybe (Maybe(..))
 import Data.Maybe as Maybe
@@ -20,9 +26,10 @@ import Data.String.NonEmpty as NES
 import Data.Traversable (for_)
 import Data.Tuple as Tuple
 import Domain.Amount as Amount
-import Domain.GroceryList (GroceryList, GroceryEntry)
+import Domain.GroceryList (GroceryEntry, GroceryList)
 import Domain.GroceryList as GroceryList
 import Domain.Id as Id
+import Effect.Aff (Milliseconds(..), delay)
 import Effect.Aff.Class (class MonadAff)
 import Halogen as H
 import Halogen.HTML as HH
@@ -95,6 +102,7 @@ type State =
   , remoteData :: RemoteData' Unit
   , grocerySuggestions :: RemoteData' (Array SortedGrocery)
   , groceryList :: Maybe GroceryList
+  , suggestionDebounceForkId :: Maybe H.ForkId
   }
 
 updateForm :: (FormState -> FormState) -> State -> State
@@ -171,6 +179,7 @@ component =
     , remoteData: NotRequested
     , grocerySuggestions: NotRequested
     , groceryList: Nothing
+    , suggestionDebounceForkId: Nothing
     }
 
   handleAction :: Action -> H.HalogenM State Action () output m Unit
@@ -190,9 +199,23 @@ component =
           , suggestionSortIndex = Nothing
           , grocerySuggestions = Loading
           }
-      -- TODO: debounce suggestGroceries
-      suggestions <- suggestGroceries value
-      H.modify_ _ { grocerySuggestions = Success suggestions }
+
+      prevForkId <- H.gets _.suggestionDebounceForkId
+      for_ prevForkId H.kill
+
+      if String.null value then
+        clearSuggestions
+      else
+        debouncedSuggest value
+
+      where
+      clearSuggestions = H.modify_ _ { grocerySuggestions = NotRequested }
+      debouncedSuggest value = do
+        forkId <- H.fork do
+          H.liftAff $ delay $ Milliseconds 250.0
+          suggestions <- suggestGroceries value
+          H.modify_ _ { grocerySuggestions = Success suggestions }
+        H.modify_ _ { suggestionDebounceForkId = Just forkId }
 
     SetAmountValueFormFieldState event -> do
       value <- S.eventTargetInputValueOrEmpty event

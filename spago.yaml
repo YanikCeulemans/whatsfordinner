@@ -9,6 +9,7 @@ package:
     - effect
     - formatters
     - halogen
+    - js-timers
     - lists
     - prelude
     - routing-duplex

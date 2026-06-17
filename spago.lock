@@ -13,6 +13,7 @@
             "effect",
             "formatters",
             "halogen",
+            "js-timers",
             "lists",
             "prelude",
             "routing-duplex",
@@ -1332,6 +1333,15 @@
         "functions",
         "maybe",
         "newtype",
+        "prelude"
+      ]
+    },
+    "js-timers": {
+      "type": "registry",
+      "version": "6.1.0",
+      "integrity": "sha256-mYEL4zjFOzrDeVCnR9Hg3pcZaBZilB6zPGaZ4fzRmzg=",
+      "dependencies": [
+        "effect",
         "prelude"
       ]
     },
