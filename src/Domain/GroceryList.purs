@@ -121,15 +121,7 @@ upsertGrocery
   -> Amount
   -> GroceryList
   -> Tuple GroceryEntry GroceryList
-upsertGrocery =
-  {--  
-    TODO: what is the proper identity of a grocery? 
-    An arbitrary ULID id field doesn't seem to be the answer. What is the
-    desired behaviour of adding multiple groceries to the grocery list?
-      - Do we want the possiblity to have multiple lines with the same description
-      - What happens when someone enters Carrots x5 when there is already Carrots 1kg on the list?
-  --}
-  upsertGrocery' Nothing
+upsertGrocery = upsertGrocery' Nothing
 
 updateBy :: forall a. (a -> Boolean) -> (a -> a) -> Array a -> Maybe (Array a)
 updateBy pred updater xs =

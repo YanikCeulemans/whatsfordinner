@@ -130,7 +130,6 @@ data Action
   | StartDrag DragEntry DragEvent
   | OverDrag DragEntry DragEvent
   | EndDrag DragEvent
-  -- TODO: implement drag leave to prevent dragging items out of lists
   | ClearCompleted
   | UncheckCompleted
   | HandleMouseDown
@@ -198,7 +197,7 @@ groceryView { dragState, allowDragging } (Tuple index grocery) =
           [ HH.label
               [ HP.classes $ H.ClassName <$>
                   ( Array.catMaybes $
-                      [ Just "grocery-description flex-1"
+                      [ Just "grocery-description flex-1 user-select-none"
                       , if GroceryList.entryChecked grocery then Just "checked"
                         else Nothing
                       ]
