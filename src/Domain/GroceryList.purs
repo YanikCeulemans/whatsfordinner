@@ -2,6 +2,7 @@ module Domain.GroceryList where
 
 import Prelude
 
+import Control.Alt ((<|>))
 import Data.Array ((:))
 import Data.Array as Array
 import Data.Codec.Argonaut (JsonCodec)
@@ -11,6 +12,7 @@ import Data.Foldable (foldr, maximum)
 import Data.Maybe (Maybe(..))
 import Data.Maybe as Maybe
 import Data.Profunctor (dimap)
+import Data.String.CaseInsensitive (CaseInsensitiveString(..))
 import Data.Tuple (Tuple(..))
 import Data.Tuple.Nested ((/\))
 import Domain.Amount (Amount)
@@ -129,13 +131,26 @@ upsertGrocery =
   --}
   upsertGrocery' Nothing
 
--- TODO: join groceries when every prop matches but amount value?
+updateBy :: forall a. (a -> Boolean) -> (a -> a) -> Array a -> Maybe (Array a)
+updateBy pred updater xs =
+  Array.findIndex pred xs >>= update
+  where
+  help = updater >>> Just
+  update i = Array.alterAt i help xs
+
 upsertEntry :: GroceryEntry -> GroceryList -> GroceryList
 upsertEntry entry groceryList =
-  (Array.findIndex (eq entry) groceryList >>= update)
+  updateBy (eq entry) update groceryList
+    <|> updateBy descriptionMatches updateAmount groceryList
     # Maybe.fromMaybe' insert
   where
-  update i = Array.alterAt i (const $ Just entry) groceryList
+  updateAmount ge@(MkGroceryEntry g) =
+    case Amount.append (entryAmount ge) (entryAmount entry) of
+      Just newAmount -> MkGroceryEntry $ g { amount = newAmount }
+      Nothing -> ge
+  descriptionMatches g = (CaseInsensitiveString $ entryDescription g) ==
+    (CaseInsensitiveString $ entryDescription entry)
+  update _ = entry
   insert _ = Array.cons entry groceryList
 
 toggleGrocery :: GroceryEntryId -> GroceryList -> GroceryList

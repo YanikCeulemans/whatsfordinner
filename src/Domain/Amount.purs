@@ -1,5 +1,6 @@
 module Domain.Amount
   ( Amount(..)
+  , append
   , codec
   , increaseWith
   , setValue
@@ -73,6 +74,14 @@ withUnit x unit' =
 
 toTaste :: Amount
 toTaste = ToTaste
+
+append :: Amount -> Amount -> Maybe Amount
+append a b = case a, b of
+  WithUnit a', WithUnit b' | a'.unit == b'.unit -> Just $ WithUnit
+    { unit: a'.unit, value: a'.value + b'.value }
+  Unitless a', Unitless b' -> Just $ Unitless $ a' + b'
+  ToTaste, ToTaste -> Just ToTaste
+  _, _ -> Nothing
 
 increaseWith :: Number -> Amount -> Amount
 increaseWith delta = case _ of
