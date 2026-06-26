@@ -20,6 +20,7 @@ import Data.Maybe (Maybe(..))
 import Data.Maybe as Maybe
 import Data.Route (Route(..))
 import Data.Route as Route
+import Data.Time.Duration (Seconds(..), convertDuration)
 import Data.Traversable (for_)
 import Data.Tuple (Tuple(..))
 import Data.Tuple as Tuple
@@ -27,10 +28,16 @@ import Data.Tuple.Nested ((/\))
 import Domain.Amount (Amount(..))
 import Domain.GroceryList (GroceryEntry, GroceryList)
 import Domain.GroceryList as GroceryList
+import Domain.GroceryListId (GroceryListId)
 import Domain.Id as Id
+import Effect.Aff as Aff
 import Effect.Aff.Class (class MonadAff)
+import Effect.Class (class MonadEffect)
 import Effect.Class.Console as Console
+import FFI.WebSocket (WebSocket)
 import FFI.WebSocket as WS
+import FFI.WebSocket.Types.CloseEvent (CloseEvent)
+import FFI.WebSocket.Types.CloseEvent as WSTC
 import FFI.WebSocket.Types.MessageEvent (MessageEvent)
 import FFI.WebSocket.Types.MessageEvent as WSTM
 import Halogen as H
@@ -38,9 +45,6 @@ import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Query.Event as HQE
-import Halogen.Subscription as HS
-import Web.Event.Event (EventType(..))
-import Web.Event.EventTarget (EventTarget)
 import Web.HTML.Event.DragEvent (DragEvent)
 import Web.UIEvent.MouseEvent (MouseEvent)
 
@@ -137,6 +141,7 @@ uncheckCompleted state = state
 data Action
   = Initialize
   | Finalize
+  | ConnectWebSocket
   | ToggleGrocery GroceryEntry MouseEvent
   | StartDrag DragEntry DragEvent
   | OverDrag DragEntry DragEvent
@@ -145,6 +150,7 @@ data Action
   | UncheckCompleted
   | HandleMouseDown
   | MessageReceived String
+  | WebSocketClosed CloseEvent
 
 printAmount :: Amount -> String
 printAmount = case _ of
@@ -276,10 +282,39 @@ groceriesView state =
       # mapWithIndex Tuple
       # Array.partition (Tuple.snd >>> GroceryList.entryChecked)
 
-onMessage :: forall a. (MessageEvent -> Maybe a) -> EventTarget -> HS.Emitter a
-onMessage f eventTarget = HQE.eventListener (EventType "message") eventTarget g
+isOwnClose :: CloseEvent -> Boolean
+isOwnClose closeEvent =
+  closeEvent.code == (WSTC.toCode WSTC.GoingAway)
+
+-- TODO: What happens when there is no internet?
+connectWebSocket :: forall m. MonadEffect m => GroceryListId -> m WebSocket
+connectWebSocket groceryListId = H.liftEffect
+  $ WS.mk
+  $ fold [ "ws://localhost:5000/ws/", Id.print groceryListId ]
+
+subscribeToWebSocketMessage
+  :: forall state action slots output m
+   . (MessageEvent -> Maybe action)
+  -> WebSocket
+  -> H.HalogenM state action slots output m Unit
+subscribeToWebSocketMessage buildAction ws =
+  void $ H.subscribe $ HQE.eventListener wsEventType wsEventTarget handleEvent
   where
-  g evt = WSTM.fromEvent evt >>= f
+  wsEventType = WS.toEventType WS.Message
+  wsEventTarget = WS.toEventTarget ws
+  handleEvent event = WSTM.fromEvent event >>= buildAction
+
+subscribeToWebSocketClose
+  :: forall state action slots output m
+   . (CloseEvent -> Maybe action)
+  -> WebSocket
+  -> H.HalogenM state action slots output m Unit
+subscribeToWebSocketClose buildAction ws =
+  void $ H.subscribe $ HQE.eventListener wsEventType wsEventTarget handleEvent
+  where
+  wsEventType = WS.toEventType WS.Close
+  wsEventTarget = WS.toEventTarget ws
+  handleEvent event = WSTC.fromEvent event >>= buildAction
 
 component
   :: forall query input output m
@@ -313,14 +348,28 @@ component =
   handleAction = case _ of
     Initialize -> do
       groceryList <- upsertGroceryList Data.dummyListId
+      H.modify_ _ { groceryList = groceryList }
+      handleAction ConnectWebSocket
 
-      ws <- H.liftEffect
-        $ WS.mk
-        $ "ws://localhost:5000/ws/" <> Id.print Data.dummyListId
-      void $ H.subscribe $ onMessage (_.data >>> MessageReceived >>> Just)
-        (WS.toEventTarget ws)
+    Finalize -> do
+      webSocket <- H.gets _.webSocket
+      H.liftEffect $ for_ webSocket $ WS.close WSTC.GoingAway
 
-      H.modify_ _ { groceryList = groceryList, webSocket = Just ws }
+    -- TODO: WebSocket to capability?
+    ConnectWebSocket -> do
+      -- TODO: handle socket closure, try to reconnect
+      ws <- connectWebSocket Data.dummyListId
+      subscribeToWebSocketMessage (_.data >>> MessageReceived >>> Just) ws
+      subscribeToWebSocketClose (WebSocketClosed >>> Just) ws
+      H.modify_ _ { webSocket = Just ws }
+
+    WebSocketClosed closeEvent -> do
+      Console.log "web socket closed"
+      unless (isOwnClose closeEvent) do
+        Console.logShow { closeEvent }
+        H.modify_ _ { webSocket = Nothing }
+        H.liftAff $ Aff.delay $ convertDuration $ Seconds 5.0
+        handleAction ConnectWebSocket
 
     StartDrag dragEntry _dragEvent ->
       H.modify_ $ _ { dragState = DraggingOverNonTarget dragEntry }
@@ -370,11 +419,6 @@ component =
 
     MessageReceived msg ->
       Console.log $ fold [ "msg received: ", msg ]
-
-    Finalize -> do
-      webSocket <- H.gets _.webSocket
-      Console.logShow { ws: Maybe.isJust webSocket }
-      H.liftEffect $ for_ webSocket WS.close
 
   render :: State -> H.ComponentHTML Action () m
   render state =
