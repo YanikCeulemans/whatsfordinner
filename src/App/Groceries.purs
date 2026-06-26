@@ -20,6 +20,7 @@ import Data.Maybe (Maybe(..))
 import Data.Maybe as Maybe
 import Data.Route (Route(..))
 import Data.Route as Route
+import Data.Traversable (for_)
 import Data.Tuple (Tuple(..))
 import Data.Tuple as Tuple
 import Data.Tuple.Nested ((/\))
@@ -28,10 +29,16 @@ import Domain.GroceryList (GroceryEntry, GroceryList)
 import Domain.GroceryList as GroceryList
 import Domain.Id as Id
 import Effect.Aff.Class (class MonadAff)
+import Effect.Class.Console as Console
+import FFI.WebSocket as WS
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
+import Halogen.Query.Event as HQE
+import Halogen.Subscription as HS
+import Web.Event.Event (EventType(..))
+import Web.Event.EventTarget (EventTarget)
 import Web.HTML.Event.DragEvent (DragEvent)
 import Web.UIEvent.MouseEvent (MouseEvent)
 
@@ -59,6 +66,7 @@ type State =
   { groceryList :: GroceryList
   , dragState :: DragState DragEntry
   , allowDragging :: Boolean
+  , webSocket :: Maybe WS.WebSocket
   }
 
 {--
@@ -126,6 +134,7 @@ uncheckCompleted state = state
 
 data Action
   = Initialize
+  | Finalize
   | ToggleGrocery GroceryEntry MouseEvent
   | StartDrag DragEntry DragEvent
   | OverDrag DragEntry DragEvent
@@ -133,6 +142,7 @@ data Action
   | ClearCompleted
   | UncheckCompleted
   | HandleMouseDown
+  | MessageReceived String
 
 printAmount :: Amount -> String
 printAmount = case _ of
@@ -264,6 +274,11 @@ groceriesView state =
       # mapWithIndex Tuple
       # Array.partition (Tuple.snd >>> GroceryList.entryChecked)
 
+onMessage :: forall a. (WS.Message -> Maybe a) -> EventTarget -> HS.Emitter a
+onMessage f eventTarget = HQE.eventListener (EventType "message") eventTarget g
+  where
+  g evt = WS.messageFromEvent evt >>= f
+
 component
   :: forall query input output m
    . MonadAff m
@@ -276,6 +291,7 @@ component =
     , eval: H.mkEval $ H.defaultEval
         { handleAction = handleAction
         , initialize = Just Initialize
+        , finalize = Just Finalize
         }
     }
 
@@ -285,6 +301,7 @@ component =
     { groceryList: mempty
     , dragState: NotDragging
     , allowDragging: false
+    , webSocket: Nothing
     }
 
   handleAction
@@ -294,7 +311,14 @@ component =
   handleAction = case _ of
     Initialize -> do
       groceryList <- upsertGroceryList Data.dummyListId
-      H.modify_ _ { groceryList = groceryList }
+
+      ws <- H.liftEffect
+        $ WS.mk
+        $ "ws://localhost:5000/ws/" <> Id.print Data.dummyListId
+      void $ H.subscribe $ onMessage (_.data >>> MessageReceived >>> Just)
+        (WS.toEventTarget ws)
+
+      H.modify_ _ { groceryList = groceryList, webSocket = Just ws }
 
     StartDrag dragEntry _dragEvent ->
       H.modify_ $ _ { dragState = DraggingOverNonTarget dragEntry }
@@ -341,6 +365,14 @@ component =
 
     HandleMouseDown ->
       H.modify_ _ { allowDragging = true }
+
+    MessageReceived msg ->
+      Console.log $ fold [ "msg received: ", msg ]
+
+    Finalize -> do
+      webSocket <- H.gets _.webSocket
+      Console.logShow { ws: Maybe.isJust webSocket }
+      H.liftEffect $ for_ webSocket WS.close
 
   render :: State -> H.ComponentHTML Action () m
   render state =
