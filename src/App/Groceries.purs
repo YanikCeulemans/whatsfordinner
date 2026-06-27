@@ -39,7 +39,6 @@ import FFI.WebSocket as WS
 import FFI.WebSocket.Types.CloseEvent (CloseEvent)
 import FFI.WebSocket.Types.CloseEvent as WSTC
 import FFI.WebSocket.Types.MessageEvent (MessageEvent)
-import FFI.WebSocket.Types.MessageEvent as WSTM
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -149,7 +148,8 @@ data Action
   | ClearCompleted
   | UncheckCompleted
   | HandleMouseDown
-  | MessageReceived String
+  | MessageReceived MessageEvent
+  | WebSocketOpened
   | WebSocketClosed CloseEvent
 
 printAmount :: Amount -> String
@@ -282,9 +282,9 @@ groceriesView state =
       # mapWithIndex Tuple
       # Array.partition (Tuple.snd >>> GroceryList.entryChecked)
 
-isOwnClose :: CloseEvent -> Boolean
-isOwnClose closeEvent =
-  closeEvent.code == (WSTC.toCode WSTC.GoingAway)
+isNoLongerInterested :: CloseEvent -> Boolean
+isNoLongerInterested closeEvent =
+  WSTC.codeMatches WSTC.NoLongerInterested closeEvent
 
 -- TODO: What happens when there is no internet?
 connectWebSocket :: forall m. MonadEffect m => GroceryListId -> m WebSocket
@@ -292,29 +292,18 @@ connectWebSocket groceryListId = H.liftEffect
   $ WS.mk
   $ fold [ "ws://localhost:5000/ws/", Id.print groceryListId ]
 
-subscribeToWebSocketMessage
-  :: forall state action slots output m
-   . (MessageEvent -> Maybe action)
+subscribeToWebSocketEvent
+  :: forall event state action slots output m
+   . WS.EventConfig event
+  -> (event -> Maybe action)
   -> WebSocket
   -> H.HalogenM state action slots output m Unit
-subscribeToWebSocketMessage buildAction ws =
+subscribeToWebSocketEvent eventConfig buildAction ws =
   void $ H.subscribe $ HQE.eventListener wsEventType wsEventTarget handleEvent
   where
-  wsEventType = WS.toEventType WS.Message
+  wsEventType = eventConfig.eventType
   wsEventTarget = WS.toEventTarget ws
-  handleEvent event = WSTM.fromEvent event >>= buildAction
-
-subscribeToWebSocketClose
-  :: forall state action slots output m
-   . (CloseEvent -> Maybe action)
-  -> WebSocket
-  -> H.HalogenM state action slots output m Unit
-subscribeToWebSocketClose buildAction ws =
-  void $ H.subscribe $ HQE.eventListener wsEventType wsEventTarget handleEvent
-  where
-  wsEventType = WS.toEventType WS.Close
-  wsEventTarget = WS.toEventTarget ws
-  handleEvent event = WSTC.fromEvent event >>= buildAction
+  handleEvent event = eventConfig.fromEvent event >>= buildAction
 
 component
   :: forall query input output m
@@ -353,19 +342,32 @@ component =
 
     Finalize -> do
       webSocket <- H.gets _.webSocket
-      H.liftEffect $ for_ webSocket $ WS.close WSTC.GoingAway
+      H.liftEffect $ for_ webSocket $ WS.close WSTC.NoLongerInterested
 
     -- TODO: WebSocket to capability?
     ConnectWebSocket -> do
-      -- TODO: handle socket closure, try to reconnect
+      -- TODO: handle socket error event, try to reconnect?
       ws <- connectWebSocket Data.dummyListId
-      subscribeToWebSocketMessage (_.data >>> MessageReceived >>> Just) ws
-      subscribeToWebSocketClose (WebSocketClosed >>> Just) ws
+      subscribeToWebSocketEvent
+        WS.eventConfigs.open
+        (const WebSocketOpened >>> Just)
+        ws
+      subscribeToWebSocketEvent
+        WS.eventConfigs.message
+        (MessageReceived >>> Just)
+        ws
+      subscribeToWebSocketEvent
+        WS.eventConfigs.close
+        (WebSocketClosed >>> Just)
+        ws
       H.modify_ _ { webSocket = Just ws }
+
+    WebSocketOpened ->
+      Console.log "web socket opened"
 
     WebSocketClosed closeEvent -> do
       Console.log "web socket closed"
-      unless (isOwnClose closeEvent) do
+      unless (isNoLongerInterested closeEvent) do
         Console.logShow { closeEvent }
         H.modify_ _ { webSocket = Nothing }
         H.liftAff $ Aff.delay $ convertDuration $ Seconds 5.0
@@ -417,8 +419,8 @@ component =
     HandleMouseDown ->
       H.modify_ _ { allowDragging = true }
 
-    MessageReceived msg ->
-      Console.log $ fold [ "msg received: ", msg ]
+    MessageReceived event ->
+      Console.log $ fold [ "msg received: ", event.data ]
 
   render :: State -> H.ComponentHTML Action () m
   render state =

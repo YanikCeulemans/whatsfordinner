@@ -22,8 +22,8 @@ wasClean: true
 export const _fromEventImpl = (evt) => {
   if (
     evt?.type === 'close' &&
-    "reason" in evt &&
-    typeof evt.reason === 'string' &&
+      "reason" in evt &&
+      typeof evt.reason === 'string' &&
       "code" in evt &&
       typeof evt.code === 'number'
   ) {
