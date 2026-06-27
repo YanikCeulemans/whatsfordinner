@@ -27,19 +27,24 @@ import Effect.Aff.Class (class MonadAff)
 import Effect.Now (nowDate)
 import Halogen as H
 import Halogen.HTML as HH
+import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Partial.Unsafe (unsafeCrashWith)
 
 type InitializedState =
   { mealSchedule :: MealSchedule
   , date :: Date
+  , now :: Date
   }
 
 data State
   = NotInitialized
   | Initialized InitializedState
 
-data Action = Initialize
+data Action
+  = Initialize
+  | BackInTime
+  | ForwardInTime
 
 displayDateTime :: DateTime -> String
 displayDateTime =
@@ -96,6 +101,16 @@ nextDays n date
         | otherwise = Just $
             unsafeAdjustDate (Days $ Int.toNumber $ n - n') date /\ (n' - 1)
 
+timeTravel :: Days -> State -> State
+timeTravel _ NotInitialized = NotInitialized
+timeTravel days (Initialized s) = Initialized $ s { date = thePast s.date }
+  where
+  thePast date =
+    case Date.adjust days date of
+      Nothing -> unsafeCrashWith
+        "invalid date created while time traveling?!"
+      Just pastDate -> pastDate
+
 viewScheduleEntry :: Date -> Tuple Date PlannedMeal -> HH.PlainHTML
 viewScheduleEntry date (mealDate /\ plannedMeal) =
   HH.article_
@@ -117,7 +132,7 @@ component
 component =
   H.mkComponent
     { initialState
-    , render: HH.fromPlainHTML <<< render
+    , render: render
     , eval: H.mkEval $ H.defaultEval
         { initialize = Just Initialize, handleAction = handleAction }
     }
@@ -132,22 +147,39 @@ component =
     Initialize -> do
       now <- H.liftEffect nowDate
       H.modify_ \_ -> Initialized
-        { date: now, mealSchedule: AData.mealSchedule }
+        { date: now, now, mealSchedule: AData.mealSchedule }
       pure unit
 
-  render :: State -> HH.PlainHTML
+    BackInTime -> do
+      H.modify_ $ timeTravel $ Days $ -3.0
+
+    ForwardInTime -> do
+      H.modify_ $ timeTravel $ Days $ 3.0
+
+  render :: State -> H.ComponentHTML Action () m
   render state =
     Layout.main $
       case state of
         NotInitialized -> HH.p_ [ HH.text "loading" ]
         Initialized initializedState ->
-          HH.div [ HP.class_ $ H.ClassName "flex column" ]
+          HH.div [ HP.class_ $ H.ClassName "flex column spaced" ]
             [ HH.h1_ [ HH.text "The next 7 days" ]
+            , HH.div
+                [ HP.class_ $ H.ClassName "flex row justify-space-between" ]
+                [ HH.button [ HE.onClick (const $ BackInTime) ]
+                    [ HH.text "Back in time" ]
+                , HH.button [ HE.onClick (const $ ForwardInTime) ]
+                    [ HH.text "Forward in time" ]
+                ]
             , case zipped of
                 [] -> HH.text ""
                 entries ->
                   HH.div [ HP.class_ $ H.ClassName "flex column spaced" ]
-                    $ map (viewScheduleEntry initializedState.date) entries
+                    $ map
+                        ( HH.fromPlainHTML <<< viewScheduleEntry
+                            initializedState.now
+                        )
+                        entries
             ]
           where
           targetDate = initializedState.date
