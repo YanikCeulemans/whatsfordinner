@@ -31,6 +31,8 @@ import Domain.Id as Id
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class.Console as Console
 import FFI.WebSocket as WS
+import FFI.WebSocket.Types.MessageEvent (MessageEvent)
+import FFI.WebSocket.Types.MessageEvent as WSTM
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -274,10 +276,10 @@ groceriesView state =
       # mapWithIndex Tuple
       # Array.partition (Tuple.snd >>> GroceryList.entryChecked)
 
-onMessage :: forall a. (WS.Message -> Maybe a) -> EventTarget -> HS.Emitter a
+onMessage :: forall a. (MessageEvent -> Maybe a) -> EventTarget -> HS.Emitter a
 onMessage f eventTarget = HQE.eventListener (EventType "message") eventTarget g
   where
-  g evt = WS.messageFromEvent evt >>= f
+  g evt = WSTM.fromEvent evt >>= f
 
 component
   :: forall query input output m
