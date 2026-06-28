@@ -21,10 +21,11 @@ import Data.Maybe as Maybe
 import Data.Route (Route(..))
 import Data.Route as Route
 import Data.Time.Duration (Seconds(..), convertDuration)
-import Data.Traversable (for_)
+import Data.Traversable (for_, traverse)
 import Data.Tuple (Tuple(..))
 import Data.Tuple as Tuple
 import Data.Tuple.Nested ((/\))
+import Debug as Debug
 import Domain.Amount (Amount(..))
 import Domain.GroceryList (GroceryEntry, GroceryList)
 import Domain.GroceryList as GroceryList
@@ -39,6 +40,7 @@ import FFI.WebSocket as WS
 import FFI.WebSocket.Types.CloseEvent (CloseEvent)
 import FFI.WebSocket.Types.CloseEvent as WSTC
 import FFI.WebSocket.Types.MessageEvent (MessageEvent)
+import FFI.WebSocket.Types.ReadyState (ReadyState(..))
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -67,11 +69,16 @@ type DragEntry =
   , item :: GroceryEntry
   }
 
+type WebSocketState =
+  { webSocket :: WebSocket
+  , readyState :: ReadyState
+  }
+
 type State =
   { groceryList :: GroceryList
   , dragState :: DragState DragEntry
   , allowDragging :: Boolean
-  , webSocket :: Maybe WS.WebSocket
+  , webSocketState :: Maybe WebSocketState
   }
 
 {--
@@ -305,6 +312,22 @@ subscribeToWebSocketEvent eventConfig buildAction ws =
   wsEventTarget = WS.toEventTarget ws
   handleEvent event = eventConfig.fromEvent event >>= buildAction
 
+updateReadyState
+  :: forall childSlots output m
+   . MonadEffect m
+  => H.HalogenM State Action childSlots output m Unit
+updateReadyState = do
+  state <- H.get
+  readyState <- H.liftEffect $ traverse getReadyState state.webSocketState
+  H.put $ state
+    { webSocketState =
+        setReadyState <$> readyState <*> state.webSocketState
+    }
+  where
+  getReadyState { webSocket } = WS.readyState webSocket
+  setReadyState readyState webSocketState = webSocketState
+    { readyState = readyState }
+
 component
   :: forall query input output m
    . MonadAff m
@@ -327,7 +350,7 @@ component =
     { groceryList: mempty
     , dragState: NotDragging
     , allowDragging: false
-    , webSocket: Nothing
+    , webSocketState: Nothing
     }
 
   handleAction
@@ -341,7 +364,7 @@ component =
       handleAction ConnectWebSocket
 
     Finalize -> do
-      webSocket <- H.gets _.webSocket
+      webSocket <- map _.webSocket <$> H.gets _.webSocketState
       H.liftEffect $ for_ webSocket $ WS.close WSTC.NoLongerInterested
 
     -- TODO: WebSocket to capability?
@@ -360,16 +383,18 @@ component =
         WS.eventConfigs.close
         (WebSocketClosed >>> Just)
         ws
-      H.modify_ _ { webSocket = Just ws }
+      readyState <- H.liftEffect $ WS.readyState ws
+      H.modify_ _ { webSocketState = Just { webSocket: ws, readyState } }
 
-    WebSocketOpened ->
+    WebSocketOpened -> do
       Console.log "web socket opened"
+      updateReadyState
 
     WebSocketClosed closeEvent -> do
-      Console.log "web socket closed"
+      Console.logShow { msg: "web socket closed", closeEvent }
+      updateReadyState
       unless (isNoLongerInterested closeEvent) do
-        Console.logShow { closeEvent }
-        H.modify_ _ { webSocket = Nothing }
+        Console.log "retrying web socket connection"
         H.liftAff $ Aff.delay $ convertDuration $ Seconds 5.0
         handleAction ConnectWebSocket
 
@@ -426,8 +451,24 @@ component =
   render state =
     Layout.main $
       HH.div [ HP.class_ $ H.ClassName "flex column spaced" ]
-        [ HH.div [ HP.class_ $ H.ClassName "flex justify-space-between" ]
-            [ HH.h1_ [ HH.text "Groceries" ]
+        [ HH.div
+            [ HP.class_ $ H.ClassName "flex justify-space-between items-center"
+            ]
+            [ HH.div
+                [ HP.class_ $ H.ClassName "flex row spaced items-baseline" ]
+                [ HH.h1 [ HP.class_ $ H.ClassName "no-margin" ]
+                    [ HH.text "Groceries" ]
+                , HH.div
+                    [ S.classes'
+                        { "live-status": true
+                        , "pico-background-lime-100": isLive
+                            state.webSocketState
+                        , "pico-background-pink-450": (not <<< isLive)
+                            state.webSocketState
+                        }
+                    ]
+                    []
+                ]
             , HH.div [ HP.class_ $ H.ClassName "flex spaced" ]
                 [ S.link GroceriesGenerate [ HH.text "Generate" ]
                 , S.link Route.AddGrocery [ HH.text "Add" ]
@@ -437,3 +478,11 @@ component =
             [] -> HH.text "No groceries have been added yet"
             _ -> groceriesView state
         ]
+    where
+    isLive ws =
+      ws
+        <#> _.readyState
+        <#> case _ of
+          Open -> true
+          _ -> false
+        # Maybe.fromMaybe false

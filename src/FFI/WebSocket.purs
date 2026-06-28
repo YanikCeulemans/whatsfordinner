@@ -7,10 +7,14 @@ module FFI.WebSocket
   , toEventTarget
   , toEventType
   , eventConfigs
+  , readyState
   ) where
 
 import Prelude
 
+import Data.Array (fold)
+import Data.Either (Either(..))
+import Data.Function.Uncurried (Fn1, runFn1)
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
@@ -18,6 +22,9 @@ import Effect.Aff.Compat (EffectFn1, EffectFn3, runEffectFn1, runEffectFn3)
 import FFI.WebSocket.Types.CloseEvent (CloseCode, toCodeAndReason)
 import FFI.WebSocket.Types.CloseEvent as WSTC
 import FFI.WebSocket.Types.MessageEvent as WSTM
+import FFI.WebSocket.Types.ReadyState (ParseReadyStateError(..), ReadyState)
+import FFI.WebSocket.Types.ReadyState as ReadyState
+import Partial.Unsafe (unsafeCrashWith)
 import Unsafe.Coerce (unsafeCoerce)
 import Web.Event.Event (Event, EventType(..))
 import Web.Event.Event as E
@@ -74,3 +81,13 @@ eventConfigs =
       }
   }
 
+foreign import _readyStateImpl :: EffectFn1 WebSocket Int
+
+readyState :: WebSocket -> Effect ReadyState
+readyState ws =
+  runEffectFn1 _readyStateImpl ws
+    <#> ReadyState.fromInt
+    <#> case _ of
+      Left (UnknownReadyState code) ->
+        unsafeCrashWith $ fold [ "unknown readyState code: ", show code ]
+      Right parsedReadyState -> parsedReadyState
