@@ -16,7 +16,7 @@ main view =
     , HH.footer [ HP.class_ $ HC.ClassName "" ]
         [ HH.nav
             [ HP.class_ $ HC.ClassName "flex spaced justify-center container" ]
-            [ Shared.link Route.Home [ HH.text "Next days" ]
+            [ Shared.link Route.Home [ HH.text "Schedule" ]
             , Shared.link Route.Groceries [ HH.text "Groceries" ]
             ]
         ]

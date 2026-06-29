@@ -5,7 +5,7 @@ import Prelude
 import App.AddGrocery as AddGrocery
 import App.GenerateGroceries as GenerateGroceries
 import App.Groceries as Groceries
-import App.Next7Days as Next7Days
+import App.Schedule as Schedule
 import Capabilities.Navigation (class Navigation)
 import Capabilities.Resource.ManageGroceryList (class ManageGroceryList)
 import Data.Maybe (Maybe(..))
@@ -16,13 +16,13 @@ import Halogen.HTML as HH
 import Type.Proxy (Proxy(..))
 
 type Slots =
-  ( next7Days :: forall query. H.Slot query Void Int
+  ( schedule :: forall query. H.Slot query Void Int
   , groceries :: forall query. H.Slot query Void Int
   , generateGroceries :: forall query. H.Slot query Void Int
   , addGrocery :: forall query. H.Slot query Void Int
   )
 
-_next7Days = Proxy :: Proxy "next7Days"
+_schedule = Proxy :: Proxy "schedule"
 _groceries = Proxy :: Proxy "groceries"
 _addGrocery = Proxy :: Proxy "addGrocery"
 _generateGroceries = Proxy :: Proxy "generateGroceries"
@@ -60,7 +60,7 @@ component =
   render :: forall action. State -> H.ComponentHTML action Slots m
   render { route } =
     case route of
-      Just Home -> HH.slot_ _next7Days 0 Next7Days.component unit
+      Just Home -> HH.slot_ _schedule 0 Schedule.component unit
       Just Groceries -> HH.slot_ _groceries 0 Groceries.component unit
       Just GroceriesGenerate ->
         HH.slot_ _generateGroceries 0 GenerateGroceries.component unit

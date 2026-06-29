@@ -1,4 +1,4 @@
-module App.Next7Days where
+module App.Schedule where
 
 import Prelude
 
@@ -163,7 +163,7 @@ component =
         NotInitialized -> HH.p_ [ HH.text "loading" ]
         Initialized initializedState ->
           HH.div [ HP.class_ $ H.ClassName "flex column spaced" ]
-            [ HH.h1_ [ HH.text "The next 7 days" ]
+            [ HH.h1_ [ HH.text "Schedule" ]
             , HH.div
                 [ HP.class_ $ H.ClassName "flex row justify-space-between" ]
                 [ HH.button [ HE.onClick (const $ BackInTime) ]
