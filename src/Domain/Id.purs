@@ -1,4 +1,4 @@
-module Domain.Id (Id(..), codec, print) where
+module Domain.Id (Id(..), codec, print, parse) where
 
 import Prelude
 
@@ -33,3 +33,8 @@ codec =
 
 print :: forall a. Id a -> String
 print (MkId id) = ULID.toString id
+
+parse :: forall a. String -> Either String (Id a)
+parse candidate =
+  DULID.parse candidate
+    <#> MkId

@@ -9,7 +9,7 @@ import App.Schedule as Schedule
 import Capabilities.Navigation (class Navigation)
 import Capabilities.Resource.ManageGroceryList (class ManageGroceryList)
 import Data.Maybe (Maybe(..))
-import Data.Route (Route(..))
+import Data.Route (GroceryListInnerRoute(..), Route(..))
 import Effect.Aff.Class (class MonadAff)
 import Halogen as H
 import Halogen.HTML as HH
@@ -61,10 +61,15 @@ component =
   render { route } =
     case route of
       Just Home -> HH.slot_ _schedule 0 Schedule.component unit
-      Just Groceries -> HH.slot_ _groceries 0 Groceries.component unit
-      Just GroceriesGenerate ->
-        HH.slot_ _generateGroceries 0 GenerateGroceries.component unit
-      Just AddGrocery -> HH.slot_ _addGrocery 0 AddGrocery.component unit
+      Just
+        (GroceryListRoute { groceryListId, groceryListRoute }) ->
+        case groceryListRoute of
+          Groceries -> HH.slot_ _groceries 0 Groceries.component groceryListId
+          GroceriesGenerate ->
+            HH.slot_ _generateGroceries 0 GenerateGroceries.component
+              groceryListId
+          AddGrocery -> HH.slot_ _addGrocery 0 AddGrocery.component
+            groceryListId
       Nothing -> HH.h1_ [ HH.text "Not found" ]
 
   handleAction

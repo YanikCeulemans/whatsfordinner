@@ -18,14 +18,12 @@ import Data.Array as Array
 import Data.Function (on)
 import Data.Maybe (Maybe(..))
 import Data.Maybe as Maybe
-import Data.Route (Route(..))
-import Data.Route as Route
+import Data.Route (GroceryListInnerRoute(..), Route(..))
 import Data.Time.Duration (Seconds(..), convertDuration)
 import Data.Traversable (for_, traverse)
 import Data.Tuple (Tuple(..))
 import Data.Tuple as Tuple
 import Data.Tuple.Nested ((/\))
-import Debug as Debug
 import Domain.Amount (Amount(..))
 import Domain.GroceryList (GroceryEntry, GroceryList)
 import Domain.GroceryList as GroceryList
@@ -74,11 +72,14 @@ type WebSocketState =
   , readyState :: ReadyState
   }
 
+type Input = GroceryListId
+
 type State =
   { groceryList :: GroceryList
   , dragState :: DragState DragEntry
   , allowDragging :: Boolean
   , webSocketState :: Maybe WebSocketState
+  , groceryListId :: GroceryListId
   }
 
 {--
@@ -329,10 +330,10 @@ updateReadyState = do
     { readyState = readyState }
 
 component
-  :: forall query input output m
+  :: forall query output m
    . MonadAff m
   => ManageGroceryList m
-  => H.Component query input output m
+  => H.Component query Input output m
 component =
   H.mkComponent
     { initialState
@@ -345,12 +346,13 @@ component =
     }
 
   where
-  initialState :: input -> State
-  initialState _ =
+  initialState :: Input -> State
+  initialState groceryListId =
     { groceryList: mempty
     , dragState: NotDragging
     , allowDragging: false
     , webSocketState: Nothing
+    , groceryListId
     }
 
   handleAction
@@ -470,8 +472,20 @@ component =
                     []
                 ]
             , HH.div [ HP.class_ $ H.ClassName "flex spaced" ]
-                [ S.link GroceriesGenerate [ HH.text "Generate" ]
-                , S.link Route.AddGrocery [ HH.text "Add" ]
+                [ S.link
+                    ( GroceryListRoute
+                        { groceryListId: state.groceryListId
+                        , groceryListRoute: GroceriesGenerate
+                        }
+                    )
+                    [ HH.text "Generate" ]
+                , S.link
+                    ( GroceryListRoute
+                        { groceryListId: state.groceryListId
+                        , groceryListRoute: AddGrocery
+                        }
+                    )
+                    [ HH.text "Add" ]
                 ]
             ]
         , case state.groceryList of

@@ -2,6 +2,7 @@ module App.Layout where
 
 import Prelude
 
+import App.Data as Data
 import App.Shared as Shared
 import Data.Route as Route
 import Halogen.HTML as HH
@@ -17,7 +18,14 @@ main view =
         [ HH.nav
             [ HP.class_ $ HC.ClassName "flex spaced justify-center container" ]
             [ Shared.link Route.Home [ HH.text "Schedule" ]
-            , Shared.link Route.Groceries [ HH.text "Groceries" ]
+            -- TODO: What is sensible navigation here?
+            , Shared.link
+                ( Route.GroceryListRoute
+                    { groceryListId: Data.dummyListId
+                    , groceryListRoute: Route.Groceries
+                    }
+                )
+                [ HH.text "Groceries" ]
             ]
         ]
     ]
