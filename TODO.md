@@ -1,2 +1,6 @@
-- [ ] minify js output
+- [x] minify js output
+- [ ] grocery list id in URL
+- [ ] auth
+- [ ] backend persistence
+- [ ] backend persistence subscriptions over websockets
 - [ ] get it deployed
