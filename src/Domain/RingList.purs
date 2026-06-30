@@ -8,13 +8,17 @@ module Domain.RingList
   , take
   , length
   , reverse
+  , codec
   ) where
 
 import Prelude
 
+import Data.Codec.Argonaut (JsonCodec)
+import Data.Codec.Argonaut.Common as CodecCommon
 import Data.Foldable (class Foldable)
 import Data.List (List(..))
 import Data.List as List
+import Data.Profunctor (dimap)
 import Domain.Range (Range)
 import Domain.Range as Range
 
@@ -37,6 +41,13 @@ fromFoldable = MkRingList <<< List.fromFoldable
 
 asList :: forall a. RingList a -> List a
 asList (MkRingList xs) = xs
+
+codec :: forall a. JsonCodec a -> JsonCodec (RingList a)
+codec innerCodec =
+  dimap serialize deserialize $ CodecCommon.list innerCodec
+  where
+  serialize = asList
+  deserialize = fromFoldable
 
 length :: forall a. RingList a -> Int
 length (MkRingList xs) = List.length xs

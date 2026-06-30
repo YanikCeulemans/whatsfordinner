@@ -2,6 +2,7 @@ module Domain.PlannedMeal where
 
 import Prelude
 
+import Data.Codec.Argonaut (JsonCodec)
 import Data.Foldable (fold)
 import Domain.Ingredient (Ingredient)
 import Domain.Meal (Meal)
@@ -16,6 +17,10 @@ instance Show PlannedMeal where
   show = case _ of
     NoMealPlanned -> "NoMealPlanned"
     PlannedMeal a -> fold [ "PlannedMeal: ", show a ]
+
+codec :: JsonCodec PlannedMeal
+-- TODO: implement
+codec = ?h
 
 ingredients :: PlannedMeal -> Array Ingredient
 ingredients = case _ of
