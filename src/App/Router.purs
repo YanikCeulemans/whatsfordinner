@@ -5,6 +5,7 @@ import Prelude
 import App.AddGrocery as AddGrocery
 import App.GenerateGroceries as GenerateGroceries
 import App.Groceries as Groceries
+import App.Home (HomeOutput(..))
 import App.Home as Home
 import App.Schedule as Schedule
 import Capabilities.Navigation (class Navigation)
@@ -13,12 +14,13 @@ import Capabilities.Resource.ManageSpaces (class ManageSpaces)
 import Data.Maybe (Maybe(..))
 import Data.Route (GroceryListInnerRoute(..), Route(..))
 import Effect.Aff.Class (class MonadAff)
+import Effect.Class.Console as Console
 import Halogen as H
 import Halogen.HTML as HH
 import Type.Proxy (Proxy(..))
 
 type Slots =
-  ( home :: forall query. H.Slot query Void Int
+  ( home :: forall query. Home.HomeSlot query Int
   , schedule :: forall query. H.Slot query Void Int
   , groceries :: forall query. H.Slot query Void Int
   , generateGroceries :: forall query. H.Slot query Void Int
@@ -39,7 +41,9 @@ type State =
   { route :: Maybe Route
   }
 
-data Action = Initialize
+data Action
+  = Initialize
+  | HandleHome HomeOutput
 
 component
   :: forall output m
@@ -62,10 +66,10 @@ component =
   where
   initialState route = { route }
 
-  render :: forall action. State -> H.ComponentHTML action Slots m
+  render :: State -> H.ComponentHTML Action Slots m
   render { route } =
     case route of
-      Just Home -> HH.slot_ _home 0 Home.component unit
+      Just Home -> HH.slot _home 0 Home.component unit HandleHome
       Just Schedule -> HH.slot_ _schedule 0 Schedule.component unit
       Just
         (GroceryListRoute { groceryListId, groceryListRoute }) ->
@@ -84,6 +88,14 @@ component =
     -> H.HalogenM State Action childSlots output m Unit
   handleAction = case _ of
     Initialize ->
+      pure unit
+
+    HandleHome (InviteAccepted spaceId) -> do
+      Console.logShow { msg: "invite accepted", spaceId }
+      pure unit
+
+    HandleHome (SpaceSelected spaceId) -> do
+      Console.logShow { msg: "space selected", spaceId }
       pure unit
 
   handleQuery
