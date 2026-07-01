@@ -12,7 +12,8 @@ import Domain.Amount as Amount
 import Domain.GroceryListId (GroceryListId)
 import Domain.Id as Id
 import Domain.Meal (Meal(..))
-import Domain.MealSchedule (Id(..), MealSchedule(..))
+import Domain.MealSchedule (MealSchedule(..))
+import Domain.MealScheduleId (MealScheduleId(..))
 import Domain.PlannedMeal (PlannedMeal(..))
 import Domain.RingList as RingList
 import Partial.Unsafe (unsafeCrashWith)
@@ -25,10 +26,19 @@ theDate =
         <*> pure March
         <*> toEnum 2
 
+dummyMealScheduleId :: MealScheduleId
+dummyMealScheduleId =
+  DULID.parse "01KNW48VB0PNCFC0KZ8SW289ZZ"
+    # Either.fromRight' crash
+    # Id.MkId
+    # MkMealScheduleId
+  where
+  crash _ = unsafeCrashWith "invalid hardcoded dummy list id ULID"
+
 mealSchedule :: MealSchedule
 mealSchedule =
   MkMealSchedule
-    { id: MkId 1
+    { id: dummyMealScheduleId
     , startDate: theDate
     , schedule: RingList.fromFoldable
         [ PlannedMeal

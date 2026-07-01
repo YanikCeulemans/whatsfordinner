@@ -5,6 +5,7 @@ import Prelude
 import Data.Date as Date
 import Data.Date.Component (Month(..))
 import Data.Either (Either(..))
+import Data.Either as Either
 import Data.Enum (toEnum)
 import Data.Foldable (class Foldable)
 import Data.List (List(..), (:))
@@ -13,9 +14,11 @@ import Data.Maybe (Maybe(..))
 import Data.Maybe as Maybe
 import Data.Time.Duration (Days(..))
 import Data.ULID as DULID
+import Domain.Id as Id
 import Domain.Meal (Meal(..))
-import Domain.MealSchedule (Id(..), MealSchedule)
+import Domain.MealSchedule (MealSchedule)
 import Domain.MealSchedule as MealSchedule
+import Domain.MealScheduleId (MealScheduleId(..))
 import Domain.PlannedMeal (PlannedMeal(..))
 import Domain.Range as Range
 import Domain.RingList (RingList)
@@ -156,7 +159,13 @@ mealScheduleSpec = do
 
   mkSchedule :: forall f. Foldable f => f PlannedMeal -> MealSchedule
   mkSchedule ps = MealSchedule.MkMealSchedule
-    { id: MkId 1, schedule: RingList.fromFoldable ps, startDate }
+    { id: MkMealScheduleId $ Id.MkId $ Either.fromRight' crash $ DULID.parse
+        "01BX5ZZKBKACTAV9WEVGEMMVYY"
+    , schedule: RingList.fromFoldable ps
+    , startDate
+    }
+    where
+    crash _ = unsafeCrashWith "invalid hardcoded ULID"
 
 rangeSpec :: Spec Unit
 rangeSpec =
