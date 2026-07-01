@@ -7,6 +7,7 @@ import Capabilities.Resource.ManageGroceryList
   ( class ManageGroceryList
   , SortedGrocery
   )
+import Capabilities.Resource.ManageSpaces (class ManageSpaces)
 import Control.Monad.State (class MonadState)
 import Control.Monad.State as MonadState
 import Control.Parallel.Class (parallel, sequential)
@@ -256,3 +257,7 @@ localStorageState f = liftEffect do
 
 instance MonadState State AppM where
   state f = AppM $ localStorageState f
+
+instance ManageSpaces AppM where
+  -- TODO: implement
+  loadSpaces = pure []

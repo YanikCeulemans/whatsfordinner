@@ -5,9 +5,11 @@ import Prelude
 import App.AddGrocery as AddGrocery
 import App.GenerateGroceries as GenerateGroceries
 import App.Groceries as Groceries
+import App.Home as Home
 import App.Schedule as Schedule
 import Capabilities.Navigation (class Navigation)
 import Capabilities.Resource.ManageGroceryList (class ManageGroceryList)
+import Capabilities.Resource.ManageSpaces (class ManageSpaces)
 import Data.Maybe (Maybe(..))
 import Data.Route (GroceryListInnerRoute(..), Route(..))
 import Effect.Aff.Class (class MonadAff)
@@ -16,12 +18,14 @@ import Halogen.HTML as HH
 import Type.Proxy (Proxy(..))
 
 type Slots =
-  ( schedule :: forall query. H.Slot query Void Int
+  ( home :: forall query. H.Slot query Void Int
+  , schedule :: forall query. H.Slot query Void Int
   , groceries :: forall query. H.Slot query Void Int
   , generateGroceries :: forall query. H.Slot query Void Int
   , addGrocery :: forall query. H.Slot query Void Int
   )
 
+_home = Proxy :: Proxy "home"
 _schedule = Proxy :: Proxy "schedule"
 _groceries = Proxy :: Proxy "groceries"
 _addGrocery = Proxy :: Proxy "addGrocery"
@@ -41,6 +45,7 @@ component
   :: forall output m
    . MonadAff m
   => ManageGroceryList m
+  => ManageSpaces m
   => Navigation m
   => H.Component Query Input output m
 component =
@@ -60,7 +65,8 @@ component =
   render :: forall action. State -> H.ComponentHTML action Slots m
   render { route } =
     case route of
-      Just Home -> HH.slot_ _schedule 0 Schedule.component unit
+      Just Home -> HH.slot_ _home 0 Home.component unit
+      Just Schedule -> HH.slot_ _schedule 0 Schedule.component unit
       Just
         (GroceryListRoute { groceryListId, groceryListRoute }) ->
         case groceryListRoute of

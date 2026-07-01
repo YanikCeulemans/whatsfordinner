@@ -41,6 +41,7 @@ type GroceryListRoute =
 
 data Route
   = Home
+  | Schedule
   | GroceryListRoute GroceryListRoute
 
 derive instance Generic Route _
@@ -63,6 +64,7 @@ groceryListRoute =
 route :: RouteDuplex' Route
 route = root $ sum
   { "Home": noArgs
+  , "Schedule": "schedule" / noArgs
   , "GroceryListRoute": groceryListRoute
   }
 
