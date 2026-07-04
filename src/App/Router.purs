@@ -94,8 +94,8 @@ component =
       Console.logShow { msg: "invite accepted", spaceId }
       pure unit
 
-    HandleHome (SpaceSelected spaceId) -> do
-      Console.logShow { msg: "space selected", spaceId }
+    HandleHome (SpaceSelected space) -> do
+      Console.logShow { msg: "space selected", name: space.name }
       pure unit
 
   handleQuery

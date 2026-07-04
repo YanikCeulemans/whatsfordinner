@@ -2,11 +2,15 @@ module App.Home where
 
 import Prelude
 
+import App.FormField (FormField)
+import App.FormField as FormField
 import App.Layout as Layout
+import App.Shared (preventDefault)
 import Capabilities.Resource.ManageSpaces (class ManageSpaces)
 import Capabilities.Resource.ManageSpaces as ManageSpaces
 import Data.Either as Either
 import Data.Maybe (Maybe(..))
+import Data.String.NonEmpty as NonEmptyString
 import Data.ULID as DULID
 import Domain.Id as Id
 import Domain.Space (Space)
@@ -17,6 +21,7 @@ import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Partial.Unsafe (unsafeCrashWith)
+import Web.Event.Event (Event)
 
 theSpaceId :: SpaceId
 theSpaceId =
@@ -26,12 +31,13 @@ theSpaceId =
 
 data HomeOutput
   = InviteAccepted SpaceId
-  | SpaceSelected SpaceId
+  | SpaceSelected Space
 
 type HomeSlot query = H.Slot query HomeOutput
 
 type InitializedState =
   { spaces :: Array Space
+  , spaceIdField :: FormField
   }
 
 data State
@@ -40,8 +46,21 @@ data State
 
 data Action
   = Initialize
-  | ClickedAccept
-  | ClickedSelect
+  | ClickedAccept Event
+  | ClickedSelect Space
+
+spaceView :: forall m. Space -> H.ComponentHTML Action () m
+spaceView space =
+  HH.li [ HP.class_ $ H.ClassName "no-list-style" ]
+    [ HH.article
+        [ HP.class_ $ H.ClassName "flex spaced items-center transparent-border"
+        , HE.onClick $ const $ ClickedSelect space
+        ]
+        [ HH.span [ HP.class_ $ H.ClassName "grocery-description pointer" ]
+            [ HH.text $ NonEmptyString.toString space.name ]
+        , HH.button [] [ HH.text "Select" ]
+        ]
+    ]
 
 component
   :: forall query input m
@@ -65,26 +84,36 @@ component =
   handleAction = case _ of
     Initialize -> do
       spaces <- ManageSpaces.loadSpaces
-      H.modify_ \_ -> Initialized { spaces }
+      H.modify_ \_ -> Initialized { spaces, spaceIdField: FormField.Pristine }
 
-    ClickedAccept -> do
+    ClickedAccept event -> do
+      preventDefault event
       H.raise $ InviteAccepted theSpaceId
 
-    ClickedSelect -> do
-      H.raise $ SpaceSelected theSpaceId
+    ClickedSelect space -> do
+      H.raise $ SpaceSelected space
 
   render :: State -> H.ComponentHTML Action () m
   render state =
-    Layout.main $
+    Layout.main' (Layout.defaultMainConfig { includeFooter = false }) $
       case state of
         NotInitialized -> HH.p_ [ HH.text "loading" ]
-        Initialized _initializedState ->
+        Initialized initializedState ->
           HH.div [ HP.class_ $ H.ClassName "flex column spaced" ]
             [ HH.h1_ [ HH.text "What's for dinner" ]
-            , HH.button [ HE.onClick $ const $ ClickedAccept ]
-                [ HH.text "accept" ]
-            , HH.button [ HE.onClick $ const $ ClickedSelect ]
-                [ HH.text "select" ]
-            , HH.text "TODO"
+            , HH.h2_ [ HH.text "Space shared with you" ]
+            , HH.form [ HE.onSubmit ClickedAccept ]
+                [ HH.fieldset [ HP.attr (H.AttrName "role") "group" ]
+                    [ HH.input
+                        [ HP.type_ HP.InputText
+                        , HP.name "space-id"
+                        , HP.placeholder "Enter space id"
+                        ]
+                    , HH.input [ HP.type_ HP.InputSubmit, HP.value "Accept" ]
+                    ]
+                ]
+            , HH.h2_ [ HH.text "Saved spaces" ]
+            , HH.ul [ HP.class_ $ H.ClassName "no-padding groceries-list" ] $
+                map spaceView initializedState.spaces
             ]
 

@@ -33,15 +33,18 @@ import Data.Profunctor (dimap)
 import Data.Route (Route)
 import Data.Route as Route
 import Data.String.CaseInsensitive (CaseInsensitiveString)
+import Data.String.NonEmpty.Internal (NonEmptyString(..))
 import Data.String.Regex as StrRegex
 import Data.String.Regex.Flags as Flags
 import Data.Traversable (for_)
 import Data.Tuple (Tuple)
 import Data.Tuple.Nested ((/\))
+import Data.ULID as DULID
 import Domain.GroceryList (GroceryEntry, GroceryList)
 import Domain.GroceryList as GroceryList
 import Domain.GroceryListId (GroceryListId)
 import Domain.Id as Id
+import Domain.MealScheduleId as MealScheduleId
 import Effect.Aff (Aff, Milliseconds(..))
 import Effect.Aff as Aff
 import Effect.Aff.Class (class MonadAff, liftAff)
@@ -258,6 +261,21 @@ localStorageState f = liftEffect do
 instance MonadState State AppM where
   state f = AppM $ localStorageState f
 
+mkId :: forall a. String -> Id.Id a
+mkId = DULID.parse >>> map Id.MkId >>> Either.fromRight' crash
+  where
+  crash _ = unsafeCrashWith "invalid hardcoded ULID"
+
 instance ManageSpaces AppM where
   -- TODO: implement
-  loadSpaces = pure []
+  loadSpaces = pure
+    [ { id: mkId "01KNW48VB0PNCFC0KZ8SW289ZZ"
+      , name: NonEmptyString "Komishes"
+      , groceryListId: mkId "01KNW48VB0PNCFC0KZ8SW289ZZ"
+      , mealScheduleId: MealScheduleId.MkMealScheduleId $ mkId
+          "01KNW48VB0PNCFC0KZ8SW289ZZ"
+      }
+    ]
+
+  loadSpace _ = pure Nothing
+
