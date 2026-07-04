@@ -56,7 +56,7 @@ spaceView space =
         [ HP.class_ $ H.ClassName "flex spaced items-center transparent-border"
         , HE.onClick $ const $ ClickedSelect space
         ]
-        [ HH.span [ HP.class_ $ H.ClassName "grocery-description pointer" ]
+        [ HH.span [ HP.class_ $ H.ClassName "select-description pointer" ]
             [ HH.text $ NonEmptyString.toString space.name ]
         , HH.button [] [ HH.text "Select" ]
         ]
@@ -113,7 +113,7 @@ component =
                     ]
                 ]
             , HH.h2_ [ HH.text "Saved spaces" ]
-            , HH.ul [ HP.class_ $ H.ClassName "no-padding groceries-list" ] $
+            , HH.ul [ HP.class_ $ H.ClassName "no-padding select-list" ] $
                 map spaceView initializedState.spaces
             ]
 

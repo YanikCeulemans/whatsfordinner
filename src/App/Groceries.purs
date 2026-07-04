@@ -223,7 +223,7 @@ groceryView { dragState, allowDragging } (Tuple index grocery) =
           [ HH.label
               [ HP.classes $ H.ClassName <$>
                   ( Array.catMaybes $
-                      [ Just "grocery-description flex-1 user-select-none"
+                      [ Just "select-description flex-1 user-select-none"
                       , if GroceryList.entryChecked grocery then Just "checked"
                         else Nothing
                       ]
@@ -259,12 +259,12 @@ groceriesView
 groceriesView state =
   HH.div_
     [ HH.ul
-        [ HP.class_ $ H.ClassName "no-padding groceries-list"
+        [ HP.class_ $ H.ClassName "no-padding select-list"
         , HE.onDragEnd $ EndDrag
         ] $
         map (groceryView state) uncheckedGroceries
     , HH.h2_ [ HH.text "Done" ]
-    , HH.ul [ HP.class_ $ H.ClassName "no-padding groceries-list" ] $
+    , HH.ul [ HP.class_ $ H.ClassName "no-padding select-list" ] $
         map (groceryView state) checkedGroceries
     , case checkedGroceries of
         [] -> HH.text ""
