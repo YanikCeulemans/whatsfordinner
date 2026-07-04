@@ -36,6 +36,7 @@ import Data.String.CaseInsensitive (CaseInsensitiveString)
 import Data.String.NonEmpty.Internal (NonEmptyString(..))
 import Data.String.Regex as StrRegex
 import Data.String.Regex.Flags as Flags
+import Data.Time.Duration (Seconds(..), convertDuration)
 import Data.Traversable (for_)
 import Data.Tuple (Tuple)
 import Data.Tuple.Nested ((/\))
@@ -277,5 +278,16 @@ instance ManageSpaces AppM where
       }
     ]
 
-  loadSpace _ = pure Nothing
+  loadSpace id = do
+    liftAff $ Aff.delay $ convertDuration $ Seconds 3.0
+    pure $ case Id.print id of
+      "01KNW48VB0PNCFC0KZ8SW289ZA" ->
+        Just
+          { id: mkId "01KNW48VB0PNCFC0KZ8SW289ZZ"
+          , name: NonEmptyString "Fake space"
+          , groceryListId: mkId "01KNW48VB0PNCFC0KZ8SW289ZZ"
+          , mealScheduleId: MealScheduleId.MkMealScheduleId $ mkId
+              "01KNW48VB0PNCFC0KZ8SW289ZZ"
+          }
+      _ -> Nothing
 

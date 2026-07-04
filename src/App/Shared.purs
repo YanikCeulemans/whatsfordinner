@@ -2,6 +2,7 @@ module App.Shared where
 
 import Prelude
 
+import App.RemoteData (RemoteData(..))
 import Data.Array as Array
 import Data.Maybe (Maybe)
 import Data.Maybe as Maybe
@@ -60,6 +61,11 @@ eventTargetInputValueOrEmpty event =
     # traverse InputElement.value
     <#> Maybe.fromMaybe ""
     # H.liftEffect
+
+ariaBusy' :: forall e a r i. RemoteData e a -> Array (HP.IProp r i)
+ariaBusy' = case _ of
+  Loading -> [ HP.attr (H.AttrName "aria-busy") $ show true ]
+  _ -> []
 
 class PreventableEvent e where
   preventDefault :: forall m. MonadEffect m => e -> m Unit

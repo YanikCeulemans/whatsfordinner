@@ -5,16 +5,18 @@ import Prelude
 import App.FormField (FormField(..))
 import App.FormField as FormField
 import App.Layout as Layout
+import App.RemoteData (RemoteData(..))
 import App.Shared (eventTargetInputValue, preventDefault)
+import App.Shared as S
 import Capabilities.Resource.ManageSpaces (class ManageSpaces)
 import Capabilities.Resource.ManageSpaces as ManageSpaces
+import Control.Monad.State (class MonadState)
 import Data.Either (Either(..))
 import Data.Either as Either
 import Data.Maybe (Maybe(..))
 import Data.String.NonEmpty as NonEmptyString
-import Data.Traversable (traverse_)
+import Data.Traversable (for_, traverse, traverse_)
 import Data.ULID as DULID
-import Debug as Debug
 import Domain.Id as Id
 import Domain.Space (Space)
 import Domain.SpaceId (SpaceId)
@@ -41,6 +43,7 @@ type HomeSlot query = H.Slot query HomeOutput
 type InitializedState =
   { spaces :: Array Space
   , spaceIdField :: FormField
+  , acceptedSpace :: RemoteData String Space
   }
 
 data State
@@ -52,6 +55,31 @@ data Action
   | ClickedAccept Event
   | ClickedSelect Space
   | SpaceIdChanged Event
+
+loadSpace
+  :: forall m
+   . ManageSpaces m
+  => MonadState State m
+  => State
+  -> m (Maybe Space)
+loadSpace = case _ of
+  NotInitialized -> pure Nothing
+  Initialized state -> do
+    let
+      spaceIdCandidate =
+        FormField.validFieldValue state.spaceIdField
+          # map DULID.parse
+          # map Either.hush
+          # join
+          # map Id.MkId
+    H.put $ Initialized $ state { acceptedSpace = Loading }
+    spaceCandidate <- join <$> traverse ManageSpaces.loadSpace spaceIdCandidate
+    H.put $ Initialized $ state
+      { acceptedSpace = case spaceCandidate of
+          Nothing -> Error "No such space exists"
+          Just space -> Success space
+      }
+    pure spaceCandidate
 
 updateSpaceIdField :: String -> State -> State
 updateSpaceIdField spaceIdCandidate = case _ of
@@ -101,11 +129,17 @@ component =
   handleAction = case _ of
     Initialize -> do
       spaces <- ManageSpaces.loadSpaces
-      H.modify_ \_ -> Initialized { spaces, spaceIdField: FormField.Pristine }
+      H.modify_ \_ -> Initialized
+        { spaces
+        , spaceIdField: FormField.Pristine
+        , acceptedSpace: NotRequested
+        }
 
     ClickedAccept event -> do
       preventDefault event
-      H.raise $ InviteAccepted theSpaceId
+      spaceCandidate <- loadSpace =<< H.get
+      -- TODO: When loadSpace can't find the space, we need to let the user know in addition to not triggering the SpaceSelected output action
+      for_ spaceCandidate $ H.raise <<< SpaceSelected
 
     ClickedSelect space -> do
       H.raise $ SpaceSelected space
@@ -142,11 +176,15 @@ component =
                                 initializedState.spaceIdField
                             ]
                         )
-                    , HH.input
-                        [ HP.type_ HP.InputSubmit
-                        , HP.value "Accept"
-                        , HP.disabled $ isAcceptDisabled initializedState
-                        ]
+                    , HH.button
+                        ( join
+                            [ [ HP.type_ HP.ButtonSubmit
+                              , HP.disabled $ isAcceptDisabled initializedState
+                              ]
+                            , S.ariaBusy' initializedState.acceptedSpace
+                            ]
+                        )
+                        [ HH.text "Accept" ]
                     ]
                 , HH.small [ HP.class_ $ H.ClassName "white-space-pre-wrap" ]
                     [ case initializedState.spaceIdField of
@@ -159,8 +197,8 @@ component =
                 map spaceView initializedState.spaces
             ]
     where
-    isAcceptDisabled initializedState =
-      case initializedState.spaceIdField of
-        Invalid _ -> true
-        _ -> false
+    isAcceptDisabled { spaceIdField, acceptedSpace } =
+      case spaceIdField, acceptedSpace of
+        Invalid _, Loading -> true
+        _, _ -> false
 
