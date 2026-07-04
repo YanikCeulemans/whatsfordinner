@@ -6,6 +6,7 @@ import App.Data as Data
 import App.FormField (FormField)
 import App.FormField as FormField
 import App.Layout as Layout
+import App.RemoteData (RemoteData(..))
 import App.Shared (preventDefault)
 import App.Shared as S
 import Capabilities.Navigation (class Navigation, navigate)
@@ -44,12 +45,6 @@ import Simple.ULID as ULID
 import Simple.ULID.Window as ULIDW
 import Web.Event.Event (Event)
 import Web.UIEvent.MouseEvent (MouseEvent)
-
-data RemoteData e a
-  = NotRequested
-  | Loading
-  | Error e
-  | Success a
 
 type RemoteData' a = RemoteData String a
 
