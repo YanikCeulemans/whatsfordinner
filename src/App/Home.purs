@@ -5,7 +5,7 @@ import Prelude
 import App.FormField (FormField)
 import App.FormField as FormField
 import App.Layout as Layout
-import App.Shared (preventDefault)
+import App.Shared (eventTargetInputValue, preventDefault)
 import Capabilities.Resource.ManageSpaces (class ManageSpaces)
 import Capabilities.Resource.ManageSpaces as ManageSpaces
 import Data.Either as Either
@@ -22,6 +22,7 @@ import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Partial.Unsafe (unsafeCrashWith)
 import Web.Event.Event (Event)
+import Web.UIEvent.InputEvent (InputEvent)
 
 theSpaceId :: SpaceId
 theSpaceId =
@@ -48,17 +49,20 @@ data Action
   = Initialize
   | ClickedAccept Event
   | ClickedSelect Space
+  | SpaceIdChanged Event
 
 spaceView :: forall m. Space -> H.ComponentHTML Action () m
 spaceView space =
   HH.li [ HP.class_ $ H.ClassName "no-list-style" ]
     [ HH.article
         [ HP.class_ $ H.ClassName "flex spaced items-center transparent-border"
-        , HE.onClick $ const $ ClickedSelect space
         ]
         [ HH.span [ HP.class_ $ H.ClassName "select-description pointer" ]
             [ HH.text $ NonEmptyString.toString space.name ]
-        , HH.button [] [ HH.text "Select" ]
+        , HH.button
+            [ HE.onClick $ const $ ClickedSelect space
+            ]
+            [ HH.text "Select" ]
         ]
     ]
 
@@ -93,6 +97,9 @@ component =
     ClickedSelect space -> do
       H.raise $ SpaceSelected space
 
+    SpaceIdChanged event -> do
+      spaceIdValue <- eventTargetInputValue event
+
   render :: State -> H.ComponentHTML Action () m
   render state =
     Layout.main' (Layout.defaultMainConfig { includeFooter = false }) $
@@ -108,6 +115,7 @@ component =
                         [ HP.type_ HP.InputText
                         , HP.name "space-id"
                         , HP.placeholder "Enter space id"
+                        , HE.onChange SpaceIdChanged
                         ]
                     , HH.input [ HP.type_ HP.InputSubmit, HP.value "Accept" ]
                     ]
