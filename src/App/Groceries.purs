@@ -452,7 +452,7 @@ component =
 
   render :: State -> H.ComponentHTML Action () m
   render state =
-    Layout.main $
+    Layout.main' (Layout.defaultMainConfig { spaceId = Just state.spaceId }) $
       HH.div [ HP.class_ $ H.ClassName "flex column spaced" ]
         [ HH.div
             [ HP.class_ $ H.ClassName "flex justify-space-between items-center"

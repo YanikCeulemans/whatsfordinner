@@ -70,16 +70,16 @@ component =
   render { route } =
     case route of
       Just Home -> HH.slot _home 0 Home.component unit HandleHome
-      Just Schedule -> HH.slot_ _schedule 0 Schedule.component unit
       Just
-        (SpaceRoute { spaceId, route }) ->
-        case groceryListRoute of
-          Groceries -> HH.slot_ _groceries 0 Groceries.component groceryListId
+        (SpaceRoute { spaceId, route: innerRoute }) ->
+        case innerRoute of
+          Schedule -> HH.slot_ _schedule 0 Schedule.component spaceId
+          Groceries -> HH.slot_ _groceries 0 Groceries.component spaceId
           GroceriesGenerate ->
             HH.slot_ _generateGroceries 0 GenerateGroceries.component
-              groceryListId
+              spaceId
           AddGrocery -> HH.slot_ _addGrocery 0 AddGrocery.component
-            groceryListId
+            spaceId
       Nothing -> HH.h1_ [ HH.text "Not found" ]
 
   handleAction

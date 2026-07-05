@@ -23,6 +23,7 @@ import Domain.MealSchedule as MealSchedule
 import Domain.PlannedMeal (PlannedMeal(..))
 import Domain.Range (Range)
 import Domain.Range as Range
+import Domain.SpaceId (SpaceId)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Now (nowDate)
 import Halogen as H
@@ -31,15 +32,18 @@ import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Partial.Unsafe (unsafeCrashWith)
 
-type InitializedState =
+type Input = SpaceId
+
+type ScheduleState =
   { mealSchedule :: MealSchedule
   , date :: Date
   , now :: Date
   }
 
-data State
-  = NotInitialized
-  | Initialized InitializedState
+type State =
+  { spaceId :: SpaceId
+  , scheduleState :: Maybe ScheduleState
+  }
 
 data Action
   = Initialize
@@ -102,9 +106,10 @@ nextDays n date
             unsafeAdjustDate (Days $ Int.toNumber $ n - n') date /\ (n' - 1)
 
 timeTravel :: Days -> State -> State
-timeTravel _ NotInitialized = NotInitialized
-timeTravel days (Initialized s) = Initialized $ s { date = thePast s.date }
+timeTravel days state =
+  state { scheduleState = timeTravel' <$> state.scheduleState }
   where
+  timeTravel' s = s { date = thePast s.date }
   thePast date =
     case Date.adjust days date of
       Nothing -> unsafeCrashWith
@@ -128,7 +133,7 @@ viewScheduleEntry date (mealDate /\ plannedMeal) =
     ]
 
 component
-  :: forall query input output m. MonadAff m => H.Component query input output m
+  :: forall query output m. MonadAff m => H.Component query Input output m
 component =
   H.mkComponent
     { initialState
@@ -138,17 +143,21 @@ component =
     }
 
   where
-  initialState :: input -> State
-  initialState _ = NotInitialized
+  initialState :: Input -> State
+  initialState spaceId =
+    { spaceId
+    , scheduleState: Nothing
+    }
 
   handleAction
     :: forall slots. Action -> H.HalogenM State Action slots output m Unit
   handleAction = case _ of
     Initialize -> do
       now <- H.liftEffect nowDate
-      H.modify_ \_ -> Initialized
-        { date: now, now, mealSchedule: AData.mealSchedule }
-      pure unit
+      H.modify_ _
+        { scheduleState = Just
+            { date: now, now, mealSchedule: AData.mealSchedule }
+        }
 
     BackInTime -> do
       H.modify_ $ timeTravel $ Days $ -3.0
@@ -158,10 +167,10 @@ component =
 
   render :: State -> H.ComponentHTML Action () m
   render state =
-    Layout.main $
-      case state of
-        NotInitialized -> HH.p_ [ HH.text "loading" ]
-        Initialized initializedState ->
+    Layout.main' (Layout.defaultMainConfig { spaceId = Just state.spaceId }) $
+      case state.scheduleState of
+        Nothing -> HH.p_ [ HH.text "loading" ]
+        Just initializedState ->
           HH.div [ HP.class_ $ H.ClassName "flex column spaced" ]
             [ HH.h1_ [ HH.text "Schedule" ]
             , HH.div
