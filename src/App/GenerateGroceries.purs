@@ -31,7 +31,7 @@ import Data.List as List
 import Data.List.NonEmpty as NEL
 import Data.Maybe (Maybe(..))
 import Data.Maybe as Maybe
-import Data.Route (GroceryListInnerRoute(..))
+import Data.Route (SpaceInnerRoute(..))
 import Data.Route as Route
 import Data.String as String
 import Data.Time.Duration (Days(..))
@@ -40,13 +40,13 @@ import Data.Tuple (Tuple(..))
 import Domain.Amount as Amount
 import Domain.GroceryList (GroceryEntry, GroceryList)
 import Domain.GroceryList as GroceryList
-import Domain.GroceryListId (GroceryListId)
 import Domain.Id as Id
 import Domain.Ingredient (Ingredient)
 import Domain.MealSchedule as MealSchedule
 import Domain.PlannedMeal as PlannedMeal
 import Domain.Range (Range)
 import Domain.Range as Range
+import Domain.SpaceId (SpaceId)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class (class MonadEffect)
 import Effect.Now (nowDate)
@@ -87,13 +87,13 @@ isComplete = case _ of
   Complete _ -> true
   _ -> false
 
-type Input = GroceryListId
+type Input = SpaceId
 
 type State =
   { groceryList :: GroceryList
   , selection :: Selection
   , loading :: Boolean
-  , groceryListId :: GroceryListId
+  , spaceId :: SpaceId
   }
 
 data Action
@@ -240,11 +240,11 @@ component =
 
   where
   initialState :: Input -> State
-  initialState groceryListId =
+  initialState spaceId =
     { groceryList: mempty
     , selection: Incomplete { from: Nothing, to: Nothing }
     , loading: false
-    , groceryListId
+    , spaceId
     }
 
   handleAction
@@ -270,9 +270,9 @@ component =
           groceries <- upsertIngredients ingredients groceryList
           void $ upsertGroceries Data.dummyListId groceries
           H.modify_ _ { loading = false }
-          groceryListId <- H.gets _.groceryListId
-          navigate $ Route.GroceryListRoute
-            { groceryListId, groceryListRoute: Groceries }
+          spaceId <- H.gets _.spaceId
+          navigate $ Route.SpaceRoute
+            { spaceId, route: Groceries }
           where
           ingredients =
             MealSchedule.toList dateRange Data.mealSchedule
@@ -290,15 +290,15 @@ component =
       modifyDate To event
 
   render :: State -> H.ComponentHTML Action () m
-  render { loading, selection, groceryListId } =
+  render { loading, selection, spaceId } =
     Layout.main $
       HH.div [ HP.class_ $ H.ClassName "flex column spaced" ]
         [ HH.div [ HP.class_ $ H.ClassName "flex justify-space-between" ]
             [ HH.h1_ [ HH.text "Generate groceries" ]
             , HH.div [ HP.class_ $ H.ClassName "flex spaced" ]
                 [ S.link
-                    ( Route.GroceryListRoute
-                        { groceryListId, groceryListRoute: Groceries }
+                    ( Route.SpaceRoute
+                        { spaceId, route: Groceries }
                     )
                     [ HH.text "Cancel" ]
                 ]

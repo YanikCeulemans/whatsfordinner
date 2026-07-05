@@ -29,8 +29,8 @@ import Data.Tuple as Tuple
 import Domain.Amount as Amount
 import Domain.GroceryList (GroceryEntry, GroceryList)
 import Domain.GroceryList as GroceryList
-import Domain.GroceryListId (GroceryListId)
 import Domain.Id as Id
+import Domain.SpaceId (SpaceId)
 import Effect.Aff (Milliseconds(..), delay)
 import Effect.Aff.Class (class MonadAff)
 import Halogen as H
@@ -99,10 +99,10 @@ type State =
   , grocerySuggestions :: RemoteData' (Array SortedGrocery)
   , groceryList :: Maybe GroceryList
   , suggestionDebounceForkId :: Maybe H.ForkId
-  , groceryListId :: GroceryListId
+  , spaceId :: SpaceId
   }
 
-type Input = GroceryListId
+type Input = SpaceId
 
 updateForm :: (FormState -> FormState) -> State -> State
 updateForm f state = state { form = f state.form }
@@ -171,7 +171,7 @@ component =
 
   where
   initialState :: Input -> State
-  initialState groceryListId =
+  initialState spaceId =
     { id: Nothing
     , form: pristineFormState
     , suggestionSortIndex: Nothing
@@ -179,7 +179,7 @@ component =
     , grocerySuggestions: NotRequested
     , groceryList: Nothing
     , suggestionDebounceForkId: Nothing
-    , groceryListId
+    , spaceId
     }
 
   handleAction :: Action -> H.HalogenM State Action () output m Unit
@@ -241,23 +241,23 @@ component =
       H.modify_ _ { remoteData = Loading }
       for_ groceryCandidate upsertGroceryForDummyList
       H.modify_ _ { remoteData = Success unit }
-      groceryListId <- H.gets _.groceryListId
+      spaceId <- H.gets _.spaceId
       navigate $
-        ( Route.GroceryListRoute
-            { groceryListId, groceryListRoute: Route.Groceries }
+        ( Route.SpaceRoute
+            { spaceId, route: Route.Groceries }
         )
       where
       upsertGroceryForDummyList = upsertGrocery Data.dummyListId
 
   render :: State -> H.ComponentHTML Action () m
-  render { form, remoteData, grocerySuggestions, groceryListId } =
+  render { form, remoteData, grocerySuggestions, spaceId } =
     Layout.main $
       HH.div [ HP.class_ $ H.ClassName "flex column" ]
         [ HH.div [ HP.class_ $ H.ClassName "flex justify-space-between" ]
             [ HH.h1_ [ HH.text "Add grocery" ]
             , S.link
-                ( Route.GroceryListRoute
-                    { groceryListId, groceryListRoute: Route.Groceries }
+                ( Route.SpaceRoute
+                    { spaceId, route: Route.Groceries }
                 )
                 [ HH.text "Cancel" ]
             ]

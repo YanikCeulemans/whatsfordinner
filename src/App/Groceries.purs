@@ -18,7 +18,7 @@ import Data.Array as Array
 import Data.Function (on)
 import Data.Maybe (Maybe(..))
 import Data.Maybe as Maybe
-import Data.Route (GroceryListInnerRoute(..), Route(..))
+import Data.Route (Route(..), SpaceInnerRoute(..))
 import Data.Time.Duration (Seconds(..), convertDuration)
 import Data.Traversable (for_, traverse)
 import Data.Tuple (Tuple(..))
@@ -29,6 +29,7 @@ import Domain.GroceryList (GroceryEntry, GroceryList)
 import Domain.GroceryList as GroceryList
 import Domain.GroceryListId (GroceryListId)
 import Domain.Id as Id
+import Domain.SpaceId (SpaceId)
 import Effect.Aff as Aff
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class (class MonadEffect)
@@ -72,14 +73,14 @@ type WebSocketState =
   , readyState :: ReadyState
   }
 
-type Input = GroceryListId
+type Input = SpaceId
 
 type State =
   { groceryList :: GroceryList
   , dragState :: DragState DragEntry
   , allowDragging :: Boolean
   , webSocketState :: Maybe WebSocketState
-  , groceryListId :: GroceryListId
+  , spaceId :: SpaceId
   }
 
 {--
@@ -347,12 +348,12 @@ component =
 
   where
   initialState :: Input -> State
-  initialState groceryListId =
+  initialState spaceId =
     { groceryList: mempty
     , dragState: NotDragging
     , allowDragging: false
     , webSocketState: Nothing
-    , groceryListId
+    , spaceId
     }
 
   handleAction
@@ -473,16 +474,16 @@ component =
                 ]
             , HH.div [ HP.class_ $ H.ClassName "flex spaced" ]
                 [ S.link
-                    ( GroceryListRoute
-                        { groceryListId: state.groceryListId
-                        , groceryListRoute: GroceriesGenerate
+                    ( SpaceRoute
+                        { spaceId: state.spaceId
+                        , route: GroceriesGenerate
                         }
                     )
                     [ HH.text "Generate" ]
                 , S.link
-                    ( GroceryListRoute
-                        { groceryListId: state.groceryListId
-                        , groceryListRoute: AddGrocery
+                    ( SpaceRoute
+                        { spaceId: state.spaceId
+                        , route: AddGrocery
                         }
                     )
                     [ HH.text "Add" ]

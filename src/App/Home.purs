@@ -17,6 +17,7 @@ import Data.Either as Either
 import Data.Map (Map)
 import Data.Map as Map
 import Data.Maybe (Maybe(..))
+import Data.Route as Route
 import Data.String.NonEmpty as NonEmptyString
 import Data.Traversable (for_, traverse, traverse_)
 import Data.Tuple (Tuple(..))
@@ -57,7 +58,6 @@ data State
 data Action
   = Initialize
   | ClickedAccept Event
-  | ClickedSelect Space
   | SpaceIdChanged Event
 
 loadSpace
@@ -116,12 +116,11 @@ spaceView space =
     [ HH.article
         [ HP.class_ $ H.ClassName "flex spaced items-center transparent-border"
         ]
-        [ HH.span [ HP.class_ $ H.ClassName "select-description pointer" ]
-            [ HH.text $ NonEmptyString.toString space.name ]
-        , HH.button
-            [ HE.onClick $ const $ ClickedSelect space
+        [ HH.span [ HP.class_ $ H.ClassName "select-description" ]
+            [ S.link
+                (Route.SpaceRoute { spaceId: space.id, route: Route.Schedule })
+                [ HH.text $ NonEmptyString.toString space.name ]
             ]
-            [ HH.text "Select" ]
         ]
     ]
 
@@ -161,16 +160,13 @@ component =
         H.raise $ SpaceSelected space
         H.modify_ $ upsertSpace space >>> clearSpaceIdField
 
-    ClickedSelect space -> do
-      H.raise $ SpaceSelected space
-
     SpaceIdChanged event -> do
       spaceIdValue <- eventTargetInputValue event
       traverse_ (H.modify_ <<< updateSpaceIdField) spaceIdValue
 
   render :: State -> H.ComponentHTML Action () m
   render state =
-    Layout.main' (Layout.defaultMainConfig { includeFooter = false }) $
+    Layout.main' (Layout.defaultMainConfig { spaceId = Nothing }) $
       case state of
         NotInitialized -> HH.p_ [ HH.text "loading" ]
         Initialized initializedState ->

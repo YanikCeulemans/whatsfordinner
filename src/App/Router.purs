@@ -12,7 +12,7 @@ import Capabilities.Navigation (class Navigation)
 import Capabilities.Resource.ManageGroceryList (class ManageGroceryList)
 import Capabilities.Resource.ManageSpaces (class ManageSpaces)
 import Data.Maybe (Maybe(..))
-import Data.Route (GroceryListInnerRoute(..), Route(..))
+import Data.Route (Route(..), SpaceInnerRoute(..))
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class.Console as Console
 import Halogen as H
@@ -72,7 +72,7 @@ component =
       Just Home -> HH.slot _home 0 Home.component unit HandleHome
       Just Schedule -> HH.slot_ _schedule 0 Schedule.component unit
       Just
-        (GroceryListRoute { groceryListId, groceryListRoute }) ->
+        (SpaceRoute { spaceId, route }) ->
         case groceryListRoute of
           Groceries -> HH.slot_ _groceries 0 Groceries.component groceryListId
           GroceriesGenerate ->
