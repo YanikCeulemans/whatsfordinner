@@ -96,6 +96,20 @@ updateSpaceIdField spaceIdCandidate = case _ of
         Left _ -> FormField.Invalid spaceIdCandidate
         Right _ -> FormField.Valid spaceIdCandidate
 
+upsertSpace :: Space -> State -> State
+upsertSpace space =
+  case _ of
+    NotInitialized -> NotInitialized
+    Initialized state -> Initialized $
+      state { spaces = upsert state.spaces }
+  where
+  upsert spaces = Map.insert space.id space spaces
+
+clearSpaceIdField :: State -> State
+clearSpaceIdField = case _ of
+  NotInitialized -> NotInitialized
+  Initialized state -> Initialized $ state { spaceIdField = Pristine }
+
 spaceView :: forall m. Space -> H.ComponentHTML Action () m
 spaceView space =
   HH.li [ HP.class_ $ H.ClassName "no-list-style" ]
@@ -143,7 +157,9 @@ component =
     ClickedAccept event -> do
       preventDefault event
       spaceCandidate <- loadSpace =<< H.get
-      for_ spaceCandidate $ H.raise <<< SpaceSelected
+      for_ spaceCandidate \space -> do
+        H.raise $ SpaceSelected space
+        H.modify_ $ upsertSpace space >>> clearSpaceIdField
 
     ClickedSelect space -> do
       H.raise $ SpaceSelected space
@@ -175,6 +191,9 @@ component =
                               , HP.name "space-id"
                               , HP.placeholder "Enter space id"
                               , HE.onChange SpaceIdChanged
+                              , HP.autocomplete HP.AutocompleteOff
+                              , HP.value $ FormField.fieldValue
+                                  initializedState.spaceIdField
                               ]
                             , FormField.ariaValidity
                                 initializedState.spaceIdField

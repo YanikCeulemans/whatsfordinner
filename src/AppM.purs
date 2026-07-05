@@ -283,7 +283,7 @@ instance ManageSpaces AppM where
     pure $ case Id.print id of
       "01KNW48VB0PNCFC0KZ8SW289ZA" ->
         Just
-          { id: mkId "01KNW48VB0PNCFC0KZ8SW289ZZ"
+          { id: mkId "01KNW48VB0PNCFC0KZ8SW289ZA"
           , name: NonEmptyString "Fake space"
           , groceryListId: mkId "01KNW48VB0PNCFC0KZ8SW289ZZ"
           , mealScheduleId: MealScheduleId.MkMealScheduleId $ mkId
