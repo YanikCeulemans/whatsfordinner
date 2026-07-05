@@ -11,11 +11,15 @@ import App.Shared as S
 import Capabilities.Resource.ManageSpaces (class ManageSpaces)
 import Capabilities.Resource.ManageSpaces as ManageSpaces
 import Control.Monad.State (class MonadState)
+import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Either as Either
+import Data.Map (Map)
+import Data.Map as Map
 import Data.Maybe (Maybe(..))
 import Data.String.NonEmpty as NonEmptyString
 import Data.Traversable (for_, traverse, traverse_)
+import Data.Tuple (Tuple(..))
 import Data.ULID as DULID
 import Domain.Id as Id
 import Domain.Space (Space)
@@ -41,7 +45,7 @@ data HomeOutput
 type HomeSlot query = H.Slot query HomeOutput
 
 type InitializedState =
-  { spaces :: Array Space
+  { spaces :: Map SpaceId Space
   , spaceIdField :: FormField
   , acceptedSpace :: RemoteData String Space
   }
@@ -130,7 +134,8 @@ component =
     Initialize -> do
       spaces <- ManageSpaces.loadSpaces
       H.modify_ \_ -> Initialized
-        { spaces
+        { spaces:
+            Map.fromFoldable $ map (\space -> Tuple space.id space) spaces
         , spaceIdField: FormField.Pristine
         , acceptedSpace: NotRequested
         }
@@ -208,6 +213,8 @@ component =
             , HH.h2_ [ HH.text "Saved spaces" ]
             , HH.ul [ HP.class_ $ H.ClassName "no-padding select-list" ] $
                 map spaceView initializedState.spaces
+                  # Map.values
+                  # Array.fromFoldable
             ]
     where
     isAcceptDisabled { spaceIdField, acceptedSpace } =
