@@ -138,7 +138,6 @@ component =
     ClickedAccept event -> do
       preventDefault event
       spaceCandidate <- loadSpace =<< H.get
-      -- TODO: When loadSpace can't find the space, we need to let the user know in addition to not triggering the SpaceSelected output action
       for_ spaceCandidate $ H.raise <<< SpaceSelected
 
     ClickedSelect space -> do
@@ -187,10 +186,24 @@ component =
                         [ HH.text "Accept" ]
                     ]
                 , HH.small [ HP.class_ $ H.ClassName "white-space-pre-wrap" ]
-                    [ case initializedState.spaceIdField of
-                        Invalid _ -> HH.text "Please enter a valid space id"
-                        _ -> HH.text " "
+                    [ HH.text $
+                        case initializedState.spaceIdField of
+                          Invalid _ ->
+                            "Please enter a valid space id"
+                          _ ->
+                            ensureHeightIsRenderedText
+                            where
+                            ensureHeightIsRenderedText = " "
                     ]
+                ]
+            , HH.span [ HP.class_ $ H.ClassName "white-space-pre-wrap" ]
+                [ HH.text $
+                    case initializedState.acceptedSpace of
+                      Error e -> e
+                      _ ->
+                        ensureHeightIsRenderedText
+                        where
+                        ensureHeightIsRenderedText = " "
                 ]
             , HH.h2_ [ HH.text "Saved spaces" ]
             , HH.ul [ HP.class_ $ H.ClassName "no-padding select-list" ] $
