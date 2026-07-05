@@ -1,7 +1,7 @@
 module Data.Route
   ( Route(..)
-  , GroceryListRoute
-  , GroceryListInnerRoute(..)
+  , SpaceRoute
+  , SpaceInnerRoute(..)
   , parse
   , parse'
   , print
@@ -13,8 +13,8 @@ import Data.Array (fold)
 import Data.Either as Either
 import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe)
-import Domain.GroceryListId (GroceryListId)
 import Domain.Id as Id
+import Domain.SpaceId (SpaceId)
 import FFI.URL as URL
 import Routing.Duplex (RouteDuplex', root, (:=))
 import Routing.Duplex as D
@@ -22,50 +22,50 @@ import Routing.Duplex.Generic (noArgs, sum)
 import Routing.Duplex.Generic.Syntax ((/))
 import Type.Prelude (Proxy(..))
 
-groceryListId :: RouteDuplex' String -> RouteDuplex' GroceryListId
-groceryListId =
+spaceId :: RouteDuplex' String -> RouteDuplex' SpaceId
+spaceId =
   D.as Id.print Id.parse
 
-data GroceryListInnerRoute
-  = Groceries
+data SpaceInnerRoute
+  = Schedule
+  | Groceries
   | GroceriesGenerate
   | AddGrocery
 
-derive instance Generic GroceryListInnerRoute _
-derive instance Eq GroceryListInnerRoute
+derive instance Generic SpaceInnerRoute _
+derive instance Eq SpaceInnerRoute
 
-type GroceryListRoute =
-  { groceryListId :: GroceryListId
-  , groceryListRoute :: GroceryListInnerRoute
+type SpaceRoute =
+  { spaceId :: SpaceId
+  , route :: SpaceInnerRoute
   }
 
 data Route
   = Home
-  | Schedule
-  | GroceryListRoute GroceryListRoute
+  | SpaceRoute SpaceRoute
 
 derive instance Generic Route _
 derive instance Eq Route
 
-groceryListInnerRoute :: RouteDuplex' GroceryListInnerRoute
-groceryListInnerRoute =
+spaceInnerRoute :: RouteDuplex' SpaceInnerRoute
+spaceInnerRoute =
   sum
-    { "Groceries": "groceries" / noArgs
+    { "Schedule": "schedule" / noArgs
+    , "Groceries": "groceries" / noArgs
     , "GroceriesGenerate": "groceries" / "generate" / noArgs
     , "AddGrocery": "groceries" / "add" / noArgs
     }
 
-groceryListRoute :: RouteDuplex' GroceryListRoute
-groceryListRoute =
+spaceRoute :: RouteDuplex' SpaceRoute
+spaceRoute =
   D.record
-    # (Proxy :: _ "groceryListId") := (groceryListId D.segment)
-    # (Proxy :: _ "groceryListRoute") := groceryListInnerRoute
+    # (Proxy :: _ "spaceId") := (spaceId D.segment)
+    # (Proxy :: _ "route") := spaceInnerRoute
 
 route :: RouteDuplex' Route
 route = root $ sum
   { "Home": noArgs
-  , "Schedule": "schedule" / noArgs
-  , "GroceryListRoute": groceryListRoute
+  , "SpaceRoute": spaceRoute
   }
 
 parseRouteFromPathAndQuery :: String -> Maybe Route
