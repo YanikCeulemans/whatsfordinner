@@ -14,4 +14,8 @@ dir = './generated-docs/html/'
 [env]
 _.path = './node_modules/.bin'
 
+[tools]
+node = "22.20.0"
+pitchfork = "latest"
+
 # vim: ts=2 sts=2 sw=2 et

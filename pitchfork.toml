@@ -1,0 +1,10 @@
+[daemons.parcel]
+run = "mise exec -- npx parcel index.html"
+auto = ["start", "stop"]
+
+[daemons.docs]
+run = "python3 -m http.server $PORT"
+port = 8000
+dir = "generated-docs/html"
+auto = ["start", "stop"]
+
