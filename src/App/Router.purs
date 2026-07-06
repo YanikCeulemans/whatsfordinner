@@ -10,6 +10,7 @@ import App.Home as Home
 import App.Schedule as Schedule
 import Capabilities.Navigation (class Navigation)
 import Capabilities.Resource.ManageGroceryList (class ManageGroceryList)
+import Capabilities.Resource.ManageMealSchedule (class ManageMealSchedule)
 import Capabilities.Resource.ManageSpaces (class ManageSpaces)
 import Data.Maybe (Maybe(..))
 import Data.Route (Route(..), SpaceInnerRoute(..))
@@ -50,6 +51,7 @@ component
    . MonadAff m
   => ManageGroceryList m
   => ManageSpaces m
+  => ManageMealSchedule m
   => Navigation m
   => H.Component Query Input output m
 component =

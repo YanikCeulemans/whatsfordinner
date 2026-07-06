@@ -2,11 +2,13 @@ module AppM (AppM, runAppM) where
 
 import Prelude
 
+import App.Data as Data
 import Capabilities.Navigation (class Navigation)
 import Capabilities.Resource.ManageGroceryList
   ( class ManageGroceryList
   , SortedGrocery
   )
+import Capabilities.Resource.ManageMealSchedule (class ManageMealSchedule)
 import Capabilities.Resource.ManageSpaces (class ManageSpaces)
 import Control.Monad.State (class MonadState)
 import Control.Monad.State as MonadState
@@ -290,4 +292,10 @@ instance ManageSpaces AppM where
               "01KNW48VB0PNCFC0KZ8SW289ZZ"
           }
       _ -> Nothing
+
+instance ManageMealSchedule AppM where
+  -- TODO: Implement
+  loadMealSchedule _id = do
+    liftAff $ Aff.delay $ convertDuration $ Seconds 2.0
+    pure $ Just Data.mealSchedule
 

@@ -4,10 +4,18 @@ import Prelude
 
 import App.Data as AData
 import App.Layout as Layout
+import App.RemoteData (RemoteData(..))
+import App.RemoteData as RemoteData
+import Capabilities.Resource.ManageMealSchedule
+  ( class ManageMealSchedule
+  , loadMealSchedule
+  )
+import Capabilities.Resource.ManageSpaces (class ManageSpaces, loadSpace)
 import Data.Array as Array
 import Data.Date (Date, Weekday(..))
 import Data.Date (adjust, weekday) as Date
 import Data.DateTime (DateTime(..))
+import Data.Either as Either
 import Data.Foldable (fold)
 import Data.Formatter.DateTime as Format
 import Data.Int as Int
@@ -15,14 +23,17 @@ import Data.List as List
 import Data.Maybe (Maybe(..))
 import Data.Maybe as Maybe
 import Data.Time.Duration (Days(..))
+import Data.Traversable (traverse)
 import Data.Tuple (Tuple)
 import Data.Tuple.Nested ((/\))
 import Data.Unfoldable (unfoldr)
+import Debug as Debug
 import Domain.MealSchedule (MealSchedule)
 import Domain.MealSchedule as MealSchedule
 import Domain.PlannedMeal (PlannedMeal(..))
 import Domain.Range (Range)
 import Domain.Range as Range
+import Domain.Space (Space)
 import Domain.SpaceId (SpaceId)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Now (nowDate)
@@ -42,7 +53,7 @@ type ScheduleState =
 
 type State =
   { spaceId :: SpaceId
-  , scheduleState :: Maybe ScheduleState
+  , scheduleState :: RemoteData String ScheduleState
   }
 
 data Action
@@ -132,8 +143,26 @@ viewScheduleEntry date (mealDate /\ plannedMeal) =
         PlannedMeal meal -> HH.span [] [ HH.text $ show meal ]
     ]
 
+loadMealSchedule'
+  :: forall m
+   . ManageMealSchedule m
+  => Maybe Space
+  -> m (RemoteData String MealSchedule)
+loadMealSchedule' foundSpace =
+  let
+    remoteFoundSpace = RemoteData.note "No such space exists" foundSpace
+    remoteFoundMealScheduleId = _.mealScheduleId <$> remoteFoundSpace
+  in
+    traverse loadMealSchedule remoteFoundMealScheduleId
+      <#> map (RemoteData.note "No such meal schedule exists")
+      <#> join
+
 component
-  :: forall query output m. MonadAff m => H.Component query Input output m
+  :: forall query output m
+   . MonadAff m
+  => ManageSpaces m
+  => ManageMealSchedule m
+  => H.Component query Input output m
 component =
   H.mkComponent
     { initialState
@@ -146,17 +175,21 @@ component =
   initialState :: Input -> State
   initialState spaceId =
     { spaceId
-    , scheduleState: Nothing
+    , scheduleState: NotRequested
     }
 
   handleAction
     :: forall slots. Action -> H.HalogenM State Action slots output m Unit
   handleAction = case _ of
     Initialize -> do
+      H.modify_ _ { scheduleState = Loading }
+      foundSpace <- loadSpace =<< H.gets _.spaceId
       now <- H.liftEffect nowDate
+      foundMealSchedule <- loadMealSchedule' foundSpace
+
       H.modify_ _
-        { scheduleState = Just
-            { date: now, now, mealSchedule: AData.mealSchedule }
+        { scheduleState =
+            { date: now, now, mealSchedule: _ } <$> foundMealSchedule
         }
 
     BackInTime -> do
@@ -169,8 +202,10 @@ component =
   render state =
     Layout.main' (Layout.defaultMainConfig { spaceId = Just state.spaceId }) $
       case state.scheduleState of
-        Nothing -> HH.p_ [ HH.text "loading" ]
-        Just initializedState ->
+        NotRequested -> HH.p_ [ HH.text "loading" ]
+        Loading -> HH.p_ [ HH.text "loading" ]
+        Error e -> HH.p_ [ HH.text e ]
+        Success initializedState ->
           HH.div [ HP.class_ $ H.ClassName "flex column spaced" ]
             [ HH.h1_ [ HH.text "Schedule" ]
             , HH.div
