@@ -77,3 +77,9 @@ note err = case _ of
   Nothing -> Error err
   Just x -> Success x
 
+toMaybe :: forall e a. RemoteData e a -> Maybe a
+toMaybe = case _ of
+  NotRequested -> Nothing
+  Loading -> Nothing
+  Error _e -> Nothing
+  Success a -> Just a

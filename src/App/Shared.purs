@@ -15,6 +15,8 @@ import Foreign.Object as FO
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Properties as HP
+import Partial.Unsafe (unsafeCrashWith)
+import Prim.TypeError (class Warn, Text)
 import Type.Row.Homogeneous (class Homogeneous)
 import Web.Event.Event (Event)
 import Web.Event.Event as E
@@ -24,6 +26,9 @@ import Web.HTML.Event.DragEvent as DragEvent
 import Web.HTML.HTMLInputElement as InputElement
 import Web.UIEvent.MouseEvent (MouseEvent)
 import Web.UIEvent.MouseEvent as MouseEvent
+
+todo :: forall a. Warn (Text "TODO left in the code") => String -> a
+todo s = unsafeCrashWith $ "TODO: " <> s
 
 link :: forall w i. Route -> Array (HH.HTML w i) -> HH.HTML w i
 link route content = HH.a [ HP.href $ Route.print route ] content

@@ -4,6 +4,8 @@ import Prelude
 
 import App.Data as Data
 import App.Layout as Layout
+import App.RemoteData (RemoteData(..))
+import App.RemoteData as RemoteData
 import App.Shared (preventDefault)
 import App.Shared as S
 import Capabilities.Resource.ManageGroceryList
@@ -13,6 +15,7 @@ import Capabilities.Resource.ManageGroceryList
   , upsertGrocery
   , upsertGroceryList
   )
+import Capabilities.Resource.ManageSpaces (class ManageSpaces, loadSpace)
 import Data.Array (fold, mapWithIndex)
 import Data.Array as Array
 import Data.Function (on)
@@ -29,6 +32,7 @@ import Domain.GroceryList (GroceryEntry, GroceryList)
 import Domain.GroceryList as GroceryList
 import Domain.GroceryListId (GroceryListId)
 import Domain.Id as Id
+import Domain.Space (Space)
 import Domain.SpaceId (SpaceId)
 import Effect.Aff as Aff
 import Effect.Aff.Class (class MonadAff)
@@ -73,13 +77,18 @@ type WebSocketState =
   , readyState :: ReadyState
   }
 
+type GroceryListState =
+  { groceryList :: GroceryList
+  , dragState :: DragState DragEntry
+  -- TODO: Isn't this derivable from DragState?
+  , allowDragging :: Boolean
+  , webSocketState :: Maybe WebSocketState
+  }
+
 type Input = SpaceId
 
 type State =
-  { groceryList :: GroceryList
-  , dragState :: DragState DragEntry
-  , allowDragging :: Boolean
-  , webSocketState :: Maybe WebSocketState
+  { groceryListState :: RemoteData String GroceryListState
   , spaceId :: SpaceId
   }
 
@@ -119,7 +128,7 @@ shiftEntry dos@{ source, target } entry =
   sourceIndex = GroceryList.entrySortIndex source.item
   targetIndex = GroceryList.entrySortIndex target.item
 
-endDrag :: State -> Tuple (Array GroceryEntry) State
+endDrag :: GroceryListState -> Tuple (Array GroceryEntry) GroceryListState
 endDrag state =
   case state.dragState of
     NotDragging -> [] /\ state
@@ -134,15 +143,15 @@ endDrag state =
         (shiftEntry dos)
         state.groceryList
 
-setGroceryEntry :: GroceryEntry -> State -> State
+setGroceryEntry :: GroceryEntry -> GroceryListState -> GroceryListState
 setGroceryEntry grocery s =
   s { groceryList = GroceryList.set grocery s.groceryList }
 
-clearCompleted :: State -> State
+clearCompleted :: GroceryListState -> GroceryListState
 clearCompleted state = state
   { groceryList = GroceryList.clearCompleted state.groceryList }
 
-uncheckCompleted :: State -> State
+uncheckCompleted :: GroceryListState -> GroceryListState
 uncheckCompleted state = state
   { groceryList = map GroceryList.uncheckEntry state.groceryList }
 
@@ -190,7 +199,7 @@ dragDirection dragEntry = case _ of
 groceryView
   :: forall m
    . MonadAff m
-  => State
+  => GroceryListState
   -> Tuple Int GroceryEntry
   -> H.ComponentHTML Action () m
 groceryView { dragState, allowDragging } (Tuple index grocery) =
@@ -255,7 +264,7 @@ groceryView { dragState, allowDragging } (Tuple index grocery) =
 groceriesView
   :: forall m
    . MonadAff m
-  => State
+  => GroceryListState
   -> H.ComponentHTML Action () m
 groceriesView state =
   HH.div_
@@ -314,26 +323,47 @@ subscribeToWebSocketEvent eventConfig buildAction ws =
   wsEventTarget = WS.toEventTarget ws
   handleEvent event = eventConfig.fromEvent event >>= buildAction
 
+-- TODO: This is too complex, simplify
 updateReadyState
   :: forall childSlots output m
    . MonadEffect m
   => H.HalogenM State Action childSlots output m Unit
 updateReadyState = do
   state <- H.get
-  readyState <- H.liftEffect $ traverse getReadyState state.webSocketState
+  let
+    webSocketState = _.webSocketState <$> state.groceryListState
+  readyState <- H.liftEffect $ traverse (traverse getReadyState) webSocketState
+  let
+    updatedSocketState = setReadyState' <$> readyState <*> webSocketState
   H.put $ state
-    { webSocketState =
-        setReadyState <$> readyState <*> state.webSocketState
+    { groceryListState = setWebSocketState <$> updatedSocketState <*>
+        state.groceryListState
     }
   where
   getReadyState { webSocket } = WS.readyState webSocket
   setReadyState readyState webSocketState = webSocketState
     { readyState = readyState }
+  setReadyState' readyState webSocketState =
+    setReadyState <$> readyState <*> webSocketState
+  setWebSocketState webSocketState groceryListState =
+    groceryListState { webSocketState = webSocketState }
+
+upsertGroceryList'
+  :: forall m
+   . ManageGroceryList m
+  => Maybe Space
+  -> m (RemoteData String GroceryList)
+upsertGroceryList' foundSpace =
+  foundSpace
+    # RemoteData.note "No such space exists"
+    # map _.groceryListId
+    # traverse upsertGroceryList
 
 component
   :: forall query output m
    . MonadAff m
   => ManageGroceryList m
+  => ManageSpaces m
   => H.Component query Input output m
 component =
   H.mkComponent
@@ -349,10 +379,7 @@ component =
   where
   initialState :: Input -> State
   initialState spaceId =
-    { groceryList: mempty
-    , dragState: NotDragging
-    , allowDragging: false
-    , webSocketState: Nothing
+    { groceryListState: NotRequested
     , spaceId
     }
 
@@ -362,12 +389,28 @@ component =
     -> H.HalogenM State Action childSlots output m Unit
   handleAction = case _ of
     Initialize -> do
-      groceryList <- upsertGroceryList Data.dummyListId
-      H.modify_ _ { groceryList = groceryList }
+      H.modify_ _ { groceryListState = Loading }
+      foundSpace <- loadSpace =<< H.gets _.spaceId
+      groceryList <- upsertGroceryList' foundSpace
+      H.modify_ _
+        { groceryListState =
+            { groceryList: _
+            , dragState: NotDragging
+            , allowDragging: false
+            , webSocketState: Nothing
+            } <$> groceryList
+        }
       handleAction ConnectWebSocket
 
     Finalize -> do
-      webSocket <- map _.webSocket <$> H.gets _.webSocketState
+      groceryListState <- H.gets _.groceryListState
+      let
+        webSocket =
+          groceryListState
+            # map _.webSocketState
+            # RemoteData.toMaybe
+            # join
+            # map _.webSocket
       H.liftEffect $ for_ webSocket $ WS.close WSTC.NoLongerInterested
 
     -- TODO: WebSocket to capability?
@@ -387,7 +430,8 @@ component =
         (WebSocketClosed >>> Just)
         ws
       readyState <- H.liftEffect $ WS.readyState ws
-      H.modify_ _ { webSocketState = Just { webSocket: ws, readyState } }
+      S.todo "update state"
+    -- H.modify_ _ { webSocketState = Just { webSocket: ws, readyState } }
 
     WebSocketOpened -> do
       Console.log "web socket opened"
@@ -402,50 +446,58 @@ component =
         handleAction ConnectWebSocket
 
     StartDrag dragEntry _dragEvent ->
-      H.modify_ $ _ { dragState = DraggingOverNonTarget dragEntry }
+      S.todo "startDrag"
+    -- H.modify_ $ _ { dragState = DraggingOverNonTarget dragEntry }
 
     OverDrag dragEntry dragEvent -> do
       preventDefault dragEvent
-      H.modify_ setDragOver
+      S.todo "overDrag"
+      -- H.modify_ setDragOver
       where
       setDragOver state = state
         { dragState = dragOverTarget dragEntry state.dragState }
 
     EndDrag _dragEvent -> do
-      state <- H.get
-      let
-        modifiedGroceries /\ newState = endDrag state
+      S.todo "endDrag"
+    -- state <- H.get
+    -- let
+    --   modifiedGroceries /\ newState = endDrag state
+    --
+    -- H.put $ newState { allowDragging = false }
+    -- void $ updateGroceries Data.dummyListId $ syncWith modifiedGroceries
 
-      H.put $ newState { allowDragging = false }
-      void $ updateGroceries Data.dummyListId $ syncWith modifiedGroceries
-
-      where
-      syncWith modifiedGroceries grocery =
-        Array.find (eq grocery) modifiedGroceries
-          # Maybe.fromMaybe grocery
+    -- where
+    -- syncWith modifiedGroceries grocery =
+    --   Array.find (eq grocery) modifiedGroceries
+    --     # Maybe.fromMaybe grocery
 
     ToggleGrocery grocery mouseEvent -> do
       preventDefault mouseEvent
-      H.modify_ $ setGroceryEntry toggledGrocery
-      upsertGrocery Data.dummyListId toggledGrocery
+      S.todo "toggle grocery"
+      -- H.modify_ $ setGroceryEntry toggledGrocery
+      -- upsertGrocery Data.dummyListId toggledGrocery
       where
       toggledGrocery = GroceryList.toggleEntryChecked grocery
 
     ClearCompleted -> do
-      completed <- H.gets getCheckedGroceries
-      H.modify_ clearCompleted
-      void $ deleteGroceries Data.dummyListId completed
+      S.todo "clear completed"
+      -- completed <- H.gets getCheckedGroceries
+      -- H.modify_ clearCompleted
+      -- void $ deleteGroceries Data.dummyListId completed
       where
       getCheckedGroceries s =
         GroceryList.partitionGroceriesOnChecked s.groceryList
           # _.checked
 
     UncheckCompleted -> do
-      H.modify_ uncheckCompleted
-      void $ updateGroceries Data.dummyListId GroceryList.uncheckEntry
+      S.todo "uncheck completed"
+    -- completed <- H.gets getCheckedGroceries
+    -- H.modify_ uncheckCompleted
+    -- void $ updateGroceries Data.dummyListId GroceryList.uncheckEntry
 
     HandleMouseDown ->
-      H.modify_ _ { allowDragging = true }
+      S.todo "handle mouse down"
+    -- H.modify_ _ { allowDragging = true }
 
     MessageReceived event ->
       Console.log $ fold [ "msg received: ", event.data ]
@@ -465,9 +517,7 @@ component =
                     [ S.classes'
                         { "live-status": true
                         , "pico-background-lime-100": isLive
-                            state.webSocketState
-                        , "pico-background-pink-450": (not <<< isLive)
-                            state.webSocketState
+                        , "pico-background-pink-450": not isLive
                         }
                     ]
                     []
@@ -489,13 +539,19 @@ component =
                     [ HH.text "Add" ]
                 ]
             ]
-        , case state.groceryList of
-            [] -> HH.text "No groceries have been added yet"
-            _ -> groceriesView state
+        , case state.groceryListState of
+            NotRequested -> HH.text "Loading"
+            Loading -> HH.text "Loading"
+            Error e -> HH.text e
+            Success { groceryList: [] } -> HH.text
+              "No groceries have been added yet"
+            Success groceryListState -> groceriesView groceryListState
         ]
     where
-    isLive ws =
-      ws
+    isLive =
+      state.groceryListState
+        # RemoteData.toMaybe
+        >>= _.webSocketState
         <#> _.readyState
         <#> case _ of
           Open -> true
