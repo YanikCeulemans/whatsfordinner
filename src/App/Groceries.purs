@@ -19,6 +19,10 @@ import Capabilities.Resource.ManageSpaces (class ManageSpaces, loadSpace)
 import Data.Array (fold, mapWithIndex)
 import Data.Array as Array
 import Data.Function (on)
+import Data.Lens (_Just)
+import Data.Lens as Lens
+import Data.Lens.AffineTraversal as LensA
+import Data.Lens.Record as LensRecord
 import Data.Maybe (Maybe(..))
 import Data.Maybe as Maybe
 import Data.Route (Route(..), SpaceInnerRoute(..))
@@ -49,6 +53,7 @@ import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Query.Event as HQE
+import Type.Prelude (Proxy(..))
 import Web.HTML.Event.DragEvent (DragEvent)
 import Web.UIEvent.MouseEvent (MouseEvent)
 
@@ -91,6 +96,20 @@ type State =
   { groceryListState :: RemoteData String GroceryListState
   , spaceId :: SpaceId
   }
+
+_groceryListState :: Lens.Lens' State (RemoteData String GroceryListState)
+_groceryListState = LensRecord.prop (Proxy :: Proxy "groceryListState")
+
+_webSocketState :: Lens.Lens' GroceryListState (Maybe WebSocketState)
+_webSocketState = LensRecord.prop (Proxy :: Proxy "webSocketState")
+
+_readyState :: Lens.Lens' WebSocketState ReadyState
+_readyState = LensRecord.prop (Proxy :: Proxy "readyState")
+
+_readyStateS :: LensA.AffineTraversal' State ReadyState
+_readyStateS =
+  _groceryListState <<< RemoteData._Success <<< _webSocketState <<< _Just <<<
+    _readyState
 
 {--
 direction == nothing: untouched
@@ -433,9 +452,7 @@ component =
         (WebSocketClosed groceryListId >>> Just)
         ws
       readyState <- H.liftEffect $ WS.readyState ws
-      void ?h
-      S.todo "update state"
-    -- H.modify_ _ { webSocketState = Just { webSocket: ws, readyState } }
+      Lens.assign _readyStateS readyState
 
     WebSocketOpened -> do
       Console.log "web socket opened"

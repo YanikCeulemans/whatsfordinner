@@ -3,6 +3,8 @@ module App.RemoteData where
 import Prelude
 
 import Data.Foldable (class Foldable)
+import Data.Lens (Prism')
+import Data.Lens.Prism as Prism
 import Data.Maybe (Maybe(..))
 import Data.Traversable (class Traversable)
 
@@ -83,3 +85,6 @@ toMaybe = case _ of
   Loading -> Nothing
   Error _e -> Nothing
   Success a -> Just a
+
+_Success :: forall e a. Prism' (RemoteData e a) a
+_Success = Prism.prism' Success toMaybe
