@@ -7,6 +7,9 @@ run = 'spago bundle --platform browser --bundle-type app --minify'
 [tasks.serve]
 run = 'parcel index.html'
 
+[tasks.docs]
+run = 'spago docs'
+
 [tasks.docs_serve]
 run = 'python -m http.server 8080'
 dir = './generated-docs/html/'
