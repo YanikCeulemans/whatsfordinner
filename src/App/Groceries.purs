@@ -23,7 +23,7 @@ import Data.Maybe (Maybe(..))
 import Data.Maybe as Maybe
 import Data.Route (Route(..), SpaceInnerRoute(..))
 import Data.Time.Duration (Seconds(..), convertDuration)
-import Data.Traversable (for_, traverse)
+import Data.Traversable (for_, traverse, traverse_)
 import Data.Tuple (Tuple(..))
 import Data.Tuple as Tuple
 import Data.Tuple.Nested ((/\))
@@ -158,7 +158,7 @@ uncheckCompleted state = state
 data Action
   = Initialize
   | Finalize
-  | ConnectWebSocket
+  | ConnectWebSocket GroceryListId
   | ToggleGrocery GroceryEntry MouseEvent
   | StartDrag DragEntry DragEvent
   | OverDrag DragEntry DragEvent
@@ -168,7 +168,7 @@ data Action
   | HandleMouseDown
   | MessageReceived MessageEvent
   | WebSocketOpened
-  | WebSocketClosed CloseEvent
+  | WebSocketClosed GroceryListId CloseEvent
 
 printAmount :: Amount -> String
 printAmount = case _ of
@@ -392,15 +392,18 @@ component =
       H.modify_ _ { groceryListState = Loading }
       foundSpace <- loadSpace =<< H.gets _.spaceId
       groceryList <- upsertGroceryList' foundSpace
+      let
+        groceryListState =
+          { groceryList: _
+          , dragState: NotDragging
+          , allowDragging: false
+          , webSocketState: Nothing
+          } <$> groceryList
       H.modify_ _
-        { groceryListState =
-            { groceryList: _
-            , dragState: NotDragging
-            , allowDragging: false
-            , webSocketState: Nothing
-            } <$> groceryList
+        { groceryListState = groceryListState
         }
-      handleAction ConnectWebSocket
+      traverse_ (handleAction <<< ConnectWebSocket) $ _.groceryListId <$>
+        foundSpace
 
     Finalize -> do
       groceryListState <- H.gets _.groceryListState
@@ -414,9 +417,9 @@ component =
       H.liftEffect $ for_ webSocket $ WS.close WSTC.NoLongerInterested
 
     -- TODO: WebSocket to capability?
-    ConnectWebSocket -> do
+    ConnectWebSocket groceryListId -> do
       -- TODO: handle socket error event, try to reconnect?
-      ws <- connectWebSocket Data.dummyListId
+      ws <- connectWebSocket groceryListId
       subscribeToWebSocketEvent
         WS.eventConfigs.open
         (const WebSocketOpened >>> Just)
@@ -427,9 +430,10 @@ component =
         ws
       subscribeToWebSocketEvent
         WS.eventConfigs.close
-        (WebSocketClosed >>> Just)
+        (WebSocketClosed groceryListId >>> Just)
         ws
       readyState <- H.liftEffect $ WS.readyState ws
+      void ?h
       S.todo "update state"
     -- H.modify_ _ { webSocketState = Just { webSocket: ws, readyState } }
 
@@ -437,13 +441,13 @@ component =
       Console.log "web socket opened"
       updateReadyState
 
-    WebSocketClosed closeEvent -> do
+    WebSocketClosed groceryListId closeEvent -> do
       Console.logShow { msg: "web socket closed", closeEvent }
       updateReadyState
       unless (isNoLongerInterested closeEvent) do
         Console.log "retrying web socket connection"
         H.liftAff $ Aff.delay $ convertDuration $ Seconds 5.0
-        handleAction ConnectWebSocket
+        handleAction $ ConnectWebSocket groceryListId
 
     StartDrag dragEntry _dragEvent ->
       S.todo "startDrag"
