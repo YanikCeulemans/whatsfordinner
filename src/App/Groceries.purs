@@ -19,15 +19,16 @@ import Capabilities.Resource.ManageSpaces (class ManageSpaces, loadSpace)
 import Data.Array (fold, mapWithIndex)
 import Data.Array as Array
 import Data.Function (on)
-import Data.Lens (_Just)
+import Data.Lens (Lens', _Just)
 import Data.Lens as Lens
+import Data.Lens.AffineTraversal (AffineTraversal')
 import Data.Lens.AffineTraversal as LensA
 import Data.Lens.Record as LensRecord
 import Data.Maybe (Maybe(..))
 import Data.Maybe as Maybe
 import Data.Route (Route(..), SpaceInnerRoute(..))
 import Data.Time.Duration (Seconds(..), convertDuration)
-import Data.Traversable (for_, traverse, traverse_)
+import Data.Traversable (for_, sequence, sequence_, traverse, traverse_)
 import Data.Tuple (Tuple(..))
 import Data.Tuple as Tuple
 import Data.Tuple.Nested ((/\))
@@ -84,6 +85,7 @@ type WebSocketState =
 
 type GroceryListState =
   { groceryList :: GroceryList
+  , groceryListId :: GroceryListId
   , dragState :: DragState DragEntry
   -- TODO: Isn't this derivable from DragState?
   , allowDragging :: Boolean
@@ -110,6 +112,34 @@ _readyStateS :: LensA.AffineTraversal' State ReadyState
 _readyStateS =
   _groceryListState <<< RemoteData._Success <<< _webSocketState <<< _Just <<<
     _readyState
+
+_dragState :: Lens' GroceryListState (DragState DragEntry)
+_dragState = LensRecord.prop (Proxy :: Proxy "dragState")
+
+_allowDragging :: Lens' GroceryListState Boolean
+_allowDragging = LensRecord.prop (Proxy :: Proxy "allowDragging")
+
+_allowDraggingS :: AffineTraversal' State Boolean
+_allowDraggingS =
+  _groceryListState <<< RemoteData._Success <<< _allowDragging
+
+_dragStateS :: AffineTraversal' State (DragState DragEntry)
+_dragStateS =
+  _groceryListState <<< RemoteData._Success <<< _dragState
+
+_groceryList :: Lens' GroceryListState GroceryList
+_groceryList = LensRecord.prop (Proxy :: Proxy "groceryList")
+
+_groceryListS :: AffineTraversal' State GroceryList
+_groceryListS =
+  _groceryListState <<< RemoteData._Success <<< _groceryList
+
+_groceryListId :: Lens' GroceryListState GroceryListId
+_groceryListId = LensRecord.prop (Proxy :: Proxy "groceryListId")
+
+_groceryListIdS :: AffineTraversal' State GroceryListId
+_groceryListIdS =
+  _groceryListState <<< RemoteData._Success <<< _groceryListId
 
 {--
 direction == nothing: untouched
@@ -162,17 +192,15 @@ endDrag state =
         (shiftEntry dos)
         state.groceryList
 
-setGroceryEntry :: GroceryEntry -> GroceryListState -> GroceryListState
-setGroceryEntry grocery s =
-  s { groceryList = GroceryList.set grocery s.groceryList }
+getCheckedGroceries :: State -> Maybe (Array GroceryEntry)
+getCheckedGroceries s =
+  Lens.preview _groceryListS s
+    # map GroceryList.partitionGroceriesOnChecked
+    # map _.checked
 
 clearCompleted :: GroceryListState -> GroceryListState
 clearCompleted state = state
   { groceryList = GroceryList.clearCompleted state.groceryList }
-
-uncheckCompleted :: GroceryListState -> GroceryListState
-uncheckCompleted state = state
-  { groceryList = map GroceryList.uncheckEntry state.groceryList }
 
 data Action
   = Initialize
@@ -370,13 +398,15 @@ updateReadyState = do
 upsertGroceryList'
   :: forall m
    . ManageGroceryList m
-  => Maybe Space
-  -> m (RemoteData String GroceryList)
-upsertGroceryList' foundSpace =
-  foundSpace
+  => Maybe GroceryListId
+  -> m (RemoteData String (Tuple GroceryListId GroceryList))
+upsertGroceryList' foundSpaceGroceryListId =
+  foundSpaceGroceryListId
     # RemoteData.note "No such space exists"
-    # map _.groceryListId
-    # traverse upsertGroceryList
+    # traverse go
+  where
+  go groceryListId =
+    Tuple groceryListId <$> upsertGroceryList groceryListId
 
 component
   :: forall query output m
@@ -409,20 +439,19 @@ component =
   handleAction = case _ of
     Initialize -> do
       H.modify_ _ { groceryListState = Loading }
-      foundSpace <- loadSpace =<< H.gets _.spaceId
-      groceryList <- upsertGroceryList' foundSpace
-      let
-        groceryListState =
-          { groceryList: _
-          , dragState: NotDragging
-          , allowDragging: false
-          , webSocketState: Nothing
-          } <$> groceryList
-      H.modify_ _
-        { groceryListState = groceryListState
+      foundSpaceGroceryListId <- map _.groceryListId <$>
+        (loadSpace =<< H.gets _.spaceId)
+      groceryList <- upsertGroceryList' foundSpaceGroceryListId
+      H.modify_ _ { groceryListState = buildGroceryListState <$> groceryList }
+      for_ foundSpaceGroceryListId $ handleAction <<< ConnectWebSocket
+      where
+      buildGroceryListState (Tuple groceryListId groceryList) =
+        { groceryList
+        , groceryListId
+        , dragState: NotDragging
+        , allowDragging: false
+        , webSocketState: Nothing
         }
-      traverse_ (handleAction <<< ConnectWebSocket) $ _.groceryListId <$>
-        foundSpace
 
     Finalize -> do
       groceryListState <- H.gets _.groceryListState
@@ -467,26 +496,31 @@ component =
         handleAction $ ConnectWebSocket groceryListId
 
     StartDrag dragEntry _dragEvent ->
-      S.todo "startDrag"
-    -- H.modify_ $ _ { dragState = DraggingOverNonTarget dragEntry }
+      Lens.assign _dragStateS $ DraggingOverNonTarget dragEntry
 
     OverDrag dragEntry dragEvent -> do
       preventDefault dragEvent
-      S.todo "overDrag"
-      -- H.modify_ setDragOver
-      where
-      setDragOver state = state
-        { dragState = dragOverTarget dragEntry state.dragState }
+      Lens.modifying _dragStateS $ dragOverTarget dragEntry
 
     EndDrag _dragEvent -> do
-      S.todo "endDrag"
-    -- state <- H.get
-    -- let
-    --   modifiedGroceries /\ newState = endDrag state
-    --
-    -- H.put $ newState { allowDragging = false }
-    -- void $ updateGroceries Data.dummyListId $ syncWith modifiedGroceries
+      void $ S.todo "endDrag"
+      state <- Lens.use _groceryListState
+      groceryListId <- H.gets $ Lens.preview _groceryListIdS
+      let
+        endDragResult = endDrag <$> state
+      -- let
+      --   modifiedGroceries /\ newState = endDrag state
+      --
+      -- H.put $ newState { allowDragging = false }
+      -- TODO: This requires the newState as well
+      Lens.assign _allowDraggingS false
+      sequence_ (updateGroceries <$> groceryListId <*> ?syncWith endDragResult)
+      -- void $ updateGroceries Data.dummyListId $ syncWith modifiedGroceries
 
+      where
+      syncWith endDragResult =
+        endDragResult
+          # RemoteData.toMaybe
     -- where
     -- syncWith modifiedGroceries grocery =
     --   Array.find (eq grocery) modifiedGroceries
@@ -494,31 +528,28 @@ component =
 
     ToggleGrocery grocery mouseEvent -> do
       preventDefault mouseEvent
-      S.todo "toggle grocery"
-      -- H.modify_ $ setGroceryEntry toggledGrocery
-      -- upsertGrocery Data.dummyListId toggledGrocery
+      Lens.modifying _groceryListS $ GroceryList.set toggledGrocery
+      groceryListId <- H.gets $ Lens.preview _groceryListIdS
+      for_ groceryListId $ upsertGrocery' toggledGrocery
       where
       toggledGrocery = GroceryList.toggleEntryChecked grocery
+      upsertGrocery' a b = upsertGrocery b a
 
     ClearCompleted -> do
-      S.todo "clear completed"
-      -- completed <- H.gets getCheckedGroceries
-      -- H.modify_ clearCompleted
-      -- void $ deleteGroceries Data.dummyListId completed
-      where
-      getCheckedGroceries s =
-        GroceryList.partitionGroceriesOnChecked s.groceryList
-          # _.checked
+      void $ S.todo "clear completed"
+      completed <- H.gets getCheckedGroceries
+      Lens.modifying _groceryListS GroceryList.clearCompleted
+      groceryListId <- H.gets $ Lens.preview _groceryListIdS
+      sequence_ (deleteGroceries <$> groceryListId <*> completed)
 
     UncheckCompleted -> do
-      S.todo "uncheck completed"
-    -- completed <- H.gets getCheckedGroceries
-    -- H.modify_ uncheckCompleted
-    -- void $ updateGroceries Data.dummyListId GroceryList.uncheckEntry
+      Lens.modifying _groceryListS $ map GroceryList.uncheckEntry
+      groceryListId <- H.gets $ Lens.preview _groceryListIdS
+      sequence_
+        (updateGroceries <$> groceryListId <*> pure GroceryList.uncheckEntry)
 
     HandleMouseDown ->
-      S.todo "handle mouse down"
-    -- H.modify_ _ { allowDragging = true }
+      Lens.assign _allowDraggingS true
 
     MessageReceived event ->
       Console.log $ fold [ "msg received: ", event.data ]
