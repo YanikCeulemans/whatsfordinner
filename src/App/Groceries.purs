@@ -24,7 +24,7 @@ import Data.Lens.AffineTraversal (AffineTraversal')
 import Data.Lens.Record as LensRecord
 import Data.Maybe (Maybe(..))
 import Data.Maybe as Maybe
-import Data.Route (Route(..), SpaceInnerRoute(..))
+import Data.Route (GroceriesRoute(..), Route(..), SpaceRoute(..))
 import Data.Time.Duration (Seconds(..), convertDuration)
 import Data.Traversable (for_, sequence_, traverse)
 import Data.Tuple (Tuple(..))
@@ -563,22 +563,8 @@ component =
                     ]
                     []
                 ]
-            , HH.div [ HP.class_ $ H.ClassName "flex spaced" ]
-                [ S.link
-                    ( SpaceRoute
-                        { spaceId: state.spaceId
-                        , route: GroceriesGenerate
-                        }
-                    )
-                    [ HH.text "Generate" ]
-                , S.link
-                    ( SpaceRoute
-                        { spaceId: state.spaceId
-                        , route: AddGrocery
-                        }
-                    )
-                    [ HH.text "Add" ]
-                ]
+            , HH.div [ HP.class_ $ H.ClassName "flex spaced" ] $ groceryLinks
+                (Lens.preview _groceryListIdS state)
             ]
         , case state.groceryListState of
             NotRequested -> HH.text "Loading"
@@ -589,6 +575,19 @@ component =
             Success groceryListState -> groceriesView groceryListState
         ]
     where
+    groceryLinks = case _ of
+      Nothing -> []
+      Just groceryListId ->
+        [ S.link
+            ( SpaceRoute state.spaceId $ GroceriesRoute groceryListId
+                GroceriesGenerate
+            )
+            [ HH.text "Generate" ]
+        , S.link
+            ( SpaceRoute state.spaceId $ GroceriesRoute groceryListId AddGrocery
+            )
+            [ HH.text "Add" ]
+        ]
     isLive =
       Lens.preview _readyStateS state
         <#> case _ of

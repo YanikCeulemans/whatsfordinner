@@ -13,7 +13,7 @@ import Capabilities.Resource.ManageGroceryList (class ManageGroceryList)
 import Capabilities.Resource.ManageMealSchedule (class ManageMealSchedule)
 import Capabilities.Resource.ManageSpaces (class ManageSpaces)
 import Data.Maybe (Maybe(..))
-import Data.Route (Route(..), SpaceInnerRoute(..))
+import Data.Route (GroceriesRoute(..), Route(..), SpaceRoute(..))
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class.Console as Console
 import Halogen as H
@@ -72,16 +72,24 @@ component =
   render { route } =
     case route of
       Just Home -> HH.slot _home 0 Home.component unit HandleHome
-      Just
-        (SpaceRoute { spaceId, route: innerRoute }) ->
+
+      Just (SpaceRoute spaceId innerRoute) ->
         case innerRoute of
           Schedule -> HH.slot_ _schedule 0 Schedule.component spaceId
+
           Groceries -> HH.slot_ _groceries 0 Groceries.component spaceId
-          GroceriesGenerate ->
-            HH.slot_ _generateGroceries 0 GenerateGroceries.component
-              spaceId
-          AddGrocery -> HH.slot_ _addGrocery 0 AddGrocery.component
-            spaceId
+
+          GroceriesRoute groceryListId GroceriesGenerate ->
+            HH.slot_ _generateGroceries 0 GenerateGroceries.component spaceId
+          -- { spaceId, routes: { cancel, submit } }
+
+          GroceriesRoute groceryListId AddGrocery ->
+            HH.slot_ _addGrocery 0 AddGrocery.component
+              { groceryListId, routes: { cancel, submit } }
+            where
+            cancel = SpaceRoute spaceId Groceries
+            submit = SpaceRoute spaceId Groceries
+
       Nothing -> HH.h1_ [ HH.text "Not found" ]
 
   handleAction

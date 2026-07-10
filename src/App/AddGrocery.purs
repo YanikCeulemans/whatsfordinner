@@ -21,6 +21,7 @@ import Data.Array as Array
 import Data.Maybe (Maybe(..))
 import Data.Maybe as Maybe
 import Data.Number as Number
+import Data.Route (Route)
 import Data.Route as Route
 import Data.String as String
 import Data.String.NonEmpty as NES
@@ -29,6 +30,7 @@ import Data.Tuple as Tuple
 import Domain.Amount as Amount
 import Domain.GroceryList (GroceryEntry, GroceryList)
 import Domain.GroceryList as GroceryList
+import Domain.GroceryListId (GroceryListId)
 import Domain.Id as Id
 import Domain.SpaceId (SpaceId)
 import Effect.Aff (Milliseconds(..), delay)
@@ -99,10 +101,17 @@ type State =
   , grocerySuggestions :: RemoteData' (Array SortedGrocery)
   , groceryList :: Maybe GroceryList
   , suggestionDebounceForkId :: Maybe H.ForkId
-  , spaceId :: SpaceId
+  , groceryListId :: GroceryListId
+  , routes ::
+      { cancel :: Route
+      , submit :: Route
+      }
   }
 
-type Input = SpaceId
+type Input =
+  { groceryListId :: GroceryListId
+  , routes :: { cancel :: Route, submit :: Route }
+  }
 
 updateForm :: (FormState -> FormState) -> State -> State
 updateForm f state = state { form = f state.form }
@@ -171,7 +180,7 @@ component =
 
   where
   initialState :: Input -> State
-  initialState spaceId =
+  initialState { groceryListId, routes } =
     { id: Nothing
     , form: pristineFormState
     , suggestionSortIndex: Nothing
@@ -179,7 +188,8 @@ component =
     , grocerySuggestions: NotRequested
     , groceryList: Nothing
     , suggestionDebounceForkId: Nothing
-    , spaceId
+    , groceryListId
+    , routes
     }
 
   handleAction :: Action -> H.HalogenM State Action () output m Unit
@@ -241,25 +251,18 @@ component =
       H.modify_ _ { remoteData = Loading }
       for_ groceryCandidate upsertGroceryForDummyList
       H.modify_ _ { remoteData = Success unit }
-      spaceId <- H.gets _.spaceId
-      navigate $
-        ( Route.SpaceRoute
-            { spaceId, route: Route.Groceries }
-        )
+      routes <- H.gets _.routes
+      navigate routes.submit
       where
       upsertGroceryForDummyList = upsertGrocery Data.dummyListId
 
   render :: State -> H.ComponentHTML Action () m
-  render { form, remoteData, grocerySuggestions, spaceId } =
+  render { form, remoteData, grocerySuggestions, routes } =
     Layout.main $
       HH.div [ HP.class_ $ H.ClassName "flex column" ]
         [ HH.div [ HP.class_ $ H.ClassName "flex justify-space-between" ]
             [ HH.h1_ [ HH.text "Add grocery" ]
-            , S.link
-                ( Route.SpaceRoute
-                    { spaceId, route: Route.Groceries }
-                )
-                [ HH.text "Cancel" ]
+            , S.link routes.cancel [ HH.text "Cancel" ]
             ]
         , HH.form [ HE.onSubmit SubmitForm ]
             [ HH.label_

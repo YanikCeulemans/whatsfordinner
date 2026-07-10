@@ -37,14 +37,10 @@ main' config view =
                 ]
                 [ Shared.link Route.Home [ HH.text "Home" ]
                 , Shared.link
-                    (Route.SpaceRoute { spaceId, route: Route.Schedule })
+                    (Route.SpaceRoute spaceId Route.Schedule)
                     [ HH.text "Schedule" ]
                 , Shared.link
-                    ( Route.SpaceRoute
-                        { spaceId: spaceId
-                        , route: Route.Groceries
-                        }
-                    )
+                    (Route.SpaceRoute spaceId Route.Groceries)
                     [ HH.text "Groceries" ]
                 ]
             ]

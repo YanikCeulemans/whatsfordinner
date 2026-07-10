@@ -31,7 +31,7 @@ import Data.List as List
 import Data.List.NonEmpty as NEL
 import Data.Maybe (Maybe(..))
 import Data.Maybe as Maybe
-import Data.Route (SpaceInnerRoute(..))
+import Data.Route (SpaceRoute(..))
 import Data.Route as Route
 import Data.String as String
 import Data.Time.Duration (Days(..))
@@ -271,8 +271,7 @@ component =
           void $ upsertGroceries Data.dummyListId groceries
           H.modify_ _ { loading = false }
           spaceId <- H.gets _.spaceId
-          navigate $ Route.SpaceRoute
-            { spaceId, route: Groceries }
+          navigate $ Route.SpaceRoute spaceId Groceries
           where
           ingredients =
             MealSchedule.toList dateRange Data.mealSchedule
@@ -297,9 +296,7 @@ component =
             [ HH.h1_ [ HH.text "Generate groceries" ]
             , HH.div [ HP.class_ $ H.ClassName "flex spaced" ]
                 [ S.link
-                    ( Route.SpaceRoute
-                        { spaceId, route: Groceries }
-                    )
+                    (Route.SpaceRoute spaceId Groceries)
                     [ HH.text "Cancel" ]
                 ]
             ]

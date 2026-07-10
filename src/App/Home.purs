@@ -118,7 +118,7 @@ spaceView space =
         ]
         [ HH.span [ HP.class_ $ H.ClassName "select-description" ]
             [ S.link
-                (Route.SpaceRoute { spaceId: space.id, route: Route.Schedule })
+                (Route.SpaceRoute space.id Route.Schedule)
                 [ HH.text $ NonEmptyString.toString space.name ]
             ]
         ]
