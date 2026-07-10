@@ -2,7 +2,6 @@ module App.Groceries where
 
 import Prelude
 
-import App.Data as Data
 import App.Layout as Layout
 import App.RemoteData (RemoteData(..))
 import App.RemoteData as RemoteData
@@ -22,13 +21,12 @@ import Data.Function (on)
 import Data.Lens (Lens', _Just)
 import Data.Lens as Lens
 import Data.Lens.AffineTraversal (AffineTraversal')
-import Data.Lens.AffineTraversal as LensA
 import Data.Lens.Record as LensRecord
 import Data.Maybe (Maybe(..))
 import Data.Maybe as Maybe
 import Data.Route (Route(..), SpaceInnerRoute(..))
 import Data.Time.Duration (Seconds(..), convertDuration)
-import Data.Traversable (for_, sequence, sequence_, traverse, traverse_)
+import Data.Traversable (for_, sequence_, traverse)
 import Data.Tuple (Tuple(..))
 import Data.Tuple as Tuple
 import Data.Tuple.Nested ((/\))
@@ -37,7 +35,6 @@ import Domain.GroceryList (GroceryEntry, GroceryList)
 import Domain.GroceryList as GroceryList
 import Domain.GroceryListId (GroceryListId)
 import Domain.Id as Id
-import Domain.Space (Space)
 import Domain.SpaceId (SpaceId)
 import Effect.Aff as Aff
 import Effect.Aff.Class (class MonadAff)
@@ -99,19 +96,40 @@ type State =
   , spaceId :: SpaceId
   }
 
-_groceryListState :: Lens.Lens' State (RemoteData String GroceryListState)
+_groceryListState :: Lens' State (RemoteData String GroceryListState)
 _groceryListState = LensRecord.prop (Proxy :: Proxy "groceryListState")
 
-_webSocketState :: Lens.Lens' GroceryListState (Maybe WebSocketState)
+_groceryListStateS :: AffineTraversal' State GroceryListState
+_groceryListStateS = _groceryListState <<< RemoteData._Success
+
+_webSocketState :: Lens' GroceryListState (Maybe WebSocketState)
 _webSocketState = LensRecord.prop (Proxy :: Proxy "webSocketState")
 
-_readyState :: Lens.Lens' WebSocketState ReadyState
+_webSocketStateS :: AffineTraversal' State (Maybe WebSocketState)
+_webSocketStateS = _groceryListStateS <<< _webSocketState
+
+_webSocket :: Lens' WebSocketState WebSocket
+_webSocket = LensRecord.prop (Proxy :: Proxy "webSocket")
+
+_webSocketS :: AffineTraversal' State WebSocket
+_webSocketS =
+  _groceryListState
+    <<< RemoteData._Success
+    <<< _webSocketState
+    <<< _Just
+    <<< _webSocket
+
+_readyState :: Lens' WebSocketState ReadyState
 _readyState = LensRecord.prop (Proxy :: Proxy "readyState")
 
-_readyStateS :: LensA.AffineTraversal' State ReadyState
+_readyStateS :: AffineTraversal' State ReadyState
 _readyStateS =
-  _groceryListState <<< RemoteData._Success <<< _webSocketState <<< _Just <<<
-    _readyState
+  _groceryListState
+    <<< RemoteData._Success
+    <<< _webSocketState
+    <<< _Just
+    <<<
+      _readyState
 
 _dragState :: Lens' GroceryListState (DragState DragEntry)
 _dragState = LensRecord.prop (Proxy :: Proxy "dragState")
@@ -370,30 +388,15 @@ subscribeToWebSocketEvent eventConfig buildAction ws =
   wsEventTarget = WS.toEventTarget ws
   handleEvent event = eventConfig.fromEvent event >>= buildAction
 
--- TODO: This is too complex, simplify
 updateReadyState
   :: forall childSlots output m
    . MonadEffect m
   => H.HalogenM State Action childSlots output m Unit
 updateReadyState = do
-  state <- H.get
-  let
-    webSocketState = _.webSocketState <$> state.groceryListState
-  readyState <- H.liftEffect $ traverse (traverse getReadyState) webSocketState
-  let
-    updatedSocketState = setReadyState' <$> readyState <*> webSocketState
-  H.put $ state
-    { groceryListState = setWebSocketState <$> updatedSocketState <*>
-        state.groceryListState
-    }
-  where
-  getReadyState { webSocket } = WS.readyState webSocket
-  setReadyState readyState webSocketState = webSocketState
-    { readyState = readyState }
-  setReadyState' readyState webSocketState =
-    setReadyState <$> readyState <*> webSocketState
-  setWebSocketState webSocketState groceryListState =
-    groceryListState { webSocketState = webSocketState }
+  webSocket <- H.gets $ Lens.preview _webSocketS
+  for_ webSocket \ws -> do
+    readyState <- H.liftEffect $ WS.readyState ws
+    Lens.assign _readyStateS readyState
 
 upsertGroceryList'
   :: forall m
@@ -480,8 +483,9 @@ component =
         WS.eventConfigs.close
         (WebSocketClosed groceryListId >>> Just)
         ws
+
       readyState <- H.liftEffect $ WS.readyState ws
-      Lens.assign _readyStateS readyState
+      Lens.assignJust _webSocketStateS { webSocket: ws, readyState }
 
     WebSocketOpened -> do
       Console.log "web socket opened"
@@ -503,28 +507,16 @@ component =
       Lens.modifying _dragStateS $ dragOverTarget dragEntry
 
     EndDrag _dragEvent -> do
-      void $ S.todo "endDrag"
       state <- Lens.use _groceryListState
-      groceryListId <- H.gets $ Lens.preview _groceryListIdS
-      let
-        endDragResult = endDrag <$> state
-      -- let
-      --   modifiedGroceries /\ newState = endDrag state
-      --
-      -- H.put $ newState { allowDragging = false }
-      -- TODO: This requires the newState as well
-      Lens.assign _allowDraggingS false
-      sequence_ (updateGroceries <$> groceryListId <*> ?syncWith endDragResult)
-      -- void $ updateGroceries Data.dummyListId $ syncWith modifiedGroceries
-
+      for_ state \s@{ groceryListId } -> do
+        let
+          modifiedGroceries /\ newState = endDrag s
+        Lens.assign _groceryListStateS $ newState { allowDragging = false }
+        void $ updateGroceries groceryListId $ syncWith modifiedGroceries
       where
-      syncWith endDragResult =
-        endDragResult
-          # RemoteData.toMaybe
-    -- where
-    -- syncWith modifiedGroceries grocery =
-    --   Array.find (eq grocery) modifiedGroceries
-    --     # Maybe.fromMaybe grocery
+      syncWith modifiedGroceries grocery =
+        Array.find (eq (grocery :: GroceryEntry)) modifiedGroceries
+          # Maybe.fromMaybe grocery
 
     ToggleGrocery grocery mouseEvent -> do
       preventDefault mouseEvent
@@ -536,7 +528,6 @@ component =
       upsertGrocery' a b = upsertGrocery b a
 
     ClearCompleted -> do
-      void $ S.todo "clear completed"
       completed <- H.gets getCheckedGroceries
       Lens.modifying _groceryListS GroceryList.clearCompleted
       groceryListId <- H.gets $ Lens.preview _groceryListIdS
@@ -601,10 +592,7 @@ component =
         ]
     where
     isLive =
-      state.groceryListState
-        # RemoteData.toMaybe
-        >>= _.webSocketState
-        <#> _.readyState
+      Lens.preview _readyStateS state
         <#> case _ of
           Open -> true
           _ -> false

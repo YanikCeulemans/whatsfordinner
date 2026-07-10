@@ -272,7 +272,7 @@ mkId = DULID.parse >>> map Id.MkId >>> Either.fromRight' crash
 instance ManageSpaces AppM where
   -- TODO: implement
   loadSpaces = pure
-    [ { id: mkId "01KNW48VB0PNCFC0KZ8SW289ZZ"
+    [ { id: mkId "01KNW48VB0PNCFC0KZ8SW289ZA"
       , name: NonEmptyString "Komishes"
       , groceryListId: mkId "01KNW48VB0PNCFC0KZ8SW289ZZ"
       , mealScheduleId: MealScheduleId.MkMealScheduleId $ mkId
