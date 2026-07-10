@@ -84,8 +84,6 @@ type GroceryListState =
   { groceryList :: GroceryList
   , groceryListId :: GroceryListId
   , dragState :: DragState DragEntry
-  -- TODO: Isn't this derivable from DragState?
-  , allowDragging :: Boolean
   , webSocketState :: Maybe WebSocketState
   }
 
@@ -133,13 +131,6 @@ _readyStateS =
 
 _dragState :: Lens' GroceryListState (DragState DragEntry)
 _dragState = LensRecord.prop (Proxy :: Proxy "dragState")
-
-_allowDragging :: Lens' GroceryListState Boolean
-_allowDragging = LensRecord.prop (Proxy :: Proxy "allowDragging")
-
-_allowDraggingS :: AffineTraversal' State Boolean
-_allowDraggingS =
-  _groceryListState <<< RemoteData._Success <<< _allowDragging
 
 _dragStateS :: AffineTraversal' State (DragState DragEntry)
 _dragStateS =
@@ -230,7 +221,7 @@ data Action
   | EndDrag DragEvent
   | ClearCompleted
   | UncheckCompleted
-  | HandleMouseDown
+  | HandleMouseDownOnGroceryEntry DragEntry
   | MessageReceived MessageEvent
   | WebSocketOpened
   | WebSocketClosed GroceryListId CloseEvent
@@ -267,9 +258,13 @@ groceryView
   => GroceryListState
   -> Tuple Int GroceryEntry
   -> H.ComponentHTML Action () m
-groceryView { dragState, allowDragging } (Tuple index grocery) =
+groceryView { dragState } (Tuple index grocery) =
   let
     dragEntry = { index, item: grocery }
+    -- TODO: Does this work?
+    allowDragging = case dragState of
+      NotDragging -> false
+      _ -> false
     direction
       | GroceryList.entryChecked grocery = Nothing
       | otherwise = dragDirection dragEntry dragState
@@ -307,8 +302,12 @@ groceryView { dragState, allowDragging } (Tuple index grocery) =
               ]
               [ HH.span
                   [ HP.style "margin-right: 10px; cursor: grab;"
-                  , HE.onMouseDown $ const HandleMouseDown
-                  , HE.onTouchStart $ const HandleMouseDown
+                  , HE.onMouseDown
+                      $ const
+                      $ HandleMouseDownOnGroceryEntry dragEntry
+                  , HE.onTouchStart
+                      $ const
+                      $ HandleMouseDownOnGroceryEntry dragEntry
                   ]
                   [ HH.text "\x283F" ]
               , HH.input
@@ -442,19 +441,18 @@ component =
   handleAction = case _ of
     Initialize -> do
       H.modify_ _ { groceryListState = Loading }
-      foundSpaceGroceryListId <- map _.groceryListId <$>
-        (loadSpace =<< H.gets _.spaceId)
-      groceryList <- upsertGroceryList' foundSpaceGroceryListId
-      H.modify_ _ { groceryListState = buildGroceryListState <$> groceryList }
-      for_ foundSpaceGroceryListId $ handleAction <<< ConnectWebSocket
-      where
-      buildGroceryListState (Tuple groceryListId groceryList) =
-        { groceryList
-        , groceryListId
-        , dragState: NotDragging
-        , allowDragging: false
-        , webSocketState: Nothing
-        }
+      foundSpace <- loadSpace =<< H.gets _.spaceId
+      for_ foundSpace \{ groceryListId } -> do
+        groceryList <- upsertGroceryList groceryListId
+        H.modify_ _
+          { groceryListState = Success
+              { groceryList
+              , groceryListId
+              , dragState: NotDragging
+              , webSocketState: Nothing
+              }
+          }
+        handleAction $ ConnectWebSocket groceryListId
 
     Finalize -> do
       groceryListState <- H.gets _.groceryListState
@@ -511,7 +509,7 @@ component =
       for_ state \s@{ groceryListId } -> do
         let
           modifiedGroceries /\ newState = endDrag s
-        Lens.assign _groceryListStateS $ newState { allowDragging = false }
+        Lens.assign _groceryListStateS newState
         void $ updateGroceries groceryListId $ syncWith modifiedGroceries
       where
       syncWith modifiedGroceries grocery =
@@ -539,8 +537,8 @@ component =
       sequence_
         (updateGroceries <$> groceryListId <*> pure GroceryList.uncheckEntry)
 
-    HandleMouseDown ->
-      Lens.assign _allowDraggingS true
+    HandleMouseDownOnGroceryEntry dragEntry -> do
+      Lens.assign _dragStateS $ DraggingOverNonTarget dragEntry
 
     MessageReceived event ->
       Console.log $ fold [ "msg received: ", event.data ]
