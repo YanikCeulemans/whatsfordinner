@@ -1,7 +1,6 @@
 - [x] minify js output
 - [x] grocery list id in URL
-    - [ ] Invite based workflow, doesn't require auth it seems?
-    - [ ] auth?
+    - [x] Invite based workflow, doesn't require auth
 - [ ] backend persistence
 - [ ] backend persistence subscriptions over websockets
 - [ ] get it deployed
