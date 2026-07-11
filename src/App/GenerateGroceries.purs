@@ -2,7 +2,6 @@ module App.GenerateGroceries where
 
 import Prelude
 
-import App.Data as Data
 import App.Layout as Layout
 import App.Shared (eventTargetInputValue, preventDefault)
 import App.Shared as S
@@ -43,6 +42,7 @@ import Domain.GroceryList as GroceryList
 import Domain.GroceryListId (GroceryListId)
 import Domain.Id as Id
 import Domain.Ingredient (Ingredient)
+import Domain.MealSchedule (MealSchedule)
 import Domain.MealSchedule as MealSchedule
 import Domain.PlannedMeal as PlannedMeal
 import Domain.Range (Range)
@@ -95,6 +95,7 @@ type Input =
 
 type State =
   { groceryList :: GroceryList
+  , mealSchedule :: MealSchedule
   , selection :: Selection
   , loading :: Boolean
   , spaceId :: SpaceId
@@ -190,11 +191,12 @@ traverseGroceries
   :: forall m
    . MonadEffect m
   => ManageGroceryList m
-  => GroceryList
+  => GroceryListId
+  -> GroceryList
   -> List GroceryEntry
   -> List Ingredient
   -> m (List GroceryEntry)
-traverseGroceries theList acc =
+traverseGroceries groceryListId theList acc =
   case _ of
     Nil -> pure acc
     Cons { name, amount } rest -> do
@@ -202,8 +204,8 @@ traverseGroceries theList acc =
       let
         Tuple entry newList =
           GroceryList.upsertGrocery (Id.MkId ulid) name amount theList
-      upsertGrocery Data.dummyListId entry
-      traverseGroceries newList (Cons entry acc) rest
+      upsertGrocery groceryListId entry
+      traverseGroceries groceryListId newList (Cons entry acc) rest
 
 upsertIngredient
   :: forall m
@@ -259,7 +261,8 @@ component =
     -> H.HalogenM State Action childSlots output m Unit
   handleAction = case _ of
     Initialize -> do
-      groceryList <- upsertGroceryList Data.dummyListId
+      { groceryListId } <- H.get
+      groceryList <- upsertGroceryList groceryListId
       today <- H.liftEffect nowDate
       H.modify_ _ { groceryList = groceryList, selection = selection today }
       where
@@ -269,12 +272,12 @@ component =
 
     SubmitForm event -> do
       preventDefault event
-      { groceryList, selection } <- H.get
+      { groceryList, selection, mealSchedule, groceryListId } <- H.get
       case selection of
         Complete dateRange -> do
           H.modify_ _ { loading = true }
           groceries <- upsertIngredients ingredients groceryList
-          void $ upsertGroceries Data.dummyListId groceries
+          void $ upsertGroceries groceryListId groceries
           H.modify_ _ { loading = false }
           state <- H.get
           navigate $ Route.SpaceRoute state.spaceId $ GroceriesRoute
@@ -282,7 +285,7 @@ component =
             Groceries
           where
           ingredients =
-            MealSchedule.toList dateRange Data.mealSchedule
+            MealSchedule.toList dateRange mealSchedule
               >>= (PlannedMeal.ingredients >>> List.fromFoldable)
               # mergeIngredients
               # Array.fromFoldable
