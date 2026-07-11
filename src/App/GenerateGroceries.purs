@@ -3,6 +3,7 @@ module App.GenerateGroceries where
 import Prelude
 
 import App.Layout as Layout
+import App.RemoteData (RemoteData(..))
 import App.Shared (eventTargetInputValue, preventDefault)
 import App.Shared as S
 import Capabilities.Navigation (class Navigation, navigate)
@@ -11,6 +12,10 @@ import Capabilities.Resource.ManageGroceryList
   , upsertGroceries
   , upsertGrocery
   , upsertGroceryList
+  )
+import Capabilities.Resource.ManageMealSchedule
+  ( class ManageMealSchedule
+  , loadMealSchedule
   )
 import Control.Bind (bindFlipped)
 import Control.Monad.State (StateT, evalStateT)
@@ -34,7 +39,7 @@ import Data.Route (GroceriesRoute(..), SpaceRoute(..))
 import Data.Route as Route
 import Data.String as String
 import Data.Time.Duration (Days(..))
-import Data.Traversable (traverse)
+import Data.Traversable (for_, traverse)
 import Data.Tuple (Tuple(..))
 import Domain.Amount as Amount
 import Domain.GroceryList (GroceryEntry, GroceryList)
@@ -44,6 +49,7 @@ import Domain.Id as Id
 import Domain.Ingredient (Ingredient)
 import Domain.MealSchedule (MealSchedule)
 import Domain.MealSchedule as MealSchedule
+import Domain.MealScheduleId (MealScheduleId)
 import Domain.PlannedMeal as PlannedMeal
 import Domain.Range (Range)
 import Domain.Range as Range
@@ -91,15 +97,17 @@ isComplete = case _ of
 type Input =
   { spaceId :: SpaceId
   , groceryListId :: GroceryListId
+  , mealScheduleId :: MealScheduleId
   }
 
 type State =
   { groceryList :: GroceryList
-  , mealSchedule :: MealSchedule
+  , mealSchedule :: RemoteData String MealSchedule
   , selection :: Selection
   , loading :: Boolean
   , spaceId :: SpaceId
   , groceryListId :: GroceryListId
+  , mealScheduleId :: MealScheduleId
   }
 
 data Action
@@ -233,6 +241,7 @@ component
   :: forall query output m
    . MonadAff m
   => ManageGroceryList m
+  => ManageMealSchedule m
   => Navigation m
   => H.Component query Input output m
 component =
@@ -247,12 +256,14 @@ component =
 
   where
   initialState :: Input -> State
-  initialState { spaceId, groceryListId, mealSchedule } =
+  initialState { spaceId, groceryListId, mealScheduleId } =
     { groceryList: mempty
+    , mealSchedule: NotRequested
     , selection: Incomplete { from: Nothing, to: Nothing }
     , loading: false
     , spaceId
     , groceryListId
+    , mealScheduleId
     }
 
   handleAction
@@ -261,10 +272,14 @@ component =
     -> H.HalogenM State Action childSlots output m Unit
   handleAction = case _ of
     Initialize -> do
-      { groceryListId } <- H.get
+      { groceryListId, mealScheduleId } <- H.get
+      H.modify_ _ { mealSchedule = Loading }
       groceryList <- upsertGroceryList groceryListId
       today <- H.liftEffect nowDate
       H.modify_ _ { groceryList = groceryList, selection = selection today }
+      foundMealSchedule <- loadMealSchedule mealScheduleId
+      for_ foundMealSchedule \mealSchedule ->
+        H.modify_ _ { mealSchedule = Success mealSchedule }
       where
       crash _ = unsafeCrashWith "invalid amount of hardcoded days"
       nextWeekFrom = Date.adjust (Days 7.0) >>> Maybe.fromMaybe' crash
@@ -273,25 +288,26 @@ component =
     SubmitForm event -> do
       preventDefault event
       { groceryList, selection, mealSchedule, groceryListId } <- H.get
-      case selection of
-        Complete dateRange -> do
-          H.modify_ _ { loading = true }
-          groceries <- upsertIngredients ingredients groceryList
-          void $ upsertGroceries groceryListId groceries
-          H.modify_ _ { loading = false }
-          state <- H.get
-          navigate $ Route.SpaceRoute state.spaceId $ GroceriesRoute
-            state.groceryListId
-            Groceries
-          where
-          ingredients =
-            MealSchedule.toList dateRange mealSchedule
-              >>= (PlannedMeal.ingredients >>> List.fromFoldable)
-              # mergeIngredients
-              # Array.fromFoldable
+      for_ mealSchedule \mealSchedule' ->
+        case selection of
+          Complete dateRange -> do
+            H.modify_ _ { loading = true }
+            groceries <- upsertIngredients ingredients groceryList
+            void $ upsertGroceries groceryListId groceries
+            H.modify_ _ { loading = false }
+            state <- H.get
+            navigate $ Route.SpaceRoute state.spaceId $ GroceriesRoute
+              state.groceryListId
+              Groceries
+            where
+            ingredients =
+              MealSchedule.toList dateRange mealSchedule'
+                >>= (PlannedMeal.ingredients >>> List.fromFoldable)
+                # mergeIngredients
+                # Array.fromFoldable
 
-        Incomplete _ ->
-          pure unit
+          Incomplete _ ->
+            pure unit
 
     SetFromFormFieldState event -> do
       modifyDate From event
