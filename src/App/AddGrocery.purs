@@ -2,7 +2,6 @@ module App.AddGrocery where
 
 import Prelude
 
-import App.Data as Data
 import App.FormField (FormField)
 import App.FormField as FormField
 import App.Layout as Layout
@@ -22,7 +21,6 @@ import Data.Maybe (Maybe(..))
 import Data.Maybe as Maybe
 import Data.Number as Number
 import Data.Route (Route)
-import Data.Route as Route
 import Data.String as String
 import Data.String.NonEmpty as NES
 import Data.Traversable (for_)
@@ -32,7 +30,6 @@ import Domain.GroceryList (GroceryEntry, GroceryList)
 import Domain.GroceryList as GroceryList
 import Domain.GroceryListId (GroceryListId)
 import Domain.Id as Id
-import Domain.SpaceId (SpaceId)
 import Effect.Aff (Milliseconds(..), delay)
 import Effect.Aff.Class (class MonadAff)
 import Halogen as H
@@ -196,7 +193,8 @@ component =
   handleAction = case _ of
     Initialize -> do
       id <- H.liftEffect $ ULID.genULID ULIDW.prng
-      groceryList <- upsertGroceryList Data.dummyListId
+      groceryListId <- H.gets _.groceryListId
+      groceryList <- upsertGroceryList groceryListId
       H.modify_ _ { id = Just id, groceryList = Just groceryList }
 
     SetDescriptionFormFieldState event -> do
@@ -248,13 +246,10 @@ component =
     SubmitForm event -> do
       preventDefault event
       groceryCandidate <- buildGrocery <$> H.modify validateForm
-      H.modify_ _ { remoteData = Loading }
-      for_ groceryCandidate upsertGroceryForDummyList
+      state <- H.modify _ { remoteData = Loading }
+      for_ groceryCandidate $ upsertGrocery state.groceryListId
       H.modify_ _ { remoteData = Success unit }
-      routes <- H.gets _.routes
-      navigate routes.submit
-      where
-      upsertGroceryForDummyList = upsertGrocery Data.dummyListId
+      navigate state.routes.submit
 
   render :: State -> H.ComponentHTML Action () m
   render { form, remoteData, grocerySuggestions, routes } =
