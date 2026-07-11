@@ -247,7 +247,7 @@ component =
 
   where
   initialState :: Input -> State
-  initialState { spaceId, groceryListId } =
+  initialState { spaceId, groceryListId, mealSchedule } =
     { groceryList: mempty
     , selection: Incomplete { from: Nothing, to: Nothing }
     , loading: false
