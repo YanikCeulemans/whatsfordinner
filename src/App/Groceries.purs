@@ -267,10 +267,9 @@ groceryView
 groceryView { dragState } (Tuple index grocery) =
   let
     dragEntry = { index, item: grocery }
-    -- TODO: Does this work?
     allowDragging = case dragState of
       NotDragging -> false
-      _ -> false
+      _ -> true
     direction
       | GroceryList.entryChecked grocery = Nothing
       | otherwise = dragDirection dragEntry dragState
