@@ -4,6 +4,7 @@ import Prelude
 
 import App.Layout as Layout
 import App.RemoteData (RemoteData(..))
+import App.RemoteData as RemoteData
 import App.Shared (eventTargetInputValue, preventDefault)
 import App.Shared as S
 import Capabilities.Navigation (class Navigation, navigate)
@@ -30,6 +31,7 @@ import Data.Foldable as Foldable
 import Data.Formatter.DateTime (FormatterCommand(..), format)
 import Data.Function (on)
 import Data.Int as Int
+import Data.Lens as Lens
 import Data.List (List(..))
 import Data.List as List
 import Data.List.NonEmpty as NEL
@@ -278,8 +280,10 @@ component =
       today <- H.liftEffect nowDate
       H.modify_ _ { groceryList = groceryList, selection = selection today }
       foundMealSchedule <- loadMealSchedule mealScheduleId
-      for_ foundMealSchedule \mealSchedule ->
-        H.modify_ _ { mealSchedule = Success mealSchedule }
+      H.modify_ _
+        { mealSchedule = RemoteData.note "No such meal schedule"
+            foundMealSchedule
+        }
       where
       crash _ = unsafeCrashWith "invalid amount of hardcoded days"
       nextWeekFrom = Date.adjust (Days 7.0) >>> Maybe.fromMaybe' crash
@@ -316,7 +320,7 @@ component =
       modifyDate To event
 
   render :: State -> H.ComponentHTML Action () m
-  render { loading, selection, spaceId, groceryListId } =
+  render { loading, selection, spaceId, groceryListId, mealSchedule } =
     Layout.main $
       HH.div [ HP.class_ $ H.ClassName "flex column spaced" ]
         [ HH.div [ HP.class_ $ H.ClassName "flex justify-space-between" ]
@@ -358,8 +362,12 @@ component =
                     Foldable.or
                       [ not $ isComplete selection
                       , loading
+                      , not mealScheduleLoadSucceeded
                       ]
-                , HP.attr (H.AttrName "aria-busy") $ show loading
+                , HP.attr (H.AttrName "aria-busy") $ show $ Foldable.or
+                    [ loading
+                    , not mealScheduleLoadSucceeded
+                    ]
                 ]
                 [ case loading of
                     true -> HH.text "Generating..."
@@ -367,3 +375,6 @@ component =
                 ]
             ]
         ]
+    where
+    mealScheduleLoadSucceeded = Maybe.isJust $ Lens.preview RemoteData._Success
+      mealSchedule

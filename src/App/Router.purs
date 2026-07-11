@@ -81,10 +81,9 @@ component =
             Groceries.component
             { spaceId, groceryListId }
 
-          GroceriesRoute groceryListId GroceriesGenerate ->
+          GroceriesRoute groceryListId (GroceriesGenerate mealScheduleId) ->
             HH.slot_ _generateGroceries 0 GenerateGroceries.component
-              { spaceId, groceryListId }
-          -- { spaceId, routes: { cancel, submit } }
+              { spaceId, groceryListId, mealScheduleId }
 
           GroceriesRoute groceryListId AddGrocery ->
             HH.slot_ _addGrocery 0 AddGrocery.component

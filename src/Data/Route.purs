@@ -15,6 +15,8 @@ import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe)
 import Domain.GroceryListId (GroceryListId)
 import Domain.Id as Id
+import Domain.MealScheduleId (MealScheduleId)
+import Domain.MealScheduleId as MealScheduleId
 import Domain.SpaceId (SpaceId)
 import FFI.URL as URL
 import Routing.Duplex (RouteDuplex', root)
@@ -30,9 +32,15 @@ groceryListId :: RouteDuplex' String -> RouteDuplex' GroceryListId
 groceryListId =
   D.as Id.print Id.parse
 
+mealScheduleId :: RouteDuplex' String -> RouteDuplex' MealScheduleId
+mealScheduleId =
+  D.as MealScheduleId.print parse
+  where
+  parse = MealScheduleId.parse >>> Either.note "invalid meal schedule id"
+
 data GroceriesRoute
   = Groceries
-  | GroceriesGenerate
+  | GroceriesGenerate MealScheduleId
   | AddGrocery
 
 derive instance Generic GroceriesRoute _
@@ -42,7 +50,7 @@ groceriesRoute :: RouteDuplex' GroceriesRoute
 groceriesRoute =
   sum
     { "Groceries": noArgs
-    , "GroceriesGenerate": "generate" / noArgs
+    , "GroceriesGenerate": "generate" / mealScheduleId D.segment
     , "AddGrocery": "add" / noArgs
     }
 

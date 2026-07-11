@@ -35,6 +35,7 @@ import Domain.GroceryList (GroceryEntry, GroceryList)
 import Domain.GroceryList as GroceryList
 import Domain.GroceryListId (GroceryListId)
 import Domain.Id as Id
+import Domain.MealScheduleId (MealScheduleId)
 import Domain.SpaceId (SpaceId)
 import Effect.Aff as Aff
 import Effect.Aff.Class (class MonadAff)
@@ -85,6 +86,7 @@ type GroceryListState =
   , groceryListId :: GroceryListId
   , dragState :: DragState DragEntry
   , webSocketState :: Maybe WebSocketState
+  , mealScheduleId :: MealScheduleId
   }
 
 type Input =
@@ -443,12 +445,13 @@ component =
     Initialize -> do
       H.modify_ _ { groceryListState = Loading }
       foundSpace <- loadSpace =<< H.gets _.spaceId
-      for_ foundSpace \{ groceryListId } -> do
+      for_ foundSpace \{ groceryListId, mealScheduleId } -> do
         groceryList <- upsertGroceryList groceryListId
         H.modify_ _
           { groceryListState = Success
               { groceryList
               , groceryListId
+              , mealScheduleId
               , dragState: NotDragging
               , webSocketState: Nothing
               }
@@ -565,7 +568,7 @@ component =
                     []
                 ]
             , HH.div [ HP.class_ $ H.ClassName "flex spaced" ] $ groceryLinks
-                (Lens.preview _groceryListIdS state)
+                (Lens.preview _groceryListStateS state)
             ]
         , case state.groceryListState of
             NotRequested -> HH.text "Loading"
@@ -578,10 +581,10 @@ component =
     where
     groceryLinks = case _ of
       Nothing -> []
-      Just groceryListId ->
+      Just { groceryListId, mealScheduleId } ->
         [ S.link
             ( SpaceRoute state.spaceId $ GroceriesRoute groceryListId
-                GroceriesGenerate
+                $ GroceriesGenerate mealScheduleId
             )
             [ HH.text "Generate" ]
         , S.link
