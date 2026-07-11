@@ -23,11 +23,12 @@ import Data.List as List
 import Data.Maybe (Maybe(..))
 import Data.Maybe as Maybe
 import Data.Time.Duration (Days(..))
-import Data.Traversable (traverse)
+import Data.Traversable (for_, traverse)
 import Data.Tuple (Tuple)
 import Data.Tuple.Nested ((/\))
 import Data.Unfoldable (unfoldr)
 import Debug as Debug
+import Domain.GroceryListId (GroceryListId)
 import Domain.MealSchedule (MealSchedule)
 import Domain.MealSchedule as MealSchedule
 import Domain.PlannedMeal (PlannedMeal(..))
@@ -46,7 +47,8 @@ import Partial.Unsafe (unsafeCrashWith)
 type Input = SpaceId
 
 type ScheduleState =
-  { mealSchedule :: MealSchedule
+  { groceryListId :: GroceryListId
+  , mealSchedule :: MealSchedule
   , date :: Date
   , now :: Date
   }
@@ -143,19 +145,12 @@ viewScheduleEntry date (mealDate /\ plannedMeal) =
         PlannedMeal meal -> HH.span [] [ HH.text $ show meal ]
     ]
 
-loadMealSchedule'
-  :: forall m
-   . ManageMealSchedule m
-  => Maybe Space
-  -> m (RemoteData String MealSchedule)
-loadMealSchedule' foundSpace =
-  let
-    remoteFoundSpace = RemoteData.note "No such space exists" foundSpace
-    remoteFoundMealScheduleId = _.mealScheduleId <$> remoteFoundSpace
-  in
-    traverse loadMealSchedule remoteFoundMealScheduleId
-      <#> map (RemoteData.note "No such meal schedule exists")
-      <#> join
+buildMainLayoutConfig :: State -> Layout.MainConfig
+buildMainLayoutConfig state =
+  Layout.defaultMainConfig { routing = Just routing }
+  where
+  groceryListId = _.groceryListId <$> RemoteData.toMaybe state.scheduleState
+  routing = { spaceId: state.spaceId, groceryListId: groceryListId }
 
 component
   :: forall query output m
@@ -184,13 +179,17 @@ component =
     Initialize -> do
       H.modify_ _ { scheduleState = Loading }
       foundSpace <- loadSpace =<< H.gets _.spaceId
-      now <- H.liftEffect nowDate
-      foundMealSchedule <- loadMealSchedule' foundSpace
+      for_ foundSpace \{ id: spaceId, groceryListId, mealScheduleId } -> do
+        now <- H.liftEffect nowDate
+        foundMealSchedule <- loadMealSchedule mealScheduleId
+        let
+          scheduleState =
+            foundMealSchedule
+              # RemoteData.note "No such meal schedule exists"
+              <#> { date: now, now, groceryListId, mealSchedule: _ }
 
-      H.modify_ _
-        { scheduleState =
-            { date: now, now, mealSchedule: _ } <$> foundMealSchedule
-        }
+        H.modify_ _
+          { scheduleState = scheduleState }
 
     BackInTime -> do
       H.modify_ $ timeTravel $ Days $ -3.0
@@ -200,7 +199,7 @@ component =
 
   render :: State -> H.ComponentHTML Action () m
   render state =
-    Layout.main' (Layout.defaultMainConfig { spaceId = Just state.spaceId }) $
+    Layout.main' (buildMainLayoutConfig state) $
       case state.scheduleState of
         NotRequested -> HH.p_ [ HH.text "loading" ]
         Loading -> HH.p_ [ HH.text "loading" ]

@@ -31,7 +31,8 @@ groceryListId =
   D.as Id.print Id.parse
 
 data GroceriesRoute
-  = GroceriesGenerate
+  = Groceries
+  | GroceriesGenerate
   | AddGrocery
 
 derive instance Generic GroceriesRoute _
@@ -40,13 +41,13 @@ derive instance Eq GroceriesRoute
 groceriesRoute :: RouteDuplex' GroceriesRoute
 groceriesRoute =
   sum
-    { "GroceriesGenerate": "generate" / noArgs
+    { "Groceries": noArgs
+    , "GroceriesGenerate": "generate" / noArgs
     , "AddGrocery": "add" / noArgs
     }
 
 data SpaceRoute
   = Schedule
-  | Groceries
   | GroceriesRoute GroceryListId GroceriesRoute
 
 derive instance Generic SpaceRoute _

@@ -31,7 +31,7 @@ import Data.List as List
 import Data.List.NonEmpty as NEL
 import Data.Maybe (Maybe(..))
 import Data.Maybe as Maybe
-import Data.Route (SpaceRoute(..))
+import Data.Route (GroceriesRoute(..), SpaceRoute(..))
 import Data.Route as Route
 import Data.String as String
 import Data.Time.Duration (Days(..))
@@ -40,6 +40,7 @@ import Data.Tuple (Tuple(..))
 import Domain.Amount as Amount
 import Domain.GroceryList (GroceryEntry, GroceryList)
 import Domain.GroceryList as GroceryList
+import Domain.GroceryListId (GroceryListId)
 import Domain.Id as Id
 import Domain.Ingredient (Ingredient)
 import Domain.MealSchedule as MealSchedule
@@ -87,13 +88,17 @@ isComplete = case _ of
   Complete _ -> true
   _ -> false
 
-type Input = SpaceId
+type Input =
+  { spaceId :: SpaceId
+  , groceryListId :: GroceryListId
+  }
 
 type State =
   { groceryList :: GroceryList
   , selection :: Selection
   , loading :: Boolean
   , spaceId :: SpaceId
+  , groceryListId :: GroceryListId
   }
 
 data Action
@@ -240,11 +245,12 @@ component =
 
   where
   initialState :: Input -> State
-  initialState spaceId =
+  initialState { spaceId, groceryListId } =
     { groceryList: mempty
     , selection: Incomplete { from: Nothing, to: Nothing }
     , loading: false
     , spaceId
+    , groceryListId
     }
 
   handleAction
@@ -270,8 +276,10 @@ component =
           groceries <- upsertIngredients ingredients groceryList
           void $ upsertGroceries Data.dummyListId groceries
           H.modify_ _ { loading = false }
-          spaceId <- H.gets _.spaceId
-          navigate $ Route.SpaceRoute spaceId Groceries
+          state <- H.get
+          navigate $ Route.SpaceRoute state.spaceId $ GroceriesRoute
+            state.groceryListId
+            Groceries
           where
           ingredients =
             MealSchedule.toList dateRange Data.mealSchedule
@@ -289,14 +297,16 @@ component =
       modifyDate To event
 
   render :: State -> H.ComponentHTML Action () m
-  render { loading, selection, spaceId } =
+  render { loading, selection, spaceId, groceryListId } =
     Layout.main $
       HH.div [ HP.class_ $ H.ClassName "flex column spaced" ]
         [ HH.div [ HP.class_ $ H.ClassName "flex justify-space-between" ]
             [ HH.h1_ [ HH.text "Generate groceries" ]
             , HH.div [ HP.class_ $ H.ClassName "flex spaced" ]
                 [ S.link
-                    (Route.SpaceRoute spaceId Groceries)
+                    ( Route.SpaceRoute spaceId $ GroceriesRoute groceryListId
+                        Groceries
+                    )
                     [ HH.text "Cancel" ]
                 ]
             ]

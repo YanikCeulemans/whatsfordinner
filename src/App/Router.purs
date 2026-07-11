@@ -77,18 +77,26 @@ component =
         case innerRoute of
           Schedule -> HH.slot_ _schedule 0 Schedule.component spaceId
 
-          Groceries -> HH.slot_ _groceries 0 Groceries.component spaceId
+          GroceriesRoute groceryListId Groceries -> HH.slot_ _groceries 0
+            Groceries.component
+            { spaceId, groceryListId }
 
           GroceriesRoute groceryListId GroceriesGenerate ->
-            HH.slot_ _generateGroceries 0 GenerateGroceries.component spaceId
+            HH.slot_ _generateGroceries 0 GenerateGroceries.component
+              { spaceId, groceryListId }
           -- { spaceId, routes: { cancel, submit } }
 
           GroceriesRoute groceryListId AddGrocery ->
             HH.slot_ _addGrocery 0 AddGrocery.component
-              { groceryListId, routes: { cancel, submit } }
+              { groceryListId
+              , routes:
+                  { cancel: groceriesRoute
+                  , submit: groceriesRoute
+                  }
+              }
             where
-            cancel = SpaceRoute spaceId Groceries
-            submit = SpaceRoute spaceId Groceries
+            groceriesRoute = SpaceRoute spaceId $
+              GroceriesRoute groceryListId Groceries
 
       Nothing -> HH.h1_ [ HH.text "Not found" ]
 

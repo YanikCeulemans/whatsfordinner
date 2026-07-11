@@ -26,7 +26,7 @@ import Data.Maybe (Maybe(..))
 import Data.Maybe as Maybe
 import Data.Route (GroceriesRoute(..), Route(..), SpaceRoute(..))
 import Data.Time.Duration (Seconds(..), convertDuration)
-import Data.Traversable (for_, sequence_, traverse)
+import Data.Traversable (for_, sequence_)
 import Data.Tuple (Tuple(..))
 import Data.Tuple as Tuple
 import Data.Tuple.Nested ((/\))
@@ -87,11 +87,15 @@ type GroceryListState =
   , webSocketState :: Maybe WebSocketState
   }
 
-type Input = SpaceId
+type Input =
+  { spaceId :: SpaceId
+  , groceryListId :: GroceryListId
+  }
 
 type State =
   { groceryListState :: RemoteData String GroceryListState
   , spaceId :: SpaceId
+  , groceryListId :: GroceryListId
   }
 
 _groceryListState :: Lens' State (RemoteData String GroceryListState)
@@ -397,18 +401,14 @@ updateReadyState = do
     readyState <- H.liftEffect $ WS.readyState ws
     Lens.assign _readyStateS readyState
 
-upsertGroceryList'
-  :: forall m
-   . ManageGroceryList m
-  => Maybe GroceryListId
-  -> m (RemoteData String (Tuple GroceryListId GroceryList))
-upsertGroceryList' foundSpaceGroceryListId =
-  foundSpaceGroceryListId
-    # RemoteData.note "No such space exists"
-    # traverse go
+buildMainLayoutConfig :: State -> Layout.MainConfig
+buildMainLayoutConfig state =
+  (Layout.defaultMainConfig { routing = Just routing })
   where
-  go groceryListId =
-    Tuple groceryListId <$> upsertGroceryList groceryListId
+  routing =
+    { spaceId: state.spaceId
+    , groceryListId: Lens.preview _groceryListIdS state
+    }
 
 component
   :: forall query output m
@@ -429,9 +429,10 @@ component =
 
   where
   initialState :: Input -> State
-  initialState spaceId =
+  initialState { spaceId, groceryListId } =
     { groceryListState: NotRequested
     , spaceId
+    , groceryListId
     }
 
   handleAction
@@ -545,7 +546,7 @@ component =
 
   render :: State -> H.ComponentHTML Action () m
   render state =
-    Layout.main' (Layout.defaultMainConfig { spaceId = Just state.spaceId }) $
+    Layout.main' (buildMainLayoutConfig state) $
       HH.div [ HP.class_ $ H.ClassName "flex column spaced" ]
         [ HH.div
             [ HP.class_ $ H.ClassName "flex justify-space-between items-center"

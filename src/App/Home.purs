@@ -166,7 +166,7 @@ component =
 
   render :: State -> H.ComponentHTML Action () m
   render state =
-    Layout.main' (Layout.defaultMainConfig { spaceId = Nothing }) $
+    Layout.main $
       case state of
         NotInitialized -> HH.p_ [ HH.text "loading" ]
         Initialized initializedState ->
