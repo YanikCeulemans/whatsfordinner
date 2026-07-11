@@ -14,5 +14,6 @@ generated-docs/
 dist/
 .parcel-cache/
 index.js
+index.js.zip
 .spec-results
 Session.vim

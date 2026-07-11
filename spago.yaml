@@ -1,6 +1,7 @@
 package:
   name: lekker
   dependencies:
+    - aff
     - aff-promise
     - argonaut
     - codec-argonaut
@@ -9,7 +10,6 @@ package:
     - effect
     - formatters
     - halogen
-    - js-timers
     - lists
     - prelude
     - routing-duplex
