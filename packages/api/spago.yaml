@@ -1,0 +1,9 @@
+package:
+  name: api
+  dependencies:
+    - console
+    - effect
+    - prelude
+  test:
+    main: Api.Test.Main
+    dependencies: []

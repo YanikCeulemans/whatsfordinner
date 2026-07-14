@@ -1,0 +1,23 @@
+package:
+  name: spa
+  dependencies:
+    - aff
+    - aff-promise
+    - argonaut
+    - codec-argonaut
+    - common
+    - console
+    - debug
+    - effect
+    - formatters
+    - halogen
+    - lists
+    - prelude
+    - routing-duplex
+    - simple-ulid
+    - spec
+    - spec-node
+    - web-html
+  test:
+    main: Spa.Test.Main
+    dependencies: []

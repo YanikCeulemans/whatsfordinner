@@ -1,14 +1,41 @@
 {
   "workspace": {
     "packages": {
-      "lekker": {
-        "path": "./",
+      "api": {
+        "path": "packages/api",
+        "core": {
+          "dependencies": [
+            "console",
+            "effect",
+            "prelude"
+          ]
+        },
+        "test": {
+          "dependencies": []
+        }
+      },
+      "common": {
+        "path": "packages/common",
+        "core": {
+          "dependencies": [
+            "console",
+            "effect",
+            "prelude"
+          ]
+        },
+        "test": {
+          "dependencies": []
+        }
+      },
+      "spa": {
+        "path": "packages/spa",
         "core": {
           "dependencies": [
             "aff",
             "aff-promise",
             "argonaut",
             "codec-argonaut",
+            "common",
             "console",
             "debug",
             "effect",

@@ -1,8 +1,8 @@
 [tasks.dev]
 run = 'watchexec -e .purs,.js -i output spago bundle --platform browser --bundle-type app'
 
-[tasks.build]
-run = 'spago bundle --platform browser --bundle-type app --minify'
+[tasks.build-spa]
+run = 'spago bundle --platform browser --bundle-type app --minify -p spa --module Spa.Main'
 
 [tasks.docs]
 run = 'spago docs'
@@ -16,5 +16,14 @@ _.path = './node_modules/.bin'
 [tools]
 node = "22.20.0"
 pitchfork = "latest"
+"npm:spago" = "latest"
+purescript = "latest"
+"npm:esbuild" = "latest"
+
+[tools."npm:purescript-language-server"]
+version = "latest"
+
+[tools."npm:parcel"]
+version = "latest"
 
 # vim: ts=2 sts=2 sw=2 et

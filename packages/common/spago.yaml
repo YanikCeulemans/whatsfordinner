@@ -1,0 +1,9 @@
+package:
+  name: common
+  dependencies:
+    - console
+    - effect
+    - prelude
+  test:
+    main: Common.Test.Main
+    dependencies: []

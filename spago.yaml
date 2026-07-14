@@ -1,25 +1,3 @@
-package:
-  name: lekker
-  dependencies:
-    - aff
-    - aff-promise
-    - argonaut
-    - codec-argonaut
-    - console
-    - debug
-    - effect
-    - formatters
-    - halogen
-    - lists
-    - prelude
-    - routing-duplex
-    - simple-ulid
-    - spec
-    - spec-node
-    - web-html
-  test:
-    main: Test.Main
-    dependencies: []
 workspace:
   packageSet:
     registry: 73.3.0
