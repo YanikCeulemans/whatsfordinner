@@ -10,6 +10,9 @@ run = 'spago docs'
 [tasks.clean]
 run = 'rm -rf output index.js'
 
+[tasks.format]
+run = 'purs-tidy format-in-place packages/**/*.purs'
+
 [env]
 _.path = './node_modules/.bin'
 
@@ -19,6 +22,7 @@ pitchfork = "latest"
 "npm:spago" = "latest"
 purescript = "latest"
 "npm:esbuild" = "latest"
+"npm:purs-tidy" = "latest"
 
 [tools."npm:purescript-language-server"]
 version = "latest"
