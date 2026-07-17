@@ -2,6 +2,11 @@ module Spa.App.Route where
 
 import Prelude
 
+import Data.Maybe (Maybe(..))
+import Effect.Aff.Class (class MonadAff)
+import Effect.Class.Console as Console
+import Halogen as H
+import Halogen.HTML as HH
 import Spa.App.AddGrocery as AddGrocery
 import Spa.App.GenerateGroceries as GenerateGroceries
 import Spa.App.Groceries as Groceries
@@ -12,12 +17,7 @@ import Spa.Capabilities.Navigation (class Navigation)
 import Spa.Capabilities.Resource.ManageGroceryList (class ManageGroceryList)
 import Spa.Capabilities.Resource.ManageMealSchedule (class ManageMealSchedule)
 import Spa.Capabilities.Resource.ManageSpaces (class ManageSpaces)
-import Data.Maybe (Maybe(..))
 import Spa.Data.Route (GroceriesRoute(..), Route(..), SpaceRoute(..))
-import Effect.Aff.Class (class MonadAff)
-import Effect.Class.Console as Console
-import Halogen as H
-import Halogen.HTML as HH
 import Type.Proxy (Proxy(..))
 
 type Slots =

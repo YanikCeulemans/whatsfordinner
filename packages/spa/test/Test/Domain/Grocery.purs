@@ -8,13 +8,13 @@ import Data.Codec.Argonaut as CA
 import Data.Either (Either)
 import Data.Either as Either
 import Data.Tuple (fst)
+import Partial.Unsafe (unsafeCrashWith)
 import Spa.Data.ULID as DULID
 import Spa.Domain.Amount as Amount
 import Spa.Domain.GroceryEntryId (GroceryEntryId)
 import Spa.Domain.GroceryList (GroceryEntry)
 import Spa.Domain.GroceryList as GroceryList
 import Spa.Domain.Id as Id
-import Partial.Unsafe (unsafeCrashWith)
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (shouldContain)
 

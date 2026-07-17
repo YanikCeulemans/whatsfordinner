@@ -7,6 +7,7 @@ import Data.Date as Date
 import Data.Either as Either
 import Data.Enum (toEnum)
 import Data.Maybe as Maybe
+import Partial.Unsafe (unsafeCrashWith)
 import Spa.Data.ULID as DULID
 import Spa.Domain.Amount as Amount
 import Spa.Domain.GroceryListId (GroceryListId)
@@ -16,7 +17,6 @@ import Spa.Domain.MealSchedule (MealSchedule(..))
 import Spa.Domain.MealScheduleId (MealScheduleId(..))
 import Spa.Domain.PlannedMeal (PlannedMeal(..))
 import Spa.Domain.RingList as RingList
-import Partial.Unsafe (unsafeCrashWith)
 
 theDate :: Date
 theDate =

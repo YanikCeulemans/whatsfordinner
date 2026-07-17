@@ -2,6 +2,22 @@ module Spa.App.Home where
 
 import Prelude
 
+import Control.Monad.State (class MonadState)
+import Data.Array as Array
+import Data.Either (Either(..))
+import Data.Either as Either
+import Data.Map (Map)
+import Data.Map as Map
+import Data.Maybe (Maybe(..))
+import Data.String.NonEmpty as NonEmptyString
+import Data.Traversable (for_, traverse, traverse_)
+import Data.Tuple (Tuple(..))
+import Effect.Aff.Class (class MonadAff)
+import Halogen as H
+import Halogen.HTML as HH
+import Halogen.HTML.Events as HE
+import Halogen.HTML.Properties as HP
+import Partial.Unsafe (unsafeCrashWith)
 import Spa.App.FormField (FormField(..))
 import Spa.App.FormField as FormField
 import Spa.App.Layout as Layout
@@ -10,27 +26,11 @@ import Spa.App.Shared (eventTargetInputValue, preventDefault)
 import Spa.App.Shared as S
 import Spa.Capabilities.Resource.ManageSpaces (class ManageSpaces)
 import Spa.Capabilities.Resource.ManageSpaces as ManageSpaces
-import Control.Monad.State (class MonadState)
-import Data.Array as Array
-import Data.Either (Either(..))
-import Data.Either as Either
-import Data.Map (Map)
-import Data.Map as Map
-import Data.Maybe (Maybe(..))
 import Spa.Data.Route as Route
-import Data.String.NonEmpty as NonEmptyString
-import Data.Traversable (for_, traverse, traverse_)
-import Data.Tuple (Tuple(..))
 import Spa.Data.ULID as DULID
 import Spa.Domain.Id as Id
 import Spa.Domain.Space (Space)
 import Spa.Domain.SpaceId (SpaceId)
-import Effect.Aff.Class (class MonadAff)
-import Halogen as H
-import Halogen.HTML as HH
-import Halogen.HTML.Events as HE
-import Halogen.HTML.Properties as HP
-import Partial.Unsafe (unsafeCrashWith)
 import Web.Event.Event (Event)
 
 theSpaceId :: SpaceId

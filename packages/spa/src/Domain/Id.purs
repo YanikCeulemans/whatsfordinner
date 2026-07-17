@@ -8,9 +8,9 @@ import Data.Codec.Argonaut (JsonCodec)
 import Data.Codec.Argonaut as CA
 import Data.Either (Either)
 import Data.Either as Either
-import Spa.Data.ULID as DULID
 import Simple.ULID (ULID)
 import Simple.ULID as ULID
+import Spa.Data.ULID as DULID
 
 newtype Id :: Type -> Type
 newtype Id a = MkId ULID

@@ -13,16 +13,16 @@ import Data.Array (fold)
 import Data.Either as Either
 import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe)
+import Routing.Duplex (RouteDuplex', root)
+import Routing.Duplex as D
+import Routing.Duplex.Generic (noArgs, sum)
+import Routing.Duplex.Generic.Syntax ((/))
 import Spa.Domain.GroceryListId (GroceryListId)
 import Spa.Domain.Id as Id
 import Spa.Domain.MealScheduleId (MealScheduleId)
 import Spa.Domain.MealScheduleId as MealScheduleId
 import Spa.Domain.SpaceId (SpaceId)
 import Spa.FFI.URL as URL
-import Routing.Duplex (RouteDuplex', root)
-import Routing.Duplex as D
-import Routing.Duplex.Generic (noArgs, sum)
-import Routing.Duplex.Generic.Syntax ((/))
 
 spaceId :: RouteDuplex' String -> RouteDuplex' SpaceId
 spaceId =

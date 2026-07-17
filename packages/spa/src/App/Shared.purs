@@ -2,12 +2,9 @@ module Spa.App.Shared where
 
 import Prelude
 
-import Spa.App.RemoteData (RemoteData(..))
 import Data.Array as Array
 import Data.Maybe (Maybe)
 import Data.Maybe as Maybe
-import Spa.Data.Route (Route)
-import Spa.Data.Route as Route
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple, fst, snd)
 import Effect.Class (class MonadEffect)
@@ -17,6 +14,9 @@ import Halogen.HTML as HH
 import Halogen.HTML.Properties as HP
 import Partial.Unsafe (unsafeCrashWith)
 import Prim.TypeError (class Warn, Text)
+import Spa.App.RemoteData (RemoteData(..))
+import Spa.Data.Route (Route)
+import Spa.Data.Route as Route
 import Type.Row.Homogeneous (class Homogeneous)
 import Web.Event.Event (Event)
 import Web.Event.Event as E

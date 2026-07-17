@@ -2,22 +2,6 @@ module Spa.App.GenerateGroceries where
 
 import Prelude
 
-import Spa.App.Layout as Layout
-import Spa.App.RemoteData (RemoteData(..))
-import Spa.App.RemoteData as RemoteData
-import Spa.App.Shared (eventTargetInputValue, preventDefault)
-import Spa.App.Shared as S
-import Spa.Capabilities.Navigation (class Navigation, navigate)
-import Spa.Capabilities.Resource.ManageGroceryList
-  ( class ManageGroceryList
-  , upsertGroceries
-  , upsertGrocery
-  , upsertGroceryList
-  )
-import Spa.Capabilities.Resource.ManageMealSchedule
-  ( class ManageMealSchedule
-  , loadMealSchedule
-  )
 import Control.Bind (bindFlipped)
 import Control.Monad.State (StateT, evalStateT)
 import Control.Monad.State as MonadState
@@ -37,12 +21,38 @@ import Data.List as List
 import Data.List.NonEmpty as NEL
 import Data.Maybe (Maybe(..))
 import Data.Maybe as Maybe
-import Spa.Data.Route (GroceriesRoute(..), SpaceRoute(..))
-import Spa.Data.Route as Route
 import Data.String as String
 import Data.Time.Duration (Days(..))
 import Data.Traversable (for_, traverse)
 import Data.Tuple (Tuple(..))
+import Effect.Aff.Class (class MonadAff)
+import Effect.Class (class MonadEffect)
+import Effect.Now (nowDate)
+import Halogen as H
+import Halogen.HTML as HH
+import Halogen.HTML.Events as HE
+import Halogen.HTML.Properties as HP
+import Partial.Unsafe (unsafeCrashWith)
+import Simple.ULID as ULID
+import Simple.ULID.Window as ULIDW
+import Spa.App.Layout as Layout
+import Spa.App.RemoteData (RemoteData(..))
+import Spa.App.RemoteData as RemoteData
+import Spa.App.Shared (eventTargetInputValue, preventDefault)
+import Spa.App.Shared as S
+import Spa.Capabilities.Navigation (class Navigation, navigate)
+import Spa.Capabilities.Resource.ManageGroceryList
+  ( class ManageGroceryList
+  , upsertGroceries
+  , upsertGrocery
+  , upsertGroceryList
+  )
+import Spa.Capabilities.Resource.ManageMealSchedule
+  ( class ManageMealSchedule
+  , loadMealSchedule
+  )
+import Spa.Data.Route (GroceriesRoute(..), SpaceRoute(..))
+import Spa.Data.Route as Route
 import Spa.Domain.Amount as Amount
 import Spa.Domain.GroceryList (GroceryEntry, GroceryList)
 import Spa.Domain.GroceryList as GroceryList
@@ -56,16 +66,6 @@ import Spa.Domain.PlannedMeal as PlannedMeal
 import Spa.Domain.Range (Range)
 import Spa.Domain.Range as Range
 import Spa.Domain.SpaceId (SpaceId)
-import Effect.Aff.Class (class MonadAff)
-import Effect.Class (class MonadEffect)
-import Effect.Now (nowDate)
-import Halogen as H
-import Halogen.HTML as HH
-import Halogen.HTML.Events as HE
-import Halogen.HTML.Properties as HP
-import Partial.Unsafe (unsafeCrashWith)
-import Simple.ULID as ULID
-import Simple.ULID.Window as ULIDW
 import Web.Event.Event (Event)
 
 data Selection

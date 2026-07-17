@@ -2,15 +2,6 @@ module Spa.App.Schedule where
 
 import Prelude
 
-import Spa.App.Data as AData
-import Spa.App.Layout as Layout
-import Spa.App.RemoteData (RemoteData(..))
-import Spa.App.RemoteData as RemoteData
-import Spa.Capabilities.Resource.ManageMealSchedule
-  ( class ManageMealSchedule
-  , loadMealSchedule
-  )
-import Spa.Capabilities.Resource.ManageSpaces (class ManageSpaces, loadSpace)
 import Data.Array as Array
 import Data.Date (Date, Weekday(..))
 import Data.Date (adjust, weekday) as Date
@@ -28,6 +19,22 @@ import Data.Tuple (Tuple)
 import Data.Tuple.Nested ((/\))
 import Data.Unfoldable (unfoldr)
 import Debug as Debug
+import Effect.Aff.Class (class MonadAff)
+import Effect.Now (nowDate)
+import Halogen as H
+import Halogen.HTML as HH
+import Halogen.HTML.Events as HE
+import Halogen.HTML.Properties as HP
+import Partial.Unsafe (unsafeCrashWith)
+import Spa.App.Data as AData
+import Spa.App.Layout as Layout
+import Spa.App.RemoteData (RemoteData(..))
+import Spa.App.RemoteData as RemoteData
+import Spa.Capabilities.Resource.ManageMealSchedule
+  ( class ManageMealSchedule
+  , loadMealSchedule
+  )
+import Spa.Capabilities.Resource.ManageSpaces (class ManageSpaces, loadSpace)
 import Spa.Domain.GroceryListId (GroceryListId)
 import Spa.Domain.MealSchedule (MealSchedule)
 import Spa.Domain.MealSchedule as MealSchedule
@@ -36,13 +43,6 @@ import Spa.Domain.Range (Range)
 import Spa.Domain.Range as Range
 import Spa.Domain.Space (Space)
 import Spa.Domain.SpaceId (SpaceId)
-import Effect.Aff.Class (class MonadAff)
-import Effect.Now (nowDate)
-import Halogen as H
-import Halogen.HTML as HH
-import Halogen.HTML.Events as HE
-import Halogen.HTML.Properties as HP
-import Partial.Unsafe (unsafeCrashWith)
 
 type Input = SpaceId
 

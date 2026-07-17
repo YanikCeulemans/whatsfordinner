@@ -19,12 +19,12 @@ import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Aff.Compat (EffectFn1, EffectFn3, runEffectFn1, runEffectFn3)
+import Partial.Unsafe (unsafeCrashWith)
 import Spa.FFI.WebSocket.Types.CloseEvent (CloseCode, toCodeAndReason)
 import Spa.FFI.WebSocket.Types.CloseEvent as WSTC
 import Spa.FFI.WebSocket.Types.MessageEvent as WSTM
 import Spa.FFI.WebSocket.Types.ReadyState (ParseReadyStateError(..), ReadyState)
 import Spa.FFI.WebSocket.Types.ReadyState as ReadyState
-import Partial.Unsafe (unsafeCrashWith)
 import Unsafe.Coerce (unsafeCoerce)
 import Web.Event.Event (Event, EventType(..))
 import Web.Event.Event as E

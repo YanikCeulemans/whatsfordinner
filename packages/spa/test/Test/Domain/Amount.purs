@@ -6,9 +6,9 @@ import Data.Argonaut as J
 import Data.Codec.Argonaut as CA
 import Data.Either (Either)
 import Data.Either as Either
+import Partial.Unsafe (unsafeCrashWith)
 import Spa.Domain.Amount (Amount)
 import Spa.Domain.Amount as Amount
-import Partial.Unsafe (unsafeCrashWith)
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (shouldContain, shouldSatisfy)
 

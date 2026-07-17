@@ -7,10 +7,10 @@ import Data.Array (fold)
 import Data.Codec.Argonaut as CA
 import Data.Either (Either(..))
 import Data.Either as Either
+import Partial.Unsafe (unsafeCrashWith)
 import Spa.Data.ULID as DULID
 import Spa.Domain.GroceryId (GroceryId)
 import Spa.Domain.Id as Id
-import Partial.Unsafe (unsafeCrashWith)
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (shouldContain, shouldEqual)
 

@@ -2,6 +2,26 @@ module Spa.App.AddGrocery where
 
 import Prelude
 
+import Data.Array as Array
+import Data.Maybe (Maybe(..))
+import Data.Maybe as Maybe
+import Data.Number as Number
+import Data.String as String
+import Data.String.NonEmpty as NES
+import Data.Traversable (for_)
+import Data.Tuple as Tuple
+import Effect.Aff (Milliseconds(..), delay)
+import Effect.Aff.Class (class MonadAff)
+import Halogen as H
+import Halogen.HTML as HH
+import Halogen.HTML.Events as HE
+import Halogen.HTML.Properties (ButtonType(..), InputType(..))
+import Halogen.HTML.Properties as HP
+import Halogen.HTML.Properties.ARIA as Aria
+import Halogen.HTML.Properties.ARIA as HPA
+import Simple.ULID (ULID)
+import Simple.ULID as ULID
+import Simple.ULID.Window as ULIDW
 import Spa.App.FormField (FormField)
 import Spa.App.FormField as FormField
 import Spa.App.Layout as Layout
@@ -16,32 +36,12 @@ import Spa.Capabilities.Resource.ManageGroceryList
   , upsertGrocery
   , upsertGroceryList
   )
-import Data.Array as Array
-import Data.Maybe (Maybe(..))
-import Data.Maybe as Maybe
-import Data.Number as Number
 import Spa.Data.Route (Route)
-import Data.String as String
-import Data.String.NonEmpty as NES
-import Data.Traversable (for_)
-import Data.Tuple as Tuple
 import Spa.Domain.Amount as Amount
 import Spa.Domain.GroceryList (GroceryEntry, GroceryList)
 import Spa.Domain.GroceryList as GroceryList
 import Spa.Domain.GroceryListId (GroceryListId)
 import Spa.Domain.Id as Id
-import Effect.Aff (Milliseconds(..), delay)
-import Effect.Aff.Class (class MonadAff)
-import Halogen as H
-import Halogen.HTML as HH
-import Halogen.HTML.Events as HE
-import Halogen.HTML.Properties (ButtonType(..), InputType(..))
-import Halogen.HTML.Properties as HP
-import Halogen.HTML.Properties.ARIA as Aria
-import Halogen.HTML.Properties.ARIA as HPA
-import Simple.ULID (ULID)
-import Simple.ULID as ULID
-import Simple.ULID.Window as ULIDW
 import Web.Event.Event (Event)
 import Web.UIEvent.MouseEvent (MouseEvent)
 

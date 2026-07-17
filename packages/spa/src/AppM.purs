@@ -2,14 +2,6 @@ module Spa.AppM (AppM, runAppM) where
 
 import Prelude
 
-import Spa.App.Data as Data
-import Spa.Capabilities.Navigation (class Navigation)
-import Spa.Capabilities.Resource.ManageGroceryList
-  ( class ManageGroceryList
-  , SortedGrocery
-  )
-import Spa.Capabilities.Resource.ManageMealSchedule (class ManageMealSchedule)
-import Spa.Capabilities.Resource.ManageSpaces (class ManageSpaces)
 import Control.Monad.State (class MonadState)
 import Control.Monad.State as MonadState
 import Control.Parallel.Class (parallel, sequential)
@@ -32,8 +24,6 @@ import Data.Maybe (Maybe(..))
 import Data.Maybe as Maybe
 import Data.Newtype (unwrap, wrap)
 import Data.Profunctor (dimap)
-import Spa.Data.Route (Route)
-import Spa.Data.Route as Route
 import Data.String.CaseInsensitive (CaseInsensitiveString)
 import Data.String.NonEmpty.Internal (NonEmptyString(..))
 import Data.String.Regex as StrRegex
@@ -42,19 +32,29 @@ import Data.Time.Duration (Seconds(..), convertDuration)
 import Data.Traversable (for_)
 import Data.Tuple (Tuple)
 import Data.Tuple.Nested ((/\))
+import Effect.Aff (Aff, Milliseconds(..))
+import Effect.Aff as Aff
+import Effect.Aff.Class (class MonadAff, liftAff)
+import Effect.Class (class MonadEffect, liftEffect)
+import Effect.Class.Console as Console
+import Partial.Unsafe (unsafeCrashWith)
+import Spa.App.Data as Data
+import Spa.Capabilities.Navigation (class Navigation)
+import Spa.Capabilities.Resource.ManageGroceryList
+  ( class ManageGroceryList
+  , SortedGrocery
+  )
+import Spa.Capabilities.Resource.ManageMealSchedule (class ManageMealSchedule)
+import Spa.Capabilities.Resource.ManageSpaces (class ManageSpaces)
+import Spa.Data.Route (Route)
+import Spa.Data.Route as Route
 import Spa.Data.ULID as DULID
 import Spa.Domain.GroceryList (GroceryEntry, GroceryList)
 import Spa.Domain.GroceryList as GroceryList
 import Spa.Domain.GroceryListId (GroceryListId)
 import Spa.Domain.Id as Id
 import Spa.Domain.MealScheduleId as MealScheduleId
-import Effect.Aff (Aff, Milliseconds(..))
-import Effect.Aff as Aff
-import Effect.Aff.Class (class MonadAff, liftAff)
-import Effect.Class (class MonadEffect, liftEffect)
-import Effect.Class.Console as Console
 import Spa.FFI.Navigation as Nav
-import Partial.Unsafe (unsafeCrashWith)
 import Web.HTML as HTML
 import Web.HTML.Window as Window
 import Web.Storage.Storage (Storage)

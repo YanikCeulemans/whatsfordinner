@@ -2,6 +2,29 @@ module Spa.App.Groceries where
 
 import Prelude
 
+import Data.Array (fold, mapWithIndex)
+import Data.Array as Array
+import Data.Function (on)
+import Data.Lens (Lens', _Just)
+import Data.Lens as Lens
+import Data.Lens.AffineTraversal (AffineTraversal')
+import Data.Lens.Record as LensRecord
+import Data.Maybe (Maybe(..))
+import Data.Maybe as Maybe
+import Data.Time.Duration (Seconds(..), convertDuration)
+import Data.Traversable (for_, sequence_)
+import Data.Tuple (Tuple(..))
+import Data.Tuple as Tuple
+import Data.Tuple.Nested ((/\))
+import Effect.Aff as Aff
+import Effect.Aff.Class (class MonadAff)
+import Effect.Class (class MonadEffect)
+import Effect.Class.Console as Console
+import Halogen as H
+import Halogen.HTML as HH
+import Halogen.HTML.Events as HE
+import Halogen.HTML.Properties as HP
+import Halogen.Query.Event as HQE
 import Spa.App.Layout as Layout
 import Spa.App.RemoteData (RemoteData(..))
 import Spa.App.RemoteData as RemoteData
@@ -15,21 +38,7 @@ import Spa.Capabilities.Resource.ManageGroceryList
   , upsertGroceryList
   )
 import Spa.Capabilities.Resource.ManageSpaces (class ManageSpaces, loadSpace)
-import Data.Array (fold, mapWithIndex)
-import Data.Array as Array
-import Data.Function (on)
-import Data.Lens (Lens', _Just)
-import Data.Lens as Lens
-import Data.Lens.AffineTraversal (AffineTraversal')
-import Data.Lens.Record as LensRecord
-import Data.Maybe (Maybe(..))
-import Data.Maybe as Maybe
 import Spa.Data.Route (GroceriesRoute(..), Route(..), SpaceRoute(..))
-import Data.Time.Duration (Seconds(..), convertDuration)
-import Data.Traversable (for_, sequence_)
-import Data.Tuple (Tuple(..))
-import Data.Tuple as Tuple
-import Data.Tuple.Nested ((/\))
 import Spa.Domain.Amount (Amount(..))
 import Spa.Domain.GroceryList (GroceryEntry, GroceryList)
 import Spa.Domain.GroceryList as GroceryList
@@ -37,21 +46,12 @@ import Spa.Domain.GroceryListId (GroceryListId)
 import Spa.Domain.Id as Id
 import Spa.Domain.MealScheduleId (MealScheduleId)
 import Spa.Domain.SpaceId (SpaceId)
-import Effect.Aff as Aff
-import Effect.Aff.Class (class MonadAff)
-import Effect.Class (class MonadEffect)
-import Effect.Class.Console as Console
 import Spa.FFI.WebSocket (WebSocket)
 import Spa.FFI.WebSocket as WS
 import Spa.FFI.WebSocket.Types.CloseEvent (CloseEvent)
 import Spa.FFI.WebSocket.Types.CloseEvent as WSTC
 import Spa.FFI.WebSocket.Types.MessageEvent (MessageEvent)
 import Spa.FFI.WebSocket.Types.ReadyState (ReadyState(..))
-import Halogen as H
-import Halogen.HTML as HH
-import Halogen.HTML.Events as HE
-import Halogen.HTML.Properties as HP
-import Halogen.Query.Event as HQE
 import Type.Prelude (Proxy(..))
 import Web.HTML.Event.DragEvent (DragEvent)
 import Web.UIEvent.MouseEvent (MouseEvent)
