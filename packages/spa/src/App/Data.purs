@@ -2,14 +2,8 @@ module Spa.App.Data where
 
 import Prelude
 
-import Data.Date (Date, Month(..))
-import Data.Date as Date
-import Data.Either as Either
-import Data.Enum (toEnum)
-import Data.Maybe as Maybe
-import Partial.Unsafe (unsafeCrashWith)
-import Spa.Data.ULID as DULID
 import Common.Amount as Amount
+import Common.Extensions.ULID as ULIDExt
 import Common.GroceryListId (GroceryListId)
 import Common.Id as Id
 import Common.Meal (Meal(..))
@@ -17,6 +11,12 @@ import Common.MealSchedule (MealSchedule(..))
 import Common.MealScheduleId (MealScheduleId(..))
 import Common.PlannedMeal (PlannedMeal(..))
 import Common.RingList as RingList
+import Data.Date (Date, Month(..))
+import Data.Date as Date
+import Data.Either as Either
+import Data.Enum (toEnum)
+import Data.Maybe as Maybe
+import Partial.Unsafe (unsafeCrashWith)
 
 theDate :: Date
 theDate =
@@ -28,7 +28,7 @@ theDate =
 
 dummyMealScheduleId :: MealScheduleId
 dummyMealScheduleId =
-  DULID.parse "01KNW48VB0PNCFC0KZ8SW289ZZ"
+  ULIDExt.parse "01KNW48VB0PNCFC0KZ8SW289ZZ"
     # Either.fromRight' crash
     # Id.MkId
     # MkMealScheduleId
@@ -609,7 +609,7 @@ mealSchedule =
 
 dummyListId :: GroceryListId
 dummyListId =
-  DULID.parse "01KNW48VB0PNCFC0KZ8SW289ZV"
+  ULIDExt.parse "01KNW48VB0PNCFC0KZ8SW289ZV"
     # Either.fromRight' crash
     # Id.MkId
   where

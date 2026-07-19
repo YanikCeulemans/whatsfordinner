@@ -1,16 +1,16 @@
-module Spa.Test.Domain.GroceryId (spec) where
+module Common.Test.GroceryId (spec) where
 
 import Prelude
 
+import Common.Extensions.ULID as ULIDExt
+import Common.GroceryId (GroceryId)
+import Common.Id as Id
 import Data.Argonaut as J
 import Data.Array (fold)
 import Data.Codec.Argonaut as CA
 import Data.Either (Either(..))
 import Data.Either as Either
 import Partial.Unsafe (unsafeCrashWith)
-import Spa.Data.ULID as DULID
-import Spa.Domain.GroceryId (GroceryId)
-import Spa.Domain.Id as Id
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (shouldContain, shouldEqual)
 
@@ -20,7 +20,7 @@ rawGroceryId = "01KNEQ7KMSBM0Q4XP56C6YP3NG"
 groceryId :: GroceryId
 groceryId = Id.MkId
   $ Either.fromRight' crash
-  $ DULID.parse rawGroceryId
+  $ ULIDExt.parse rawGroceryId
   where
   crash _ = unsafeCrashWith "invalid hardcoded ulid"
 

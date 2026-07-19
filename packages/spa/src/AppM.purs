@@ -2,6 +2,12 @@ module Spa.AppM (AppM, runAppM) where
 
 import Prelude
 
+import Common.Extensions.ULID as ULIDExt
+import Common.GroceryList (GroceryEntry, GroceryList)
+import Common.GroceryList as GroceryList
+import Common.GroceryListId (GroceryListId)
+import Common.Id as Id
+import Common.MealScheduleId as MealScheduleId
 import Control.Monad.State (class MonadState)
 import Control.Monad.State as MonadState
 import Control.Parallel.Class (parallel, sequential)
@@ -48,12 +54,6 @@ import Spa.Capabilities.Resource.ManageMealSchedule (class ManageMealSchedule)
 import Spa.Capabilities.Resource.ManageSpaces (class ManageSpaces)
 import Spa.Data.Route (Route)
 import Spa.Data.Route as Route
-import Spa.Data.ULID as DULID
-import Common.GroceryList (GroceryEntry, GroceryList)
-import Common.GroceryList as GroceryList
-import Common.GroceryListId (GroceryListId)
-import Common.Id as Id
-import Common.MealScheduleId as MealScheduleId
 import Spa.FFI.Navigation as Nav
 import Web.HTML as HTML
 import Web.HTML.Window as Window
@@ -265,7 +265,7 @@ instance MonadState State AppM where
   state f = AppM $ localStorageState f
 
 mkId :: forall a. String -> Id.Id a
-mkId = DULID.parse >>> map Id.MkId >>> Either.fromRight' crash
+mkId = ULIDExt.parse >>> map Id.MkId >>> Either.fromRight' crash
   where
   crash _ = unsafeCrashWith "invalid hardcoded ULID"
 

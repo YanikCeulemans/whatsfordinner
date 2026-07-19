@@ -18,13 +18,19 @@
         "path": "packages/common",
         "core": {
           "dependencies": [
-            "console",
-            "effect",
-            "prelude"
+            "argonaut",
+            "codec-argonaut",
+            "formatters",
+            "prelude",
+            "simple-ulid"
           ]
         },
         "test": {
-          "dependencies": []
+          "dependencies": [
+            "effect",
+            "spec",
+            "spec-node"
+          ]
         }
       },
       "spa": {
@@ -39,19 +45,20 @@
             "console",
             "debug",
             "effect",
-            "formatters",
             "halogen",
             "lists",
             "prelude",
             "routing-duplex",
             "simple-ulid",
-            "spec",
-            "spec-node",
             "web-html"
           ]
         },
         "test": {
-          "dependencies": []
+          "dependencies": [
+            "effect",
+            "spec",
+            "spec-node"
+          ]
         }
       }
     },

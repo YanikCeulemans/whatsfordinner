@@ -2,6 +2,10 @@ module Spa.App.Home where
 
 import Prelude
 
+import Common.Extensions.ULID as ULIDExt
+import Common.Id as Id
+import Common.Space (Space)
+import Common.SpaceId (SpaceId)
 import Control.Monad.State (class MonadState)
 import Data.Array as Array
 import Data.Either (Either(..))
@@ -27,15 +31,11 @@ import Spa.App.Shared as S
 import Spa.Capabilities.Resource.ManageSpaces (class ManageSpaces)
 import Spa.Capabilities.Resource.ManageSpaces as ManageSpaces
 import Spa.Data.Route as Route
-import Spa.Data.ULID as DULID
-import Common.Id as Id
-import Common.Space (Space)
-import Common.SpaceId (SpaceId)
 import Web.Event.Event (Event)
 
 theSpaceId :: SpaceId
 theSpaceId =
-  Id.MkId $ Either.fromRight' crash $ DULID.parse "01KNW48VB0PNCFC0KZ8SW289ZA"
+  Id.MkId $ Either.fromRight' crash $ ULIDExt.parse "01KNW48VB0PNCFC0KZ8SW289ZA"
   where
   crash _ = unsafeCrashWith "invalid space id ULID"
 
@@ -72,7 +72,7 @@ loadSpace = case _ of
     let
       spaceIdCandidate =
         FormField.validFieldValue state.spaceIdField
-          # map DULID.parse
+          # map ULIDExt.parse
           # map Either.hush
           # join
           # map Id.MkId
@@ -92,7 +92,7 @@ updateSpaceIdField spaceIdCandidate = case _ of
     Initialized $ state { spaceIdField = updatedSpaceIdField }
     where
     updatedSpaceIdField =
-      case DULID.parse spaceIdCandidate of
+      case ULIDExt.parse spaceIdCandidate of
         Left _ -> FormField.Invalid spaceIdCandidate
         Right _ -> FormField.Valid spaceIdCandidate
 

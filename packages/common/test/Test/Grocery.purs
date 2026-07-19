@@ -1,7 +1,13 @@
-module Spa.Test.Domain.Grocery (spec) where
+module Common.Test.Grocery (spec) where
 
 import Prelude
 
+import Common.Amount as Amount
+import Common.Extensions.ULID as ULIDExt
+import Common.GroceryEntryId (GroceryEntryId)
+import Common.GroceryList (GroceryEntry)
+import Common.GroceryList as GroceryList
+import Common.Id as Id
 import Data.Argonaut as J
 import Data.Array (fold)
 import Data.Codec.Argonaut as CA
@@ -9,12 +15,6 @@ import Data.Either (Either)
 import Data.Either as Either
 import Data.Tuple (fst)
 import Partial.Unsafe (unsafeCrashWith)
-import Spa.Data.ULID as DULID
-import Spa.Domain.Amount as Amount
-import Spa.Domain.GroceryEntryId (GroceryEntryId)
-import Spa.Domain.GroceryList (GroceryEntry)
-import Spa.Domain.GroceryList as GroceryList
-import Spa.Domain.Id as Id
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (shouldContain)
 
@@ -24,7 +24,7 @@ rawGroceryId = "01KNEQ7KMSBM0Q4XP56C6YP3NG"
 groceryId :: GroceryEntryId
 groceryId = Id.MkId
   $ Either.fromRight' crash
-  $ DULID.parse rawGroceryId
+  $ ULIDExt.parse rawGroceryId
   where
   crash _ = unsafeCrashWith "invalid hardcoded ulid"
 

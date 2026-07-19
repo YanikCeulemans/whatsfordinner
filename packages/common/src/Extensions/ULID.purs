@@ -1,4 +1,4 @@
-module Spa.Data.ULID (parse) where
+module Common.Extensions.ULID (parse) where
 
 import Prelude
 

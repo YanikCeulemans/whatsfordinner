@@ -2,6 +2,19 @@ module Common.Test.Main where
 
 import Prelude
 
+import Common.Extensions.ULID as ULIDExt
+import Common.Id as Id
+import Common.Meal (Meal(..))
+import Common.MealSchedule (MealSchedule)
+import Common.MealSchedule as MealSchedule
+import Common.MealScheduleId (MealScheduleId(..))
+import Common.PlannedMeal (PlannedMeal(..))
+import Common.Range as Range
+import Common.RingList (RingList)
+import Common.RingList as RingList
+import Common.Test.Amount as Amount
+import Common.Test.Grocery as Grocery
+import Common.Test.GroceryId as GroceryId
 import Data.Date as Date
 import Data.Date.Component (Month(..))
 import Data.Either (Either(..))
@@ -16,19 +29,6 @@ import Data.Time.Duration (Days(..))
 import Effect (Effect)
 import Partial.Unsafe (unsafeCrashWith)
 import Simple.ULID as ULID
-import Spa.Data.ULID as DULID
-import Common.Id as Id
-import Common.Meal (Meal(..))
-import Common.MealSchedule (MealSchedule)
-import Common.MealSchedule as MealSchedule
-import Common.MealScheduleId (MealScheduleId(..))
-import Common.PlannedMeal (PlannedMeal(..))
-import Common.Range as Range
-import Common.RingList (RingList)
-import Common.RingList as RingList
-import Common.Test.Amount as Amount
-import Common.Test.Grocery as Grocery
-import Common.Test.GroceryId as GroceryId
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (shouldEqual)
 import Test.Spec.Reporter (consoleReporter)
@@ -159,7 +159,7 @@ mealScheduleSpec = do
 
   mkSchedule :: forall f. Foldable f => f PlannedMeal -> MealSchedule
   mkSchedule ps = MealSchedule.MkMealSchedule
-    { id: MkMealScheduleId $ Id.MkId $ Either.fromRight' crash $ DULID.parse
+    { id: MkMealScheduleId $ Id.MkId $ Either.fromRight' crash $ ULIDExt.parse
         "01BX5ZZKBKACTAV9WEVGEMMVYY"
     , schedule: RingList.fromFoldable ps
     , startDate
@@ -183,7 +183,7 @@ ulidSpec =
       it "should work" do
         let
           ulid = "01BX5ZZKBKACTAV9WEVGEMMVRY"
-          actual = DULID.parse ulid
+          actual = ULIDExt.parse ulid
         (actual <#> ULID.toString) `shouldEqual` Right ulid
 
 spec :: Spec Unit

@@ -2,11 +2,17 @@ module Spa.App.Schedule where
 
 import Prelude
 
+import Common.GroceryListId (GroceryListId)
+import Common.MealSchedule (MealSchedule)
+import Common.MealSchedule as MealSchedule
+import Common.PlannedMeal (PlannedMeal(..))
+import Common.Range (Range)
+import Common.Range as Range
+import Common.SpaceId (SpaceId)
 import Data.Array as Array
 import Data.Date (Date, Weekday(..))
 import Data.Date (adjust, weekday) as Date
 import Data.DateTime (DateTime(..))
-import Data.Either as Either
 import Data.Foldable (fold)
 import Data.Formatter.DateTime as Format
 import Data.Int as Int
@@ -14,11 +20,10 @@ import Data.List as List
 import Data.Maybe (Maybe(..))
 import Data.Maybe as Maybe
 import Data.Time.Duration (Days(..))
-import Data.Traversable (for_, traverse)
+import Data.Traversable (for_)
 import Data.Tuple (Tuple)
 import Data.Tuple.Nested ((/\))
 import Data.Unfoldable (unfoldr)
-import Debug as Debug
 import Effect.Aff.Class (class MonadAff)
 import Effect.Now (nowDate)
 import Halogen as H
@@ -26,7 +31,6 @@ import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Partial.Unsafe (unsafeCrashWith)
-import Spa.App.Data as AData
 import Spa.App.Layout as Layout
 import Spa.App.RemoteData (RemoteData(..))
 import Spa.App.RemoteData as RemoteData
@@ -35,14 +39,6 @@ import Spa.Capabilities.Resource.ManageMealSchedule
   , loadMealSchedule
   )
 import Spa.Capabilities.Resource.ManageSpaces (class ManageSpaces, loadSpace)
-import Common.GroceryListId (GroceryListId)
-import Common.MealSchedule (MealSchedule)
-import Common.MealSchedule as MealSchedule
-import Common.PlannedMeal (PlannedMeal(..))
-import Common.Range (Range)
-import Common.Range as Range
-import Common.Space (Space)
-import Common.SpaceId (SpaceId)
 
 type Input = SpaceId
 
@@ -179,7 +175,7 @@ component =
     Initialize -> do
       H.modify_ _ { scheduleState = Loading }
       foundSpace <- loadSpace =<< H.gets _.spaceId
-      for_ foundSpace \{ id: spaceId, groceryListId, mealScheduleId } -> do
+      for_ foundSpace \{ groceryListId, mealScheduleId } -> do
         now <- H.liftEffect nowDate
         foundMealSchedule <- loadMealSchedule mealScheduleId
         let

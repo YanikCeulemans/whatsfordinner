@@ -8,13 +8,12 @@ module Common.MealScheduleId
 
 import Prelude
 
-import Data.Codec.Argonaut (JsonCodec)
-import Data.Either as Either
-import Data.Maybe (Maybe)
-import Data.Profunctor (dimap)
-import Spa.Data.ULID as DULID
+import Common.Extensions.ULID as ULIDExt
 import Common.Id (Id)
 import Common.Id as Id
+import Data.Codec.Argonaut (JsonCodec)
+import Data.Either (Either)
+import Data.Profunctor (dimap)
 
 data MealSchedule
 
@@ -29,8 +28,8 @@ codec =
   unwrap (MkMealScheduleId id) = id
   wrap = MkMealScheduleId
 
-parse :: String -> Maybe MealScheduleId
-parse = DULID.parse >>> map Id.MkId >>> map MkMealScheduleId >>> Either.hush
+parse :: String -> Either String MealScheduleId
+parse = ULIDExt.parse >>> map Id.MkId >>> map MkMealScheduleId
 
 print :: MealScheduleId -> String
 print (MkMealScheduleId id) = Id.print id

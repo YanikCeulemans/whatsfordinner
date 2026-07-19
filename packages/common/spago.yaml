@@ -1,9 +1,14 @@
 package:
   name: common
   dependencies:
-    - console
-    - effect
+    - argonaut
+    - codec-argonaut
+    - formatters
     - prelude
+    - simple-ulid
   test:
     main: Common.Test.Main
-    dependencies: []
+    dependencies:
+      - effect
+      - spec
+      - spec-node

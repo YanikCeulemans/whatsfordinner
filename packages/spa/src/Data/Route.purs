@@ -9,6 +9,11 @@ module Spa.Data.Route
 
 import Prelude hiding ((/))
 
+import Common.GroceryListId (GroceryListId)
+import Common.Id as Id
+import Common.MealScheduleId (MealScheduleId)
+import Common.MealScheduleId as MealScheduleId
+import Common.SpaceId (SpaceId)
 import Data.Array (fold)
 import Data.Either as Either
 import Data.Generic.Rep (class Generic)
@@ -17,11 +22,6 @@ import Routing.Duplex (RouteDuplex', root)
 import Routing.Duplex as D
 import Routing.Duplex.Generic (noArgs, sum)
 import Routing.Duplex.Generic.Syntax ((/))
-import Common.GroceryListId (GroceryListId)
-import Common.Id as Id
-import Common.MealScheduleId (MealScheduleId)
-import Common.MealScheduleId as MealScheduleId
-import Common.SpaceId (SpaceId)
 import Spa.FFI.URL as URL
 
 spaceId :: RouteDuplex' String -> RouteDuplex' SpaceId
@@ -34,9 +34,7 @@ groceryListId =
 
 mealScheduleId :: RouteDuplex' String -> RouteDuplex' MealScheduleId
 mealScheduleId =
-  D.as MealScheduleId.print parse
-  where
-  parse = MealScheduleId.parse >>> Either.note "invalid meal schedule id"
+  D.as MealScheduleId.print MealScheduleId.parse
 
 data GroceriesRoute
   = Groceries
