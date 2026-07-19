@@ -2,12 +2,12 @@ module Common.Meal (Meal(..), ingredients, codec) where
 
 import Prelude
 
+import Common.Ingredient (Ingredient)
+import Common.Ingredient as Ingredient
 import Data.Codec.Argonaut (JsonCodec)
 import Data.Codec.Argonaut as Codec
 import Data.Codec.Argonaut.Record as CodecRecord
 import Data.Profunctor (dimap)
-import Common.Ingredient (Ingredient)
-import Common.Ingredient as Ingredient
 
 newtype Meal =
   MkMeal

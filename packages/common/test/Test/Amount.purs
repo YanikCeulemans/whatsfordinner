@@ -2,13 +2,13 @@ module Common.Test.Amount (spec) where
 
 import Prelude
 
+import Common.Amount (Amount)
+import Common.Amount as Amount
 import Data.Argonaut as J
 import Data.Codec.Argonaut as CA
 import Data.Either (Either)
 import Data.Either as Either
 import Partial.Unsafe (unsafeCrashWith)
-import Common.Amount (Amount)
-import Common.Amount as Amount
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (shouldContain, shouldSatisfy)
 

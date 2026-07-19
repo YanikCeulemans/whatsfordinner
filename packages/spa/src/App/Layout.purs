@@ -2,14 +2,14 @@ module Spa.App.Layout where
 
 import Prelude
 
+import Common.GroceryListId (GroceryListId)
+import Common.SpaceId (SpaceId)
 import Data.Maybe (Maybe(..))
 import Halogen.HTML as HH
 import Halogen.HTML.Core as HC
 import Halogen.HTML.Properties as HP
 import Spa.App.Shared as Shared
 import Spa.Data.Route as Route
-import Common.GroceryListId (GroceryListId)
-import Common.SpaceId (SpaceId)
 
 type Routing =
   { spaceId :: SpaceId

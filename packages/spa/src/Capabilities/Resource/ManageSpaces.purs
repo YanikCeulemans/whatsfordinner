@@ -2,10 +2,10 @@ module Spa.Capabilities.Resource.ManageSpaces where
 
 import Prelude
 
-import Data.Maybe (Maybe)
-import Halogen as H
 import Common.Space (Space)
 import Common.SpaceId (SpaceId)
+import Data.Maybe (Maybe)
+import Halogen as H
 
 class Monad m <= ManageSpaces m where
   loadSpaces :: m (Array Space)

@@ -2,9 +2,9 @@ module Spa.Capabilities.Resource.ManageGroceryList where
 
 import Prelude
 
-import Halogen as H
 import Common.GroceryList (GroceryEntry, GroceryList)
 import Common.GroceryListId (GroceryListId)
+import Halogen as H
 
 type SortedGrocery =
   { description :: String

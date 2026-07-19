@@ -2,6 +2,19 @@ module Spa.App.GenerateGroceries where
 
 import Prelude
 
+import Common.Amount as Amount
+import Common.GroceryList (GroceryEntry, GroceryList)
+import Common.GroceryList as GroceryList
+import Common.GroceryListId (GroceryListId)
+import Common.Id as Id
+import Common.Ingredient (Ingredient)
+import Common.MealSchedule (MealSchedule)
+import Common.MealSchedule as MealSchedule
+import Common.MealScheduleId (MealScheduleId)
+import Common.PlannedMeal as PlannedMeal
+import Common.Range (Range)
+import Common.Range as Range
+import Common.SpaceId (SpaceId)
 import Control.Bind (bindFlipped)
 import Control.Monad.State (StateT, evalStateT)
 import Control.Monad.State as MonadState
@@ -53,19 +66,6 @@ import Spa.Capabilities.Resource.ManageMealSchedule
   )
 import Spa.Data.Route (GroceriesRoute(..), SpaceRoute(..))
 import Spa.Data.Route as Route
-import Common.Amount as Amount
-import Common.GroceryList (GroceryEntry, GroceryList)
-import Common.GroceryList as GroceryList
-import Common.GroceryListId (GroceryListId)
-import Common.Id as Id
-import Common.Ingredient (Ingredient)
-import Common.MealSchedule (MealSchedule)
-import Common.MealSchedule as MealSchedule
-import Common.MealScheduleId (MealScheduleId)
-import Common.PlannedMeal as PlannedMeal
-import Common.Range (Range)
-import Common.Range as Range
-import Common.SpaceId (SpaceId)
 import Web.Event.Event (Event)
 
 data Selection

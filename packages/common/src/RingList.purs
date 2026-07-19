@@ -13,14 +13,14 @@ module Common.RingList
 
 import Prelude
 
+import Common.Range (Range)
+import Common.Range as Range
 import Data.Codec.Argonaut (JsonCodec)
 import Data.Codec.Argonaut.Common as CodecCommon
 import Data.Foldable (class Foldable)
 import Data.List (List(..))
 import Data.List as List
 import Data.Profunctor (dimap)
-import Common.Range (Range)
-import Common.Range as Range
 
 newtype RingList a = MkRingList (List a)
 

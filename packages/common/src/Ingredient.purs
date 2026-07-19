@@ -1,10 +1,10 @@
 module Common.Ingredient where
 
+import Common.Amount (Amount)
+import Common.Amount as Amount
 import Data.Codec.Argonaut (JsonCodec)
 import Data.Codec.Argonaut as Codec
 import Data.Codec.Argonaut.Record as CodecRecord
-import Common.Amount (Amount)
-import Common.Amount as Amount
 
 type Ingredient =
   { name :: String

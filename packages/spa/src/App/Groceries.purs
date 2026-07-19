@@ -2,6 +2,13 @@ module Spa.App.Groceries where
 
 import Prelude
 
+import Common.Amount (Amount(..))
+import Common.GroceryList (GroceryEntry, GroceryList)
+import Common.GroceryList as GroceryList
+import Common.GroceryListId (GroceryListId)
+import Common.Id as Id
+import Common.MealScheduleId (MealScheduleId)
+import Common.SpaceId (SpaceId)
 import Data.Array (fold, mapWithIndex)
 import Data.Array as Array
 import Data.Function (on)
@@ -39,13 +46,6 @@ import Spa.Capabilities.Resource.ManageGroceryList
   )
 import Spa.Capabilities.Resource.ManageSpaces (class ManageSpaces, loadSpace)
 import Spa.Data.Route (GroceriesRoute(..), Route(..), SpaceRoute(..))
-import Common.Amount (Amount(..))
-import Common.GroceryList (GroceryEntry, GroceryList)
-import Common.GroceryList as GroceryList
-import Common.GroceryListId (GroceryListId)
-import Common.Id as Id
-import Common.MealScheduleId (MealScheduleId)
-import Common.SpaceId (SpaceId)
 import Spa.FFI.WebSocket (WebSocket)
 import Spa.FFI.WebSocket as WS
 import Spa.FFI.WebSocket.Types.CloseEvent (CloseEvent)

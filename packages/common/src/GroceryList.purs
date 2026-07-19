@@ -2,6 +2,10 @@ module Common.GroceryList where
 
 import Prelude
 
+import Common.Amount (Amount)
+import Common.Amount as Amount
+import Common.GroceryEntryId (GroceryEntryId)
+import Common.Id as Id
 import Control.Alt ((<|>))
 import Data.Array ((:))
 import Data.Array as Array
@@ -15,10 +19,6 @@ import Data.Profunctor (dimap)
 import Data.String.CaseInsensitive (CaseInsensitiveString(..))
 import Data.Tuple (Tuple(..))
 import Data.Tuple.Nested ((/\))
-import Common.Amount (Amount)
-import Common.Amount as Amount
-import Common.GroceryEntryId (GroceryEntryId)
-import Common.Id as Id
 
 newtype GroceryEntry = MkGroceryEntry
   { id :: GroceryEntryId

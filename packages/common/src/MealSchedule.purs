@@ -2,15 +2,7 @@ module Common.MealSchedule where
 
 import Prelude
 
-import Data.Codec.Argonaut (JsonCodec)
-import Data.Codec.Argonaut.Record as CodecRecord
-import Data.Date (Date)
-import Data.Date as Date
-import Data.Int as Int
-import Data.List (List)
-import Data.Profunctor (dimap)
-import Data.Time.Duration (Days(..))
-import Common.Extensions.Date as DateExtensions
+import Common.Extensions.Date as DateExt
 import Common.MealScheduleId (MealScheduleId)
 import Common.MealScheduleId as MealSchedule
 import Common.PlannedMeal (PlannedMeal)
@@ -19,6 +11,14 @@ import Common.Range (Range)
 import Common.Range as Range
 import Common.RingList (RingList)
 import Common.RingList as RingList
+import Data.Codec.Argonaut (JsonCodec)
+import Data.Codec.Argonaut.Record as CodecRecord
+import Data.Date (Date)
+import Data.Date as Date
+import Data.Int as Int
+import Data.List (List)
+import Data.Profunctor (dimap)
+import Data.Time.Duration (Days(..))
 
 newtype MealSchedule = MkMealSchedule
   { id :: MealScheduleId, startDate :: Date, schedule :: RingList PlannedMeal }
@@ -27,7 +27,7 @@ codec :: JsonCodec MealSchedule
 codec =
   dimap unwrap wrap $ CodecRecord.object "MealSchedule"
     { id: MealSchedule.codec
-    , startDate: DateExtensions.codec
+    , startDate: DateExt.codec
     , schedule: RingList.codec PlannedMeal.codec
     }
   where

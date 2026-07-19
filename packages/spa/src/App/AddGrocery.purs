@@ -2,6 +2,11 @@ module Spa.App.AddGrocery where
 
 import Prelude
 
+import Common.Amount as Amount
+import Common.GroceryList (GroceryEntry, GroceryList)
+import Common.GroceryList as GroceryList
+import Common.GroceryListId (GroceryListId)
+import Common.Id as Id
 import Data.Array as Array
 import Data.Maybe (Maybe(..))
 import Data.Maybe as Maybe
@@ -37,11 +42,6 @@ import Spa.Capabilities.Resource.ManageGroceryList
   , upsertGroceryList
   )
 import Spa.Data.Route (Route)
-import Common.Amount as Amount
-import Common.GroceryList (GroceryEntry, GroceryList)
-import Common.GroceryList as GroceryList
-import Common.GroceryListId (GroceryListId)
-import Common.Id as Id
 import Web.Event.Event (Event)
 import Web.UIEvent.MouseEvent (MouseEvent)
 

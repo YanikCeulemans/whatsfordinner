@@ -2,15 +2,15 @@ module Common.PlannedMeal where
 
 import Prelude
 
+import Common.Ingredient (Ingredient)
+import Common.Meal (Meal)
+import Common.Meal as Meal
 import Data.Codec.Argonaut (JsonCodec)
 import Data.Codec.Argonaut.Variant as CodecVariant
 import Data.Either (Either(..))
 import Data.Foldable (fold)
 import Data.Profunctor (dimap)
 import Data.Variant as V
-import Common.Ingredient (Ingredient)
-import Common.Meal (Meal)
-import Common.Meal as Meal
 import Type.Prelude (Proxy(..))
 
 data PlannedMeal
