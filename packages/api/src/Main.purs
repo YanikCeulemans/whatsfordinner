@@ -1,11 +1,20 @@
 module Api.Main where
 
-import Prelude
+import HTTPurple
+import Prelude hiding ((/))
 
-import Effect (Effect)
-import Effect.Console (log)
+data Route = Api String
 
-main :: Effect Unit
+derive instance Generic Route _
+
+route :: RouteDuplex' Route
+route = mkRoute
+  { "Api": "api" / segment
+  }
+
+main :: ServerM
 main = do
-  log "🍝"
+  serve { port: 8080 } { route, router }
+  where
+  router { route: Api rest } = ok $ "api route " <> rest
 

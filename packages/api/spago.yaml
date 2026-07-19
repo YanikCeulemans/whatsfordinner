@@ -3,6 +3,7 @@ package:
   dependencies:
     - console
     - effect
+    - httpurple
     - prelude
   test:
     main: Api.Test.Main

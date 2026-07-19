@@ -1,5 +1,5 @@
 [tasks.dev]
-run = 'watchexec -e .purs,.js -i output spago bundle --platform browser --bundle-type app'
+run = 'watchexec -e .purs,.js -i output spago bundle -p spa --platform browser --bundle-type app'
 
 [tasks.build-spa]
 run = 'spago bundle --platform browser --bundle-type app --minify -p spa --module Spa.Main'
