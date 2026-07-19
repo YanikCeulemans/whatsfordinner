@@ -2,10 +2,8 @@ module Spa.Main where
 
 import Prelude
 
-import Common.Greeting as Greeting
 import Data.Array (fold)
 import Data.Maybe (Maybe(..))
-import Debug as Debug
 import Effect (Effect)
 import Effect.Aff (Aff, launchAff_)
 import Effect.Class (liftEffect)
@@ -52,7 +50,6 @@ interceptNavigation f = liftEffect do
 
 main :: Effect Unit
 main = launchAff_ $ do
-  Debug.traceM $ { msg: Greeting.greeting "world" }
   let
     component = H.hoist AppM.runAppM Router.component
 

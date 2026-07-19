@@ -17,11 +17,11 @@ import Routing.Duplex (RouteDuplex', root)
 import Routing.Duplex as D
 import Routing.Duplex.Generic (noArgs, sum)
 import Routing.Duplex.Generic.Syntax ((/))
-import Spa.Domain.GroceryListId (GroceryListId)
-import Spa.Domain.Id as Id
-import Spa.Domain.MealScheduleId (MealScheduleId)
-import Spa.Domain.MealScheduleId as MealScheduleId
-import Spa.Domain.SpaceId (SpaceId)
+import Common.GroceryListId (GroceryListId)
+import Common.Id as Id
+import Common.MealScheduleId (MealScheduleId)
+import Common.MealScheduleId as MealScheduleId
+import Common.SpaceId (SpaceId)
 import Spa.FFI.URL as URL
 
 spaceId :: RouteDuplex' String -> RouteDuplex' SpaceId

@@ -35,14 +35,14 @@ import Spa.Capabilities.Resource.ManageMealSchedule
   , loadMealSchedule
   )
 import Spa.Capabilities.Resource.ManageSpaces (class ManageSpaces, loadSpace)
-import Spa.Domain.GroceryListId (GroceryListId)
-import Spa.Domain.MealSchedule (MealSchedule)
-import Spa.Domain.MealSchedule as MealSchedule
-import Spa.Domain.PlannedMeal (PlannedMeal(..))
-import Spa.Domain.Range (Range)
-import Spa.Domain.Range as Range
-import Spa.Domain.Space (Space)
-import Spa.Domain.SpaceId (SpaceId)
+import Common.GroceryListId (GroceryListId)
+import Common.MealSchedule (MealSchedule)
+import Common.MealSchedule as MealSchedule
+import Common.PlannedMeal (PlannedMeal(..))
+import Common.Range (Range)
+import Common.Range as Range
+import Common.Space (Space)
+import Common.SpaceId (SpaceId)
 
 type Input = SpaceId
 

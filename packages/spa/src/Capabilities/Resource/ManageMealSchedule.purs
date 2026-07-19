@@ -4,8 +4,8 @@ import Prelude
 
 import Data.Maybe (Maybe)
 import Halogen as H
-import Spa.Domain.MealSchedule (MealSchedule)
-import Spa.Domain.MealScheduleId (MealScheduleId)
+import Common.MealSchedule (MealSchedule)
+import Common.MealScheduleId (MealScheduleId)
 
 class Monad m <= ManageMealSchedule m where
   loadMealSchedule :: MealScheduleId -> m (Maybe MealSchedule)

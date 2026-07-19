@@ -53,19 +53,19 @@ import Spa.Capabilities.Resource.ManageMealSchedule
   )
 import Spa.Data.Route (GroceriesRoute(..), SpaceRoute(..))
 import Spa.Data.Route as Route
-import Spa.Domain.Amount as Amount
-import Spa.Domain.GroceryList (GroceryEntry, GroceryList)
-import Spa.Domain.GroceryList as GroceryList
-import Spa.Domain.GroceryListId (GroceryListId)
-import Spa.Domain.Id as Id
-import Spa.Domain.Ingredient (Ingredient)
-import Spa.Domain.MealSchedule (MealSchedule)
-import Spa.Domain.MealSchedule as MealSchedule
-import Spa.Domain.MealScheduleId (MealScheduleId)
-import Spa.Domain.PlannedMeal as PlannedMeal
-import Spa.Domain.Range (Range)
-import Spa.Domain.Range as Range
-import Spa.Domain.SpaceId (SpaceId)
+import Common.Amount as Amount
+import Common.GroceryList (GroceryEntry, GroceryList)
+import Common.GroceryList as GroceryList
+import Common.GroceryListId (GroceryListId)
+import Common.Id as Id
+import Common.Ingredient (Ingredient)
+import Common.MealSchedule (MealSchedule)
+import Common.MealSchedule as MealSchedule
+import Common.MealScheduleId (MealScheduleId)
+import Common.PlannedMeal as PlannedMeal
+import Common.Range (Range)
+import Common.Range as Range
+import Common.SpaceId (SpaceId)
 import Web.Event.Event (Event)
 
 data Selection

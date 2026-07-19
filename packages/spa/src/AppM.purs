@@ -49,11 +49,11 @@ import Spa.Capabilities.Resource.ManageSpaces (class ManageSpaces)
 import Spa.Data.Route (Route)
 import Spa.Data.Route as Route
 import Spa.Data.ULID as DULID
-import Spa.Domain.GroceryList (GroceryEntry, GroceryList)
-import Spa.Domain.GroceryList as GroceryList
-import Spa.Domain.GroceryListId (GroceryListId)
-import Spa.Domain.Id as Id
-import Spa.Domain.MealScheduleId as MealScheduleId
+import Common.GroceryList (GroceryEntry, GroceryList)
+import Common.GroceryList as GroceryList
+import Common.GroceryListId (GroceryListId)
+import Common.Id as Id
+import Common.MealScheduleId as MealScheduleId
 import Spa.FFI.Navigation as Nav
 import Web.HTML as HTML
 import Web.HTML.Window as Window

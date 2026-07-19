@@ -4,8 +4,8 @@ import Prelude
 
 import Data.Maybe (Maybe)
 import Halogen as H
-import Spa.Domain.Space (Space)
-import Spa.Domain.SpaceId (SpaceId)
+import Common.Space (Space)
+import Common.SpaceId (SpaceId)
 
 class Monad m <= ManageSpaces m where
   loadSpaces :: m (Array Space)

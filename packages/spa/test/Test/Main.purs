@@ -17,15 +17,15 @@ import Effect (Effect)
 import Partial.Unsafe (unsafeCrashWith)
 import Simple.ULID as ULID
 import Spa.Data.ULID as DULID
-import Spa.Domain.Id as Id
-import Spa.Domain.Meal (Meal(..))
-import Spa.Domain.MealSchedule (MealSchedule)
-import Spa.Domain.MealSchedule as MealSchedule
-import Spa.Domain.MealScheduleId (MealScheduleId(..))
-import Spa.Domain.PlannedMeal (PlannedMeal(..))
-import Spa.Domain.Range as Range
-import Spa.Domain.RingList (RingList)
-import Spa.Domain.RingList as RingList
+import Common.Id as Id
+import Common.Meal (Meal(..))
+import Common.MealSchedule (MealSchedule)
+import Common.MealSchedule as MealSchedule
+import Common.MealScheduleId (MealScheduleId(..))
+import Common.PlannedMeal (PlannedMeal(..))
+import Common.Range as Range
+import Common.RingList (RingList)
+import Common.RingList as RingList
 import Spa.Test.Domain.Amount as Amount
 import Spa.Test.Domain.Grocery as Grocery
 import Spa.Test.Domain.GroceryId as GroceryId

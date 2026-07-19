@@ -9,14 +9,14 @@ import Data.Enum (toEnum)
 import Data.Maybe as Maybe
 import Partial.Unsafe (unsafeCrashWith)
 import Spa.Data.ULID as DULID
-import Spa.Domain.Amount as Amount
-import Spa.Domain.GroceryListId (GroceryListId)
-import Spa.Domain.Id as Id
-import Spa.Domain.Meal (Meal(..))
-import Spa.Domain.MealSchedule (MealSchedule(..))
-import Spa.Domain.MealScheduleId (MealScheduleId(..))
-import Spa.Domain.PlannedMeal (PlannedMeal(..))
-import Spa.Domain.RingList as RingList
+import Common.Amount as Amount
+import Common.GroceryListId (GroceryListId)
+import Common.Id as Id
+import Common.Meal (Meal(..))
+import Common.MealSchedule (MealSchedule(..))
+import Common.MealScheduleId (MealScheduleId(..))
+import Common.PlannedMeal (PlannedMeal(..))
+import Common.RingList as RingList
 
 theDate :: Date
 theDate =

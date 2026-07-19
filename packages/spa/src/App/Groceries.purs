@@ -39,13 +39,13 @@ import Spa.Capabilities.Resource.ManageGroceryList
   )
 import Spa.Capabilities.Resource.ManageSpaces (class ManageSpaces, loadSpace)
 import Spa.Data.Route (GroceriesRoute(..), Route(..), SpaceRoute(..))
-import Spa.Domain.Amount (Amount(..))
-import Spa.Domain.GroceryList (GroceryEntry, GroceryList)
-import Spa.Domain.GroceryList as GroceryList
-import Spa.Domain.GroceryListId (GroceryListId)
-import Spa.Domain.Id as Id
-import Spa.Domain.MealScheduleId (MealScheduleId)
-import Spa.Domain.SpaceId (SpaceId)
+import Common.Amount (Amount(..))
+import Common.GroceryList (GroceryEntry, GroceryList)
+import Common.GroceryList as GroceryList
+import Common.GroceryListId (GroceryListId)
+import Common.Id as Id
+import Common.MealScheduleId (MealScheduleId)
+import Common.SpaceId (SpaceId)
 import Spa.FFI.WebSocket (WebSocket)
 import Spa.FFI.WebSocket as WS
 import Spa.FFI.WebSocket.Types.CloseEvent (CloseEvent)

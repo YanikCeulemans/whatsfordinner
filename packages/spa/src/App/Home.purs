@@ -28,9 +28,9 @@ import Spa.Capabilities.Resource.ManageSpaces (class ManageSpaces)
 import Spa.Capabilities.Resource.ManageSpaces as ManageSpaces
 import Spa.Data.Route as Route
 import Spa.Data.ULID as DULID
-import Spa.Domain.Id as Id
-import Spa.Domain.Space (Space)
-import Spa.Domain.SpaceId (SpaceId)
+import Common.Id as Id
+import Common.Space (Space)
+import Common.SpaceId (SpaceId)
 import Web.Event.Event (Event)
 
 theSpaceId :: SpaceId

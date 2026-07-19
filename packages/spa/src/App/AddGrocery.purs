@@ -37,11 +37,11 @@ import Spa.Capabilities.Resource.ManageGroceryList
   , upsertGroceryList
   )
 import Spa.Data.Route (Route)
-import Spa.Domain.Amount as Amount
-import Spa.Domain.GroceryList (GroceryEntry, GroceryList)
-import Spa.Domain.GroceryList as GroceryList
-import Spa.Domain.GroceryListId (GroceryListId)
-import Spa.Domain.Id as Id
+import Common.Amount as Amount
+import Common.GroceryList (GroceryEntry, GroceryList)
+import Common.GroceryList as GroceryList
+import Common.GroceryListId (GroceryListId)
+import Common.Id as Id
 import Web.Event.Event (Event)
 import Web.UIEvent.MouseEvent (MouseEvent)
 

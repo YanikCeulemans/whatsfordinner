@@ -8,8 +8,8 @@ import Halogen.HTML.Core as HC
 import Halogen.HTML.Properties as HP
 import Spa.App.Shared as Shared
 import Spa.Data.Route as Route
-import Spa.Domain.GroceryListId (GroceryListId)
-import Spa.Domain.SpaceId (SpaceId)
+import Common.GroceryListId (GroceryListId)
+import Common.SpaceId (SpaceId)
 
 type Routing =
   { spaceId :: SpaceId
