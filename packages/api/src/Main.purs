@@ -132,6 +132,7 @@ renderHTML html' = "<!DOCTYPE html>" <> help html'
 
 instance Body HTML where
   -- TODO: This implementation renders the body twice, can we reduce it?
+  -- - We could create a new type containing the rendered html that has an instance for Body
   defaultHeaders html' =
     pure $ mkRequestHeaders
       [ Tuple "Content-Type" "text/html"
@@ -169,13 +170,38 @@ button = Node "button"
 text :: String -> HTML
 text = Content
 
+script :: Array String -> Array HTML -> HTML
+script = Node "script"
+
 rootView :: HTML
 rootView =
   html []
-    [ head [] []
+    [ head []
+        [ script []
+            [ text
+                """
+                let ws = null;
+                const connect = () => {
+                  if (ws) return;
+                  ws = new WebSocket('/ws');
+                  ws.addEventListener('message', evt => {
+                    console.log('message received', evt);
+                  });
+                  ws.addEventListener('close', evt => {
+                    console.log('socket closed', evt);
+                  });
+                };
+                const disconnect = () => {
+                  console.log("disconnect from js");
+                  ws?.close();
+                  ws = null;
+                };
+                """
+            ]
+        ]
     , body []
-        [ button [] [ text "connect" ]
-        , button [] [ text "disconnect" ]
+        [ button [ "onclick='connect()'" ] [ text "connect" ]
+        , button [ "onclick='disconnect()'" ] [ text "disconnect" ]
         ]
     ]
 
