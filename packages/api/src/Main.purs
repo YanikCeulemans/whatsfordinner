@@ -4,37 +4,42 @@ import HTTPurple
 import Prelude hiding ((/))
 
 import Data.Array as Array
+import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Data.String as String
+import Data.Tuple (Tuple(..))
 import Debug as Debug
 import Effect (Effect)
+import Effect.Aff (makeAff, nonCanceler)
 import Effect.Aff.Compat
-  ( EffectFn1
-  , EffectFn3
-  , mkEffectFn1
-  , mkEffectFn3
+  ( mkEffectFn3
   , runEffectFn1
   )
 import Effect.Exception (Error)
 import Effect.Exception.Unsafe (unsafeThrow)
+import HTTPurple.Body (class Body)
+import HTTPurple.Headers (mkRequestHeaders)
 import Literals.Undefined (undefined)
 import Node.Encoding as Encoding
 import Node.HTTP.IncomingMessage as NodeIM
 import Node.HTTP.OutgoingMessage as OutgoingMessage
 import Node.HTTP.ServerResponse as ServerResponse
 import Node.HTTP.Types (IMServer, IncomingMessage, ServerResponse)
+import Node.Stream (end')
 import Node.Stream as Writable
 import Untagged.Union (UndefinedOr, asOneOf)
 
 data Route
-  = Api String
+  = Root
+  | Api String
   | WS
 
 derive instance Generic Route _
 
 route :: RouteDuplex' Route
 route = mkRoute
-  { "Api": "api" / segment
+  { "Root": noArgs
+  , "Api": "api" / segment
   , "WS": "ws" / noArgs
   }
 
@@ -101,11 +106,85 @@ nodeMiddleware =
     $ usingMiddleware
     $ pursMiddleware myMiddleware
 
+data HTML
+  = Node String (Array String) (Array HTML)
+  | Content String
+
+renderHTML :: HTML -> String
+renderHTML html' = "<!DOCTYPE html>" <> help html'
+  where
+  help =
+    case _ of
+      Node tag attrs children ->
+        Array.fold
+          [ "<"
+          , tag
+          , case attrs of
+              [] -> ""
+              _ -> " " <> Array.intercalate " " attrs
+          , ">"
+          , Array.fold $ help <$> children
+          , "</"
+          , tag
+          , ">"
+          ]
+      Content text' -> text'
+
+instance Body HTML where
+  -- TODO: This implementation renders the body twice, can we reduce it?
+  defaultHeaders html' =
+    pure $ mkRequestHeaders
+      [ Tuple "Content-Type" "text/html"
+      , Tuple "Content-Length" $ show $ String.length rendered
+      ]
+    where
+    rendered = renderHTML html'
+  write html' response = makeAff \done -> do
+    let
+      stream = OutgoingMessage.toWriteable $ ServerResponse.toOutgoingMessage
+        response
+    void
+      $ Writable.writeString' stream Encoding.UTF8 rendered
+      $ const
+      $ end' stream
+      $ const
+      $ done
+      $ Right unit
+    pure nonCanceler
+    where
+    rendered = renderHTML html'
+
+html :: Array String -> Array HTML -> HTML
+html = Node "html"
+
+head :: Array String -> Array HTML -> HTML
+head = Node "head"
+
+body :: Array String -> Array HTML -> HTML
+body = Node "body"
+
+button :: Array String -> Array HTML -> HTML
+button = Node "button"
+
+text :: String -> HTML
+text = Content
+
+rootView :: HTML
+rootView =
+  html []
+    [ head [] []
+    , body []
+        [ button [] [ text "connect" ]
+        , button [] [ text "disconnect" ]
+        ]
+    ]
+
 main :: ServerM
 main = do
   serveNodeMiddleware { port: 8080 } { route, router, nodeMiddleware }
   where
   router = case _ of
+    { route: Root } -> ok rootView
     { route: Api rest } -> ok $ "api route " <> rest
     { route: WS, headers } -> handleWS headers
 
