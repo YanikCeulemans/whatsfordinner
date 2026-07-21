@@ -2,6 +2,7 @@ package:
   name: api
   dependencies:
     - console
+    - debug
     - effect
     - httpurple
     - prelude
