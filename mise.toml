@@ -17,11 +17,11 @@ run = 'purs-tidy format-in-place packages/**/*.purs'
 _.path = './node_modules/.bin'
 
 [tools]
-node = "22.20.0"
+node = "24.18"
 pitchfork = "latest"
 "npm:spago" = "latest"
 purescript = "latest"
-"npm:esbuild" = "latest"
+"npm:esbuild" = { version = "latest", allow_builds = ["esbuild"] }
 "npm:purs-tidy" = "latest"
 
 [tools."npm:purescript-language-server"]

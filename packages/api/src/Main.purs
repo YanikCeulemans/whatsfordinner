@@ -3,24 +3,30 @@ module Api.Main where
 import HTTPurple
 import Prelude hiding ((/))
 
+import Api.Crypto as Crypto
+import Control.Monad.Except (except, runExceptT)
 import Data.Array as Array
 import Data.Either (Either(..))
+import Data.Either as Either
 import Data.Maybe (Maybe(..))
 import Data.String as String
+import Data.Traversable (for_)
 import Data.Tuple (Tuple(..))
 import Debug as Debug
 import Effect (Effect)
 import Effect.Aff (makeAff, nonCanceler)
-import Effect.Aff.Compat
-  ( mkEffectFn3
-  , runEffectFn1
-  )
+import Effect.Aff.Compat (mkEffectFn3, runEffectFn1)
+import Effect.Class (liftEffect)
 import Effect.Exception (Error)
 import Effect.Exception.Unsafe (unsafeThrow)
+import Effect.Unsafe (unsafePerformEffect)
+import Foreign.Object as Object
 import HTTPurple.Body (class Body)
 import HTTPurple.Headers (mkRequestHeaders)
 import Literals.Undefined (undefined)
+import Node.Buffer as Buffer
 import Node.Encoding as Encoding
+import Node.HTTP.IncomingMessage as IncomingMessage
 import Node.HTTP.IncomingMessage as NodeIM
 import Node.HTTP.OutgoingMessage as OutgoingMessage
 import Node.HTTP.ServerResponse as ServerResponse
@@ -74,6 +80,30 @@ parseUrlParts =
   String.split (String.Pattern "/")
     >>> Array.filter (not <<< String.null)
 
+websocketKeyHeader :: String
+websocketKeyHeader = "Sec-WebSocket-Key"
+
+websocketAcceptHeader :: String
+websocketAcceptHeader = "Sec-WebSocket-Accept"
+
+switchingProtocols_ :: String -> ServerResponse -> Effect Unit
+switchingProtocols_ _ _ = unsafeThrow "todo1"
+
+badRequest_ :: ServerResponse -> Effect Unit
+badRequest_ _ = unsafeThrow "todo2"
+
+buildWsAcceptHeaderValue :: String -> String
+buildWsAcceptHeaderValue key =
+  Crypto.sha1 Encoding.Base64 $ key <> magicString
+  where
+  magicString = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+
+httpStatusCodes =
+  { switchingProtocols: 101
+  , ok: 200
+  , badRequest: 400
+  }
+
 myMiddleware :: PursMiddleware
 myMiddleware request response next = do
   let
@@ -83,20 +113,38 @@ myMiddleware request response next = do
   Debug.traceM { method, url, urlParts }
   case method, urlParts of
     "GET", [ "ws" ] -> do
-      socket <- NodeIM.socket request
-      Debug.traceM { socket, method, url }
-      ServerResponse.setStatusCode 200 response
-      let
-        payload = "Hello, world!"
-        outMsg = ServerResponse.toOutgoingMessage response
-      OutgoingMessage.appendHeader "Content-Type" "text/plain" outMsg
-      OutgoingMessage.appendHeader
-        "Content-Length"
-        (show $ String.length payload)
-        outMsg
-      let
-        writeable = OutgoingMessage.toWriteable outMsg
-      void $ Writable.writeString writeable Encoding.UTF8 payload
+      result <- runExceptT do
+        let
+          headers = IncomingMessage.headers request
+        websocketKey <- except
+          $ Either.note ("missing header: " <> websocketKeyHeader)
+          $ Object.lookup websocketKeyHeader headers
+
+        let
+          responseHeaders =
+            [ Tuple "Upgrade" "websocket"
+            , Tuple "Connection" "Upgrade"
+            , Tuple websocketAcceptHeader $ buildWsAcceptHeaderValue
+                websocketKey
+            ]
+
+        socket <- liftEffect $ NodeIM.socket request
+
+        liftEffect $ ServerResponse.setStatusCode
+          httpStatusCodes.switchingProtocols
+          response
+
+        let
+          outMsg = ServerResponse.toOutgoingMessage response
+
+        for_ responseHeaders \(Tuple key value) ->
+          liftEffect $ OutgoingMessage.appendHeader key value outMsg
+
+      case result of
+        Left _e ->
+          badRequest_ response
+        Right _ ->
+          pure unit
     _, _ ->
       next $ asOneOf undefined
 
