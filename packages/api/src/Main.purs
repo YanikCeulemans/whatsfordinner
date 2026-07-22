@@ -8,10 +8,14 @@ import Control.Monad.Except (except, runExceptT)
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Either as Either
+import Data.Map (Map)
+import Data.Map as Map
 import Data.Maybe (Maybe(..))
 import Data.String as String
+import Data.String.CaseInsensitive (CaseInsensitiveString(..))
 import Data.Traversable (for_)
 import Data.Tuple (Tuple(..))
+import Data.Tuple as Tuple
 import Debug as Debug
 import Effect (Effect)
 import Effect.Aff (makeAff, nonCanceler)
@@ -87,10 +91,32 @@ websocketAcceptHeader :: String
 websocketAcceptHeader = "Sec-WebSocket-Accept"
 
 switchingProtocols_ :: String -> ServerResponse -> Effect Unit
-switchingProtocols_ _ _ = unsafeThrow "todo1"
+switchingProtocols_ websocketKey serverResponse = do
+  ServerResponse.setStatusCode
+    httpStatusCodes.switchingProtocols
+    serverResponse
+
+  Debug.traceM "set statuscode"
+  let
+    responseHeaders =
+      [ Tuple "Upgrade" "websocket"
+      , Tuple "Connection" "Upgrade"
+      , Tuple websocketAcceptHeader
+          $ buildWsAcceptHeaderValue websocketKey
+      ]
+
+  let
+    outMsg = ServerResponse.toOutgoingMessage serverResponse
+
+  for_ responseHeaders \(Tuple key value) ->
+    OutgoingMessage.appendHeader key value outMsg
+
+  Writable.end $ OutgoingMessage.toWriteable outMsg
 
 badRequest_ :: ServerResponse -> Effect Unit
-badRequest_ _ = unsafeThrow "todo2"
+badRequest_ serverResponse = do
+  void $ unsafeThrow "TODO"
+  ServerResponse.setStatusCode httpStatusCodes.badRequest serverResponse
 
 buildWsAcceptHeaderValue :: String -> String
 buildWsAcceptHeaderValue key =
@@ -104,6 +130,15 @@ httpStatusCodes =
   , badRequest: 400
   }
 
+headerLookup
+  :: forall messageType
+   . String
+  -> Map CaseInsensitiveString String
+  -> Either String String
+headerLookup key requestHeaders =
+  Map.lookup (CaseInsensitiveString key) requestHeaders
+    # Either.note ("missing header: " <> key)
+
 myMiddleware :: PursMiddleware
 myMiddleware request response next = do
   let
@@ -113,34 +148,26 @@ myMiddleware request response next = do
   Debug.traceM { method, url, urlParts }
   case method, urlParts of
     "GET", [ "ws" ] -> do
+      Debug.traceM "GET /ws"
       result <- runExceptT do
         let
-          headers = IncomingMessage.headers request
-        websocketKey <- except
-          $ Either.note ("missing header: " <> websocketKeyHeader)
-          $ Object.lookup websocketKeyHeader headers
+          requestHeaders =
+            IncomingMessage.headers request
+              # (Object.toUnfoldable :: _ -> Array _)
+              # map
+                  ( \(Tuple key value) ->
+                      Tuple (CaseInsensitiveString key) value
+                  )
+              # Map.fromFoldable
 
-        let
-          responseHeaders =
-            [ Tuple "Upgrade" "websocket"
-            , Tuple "Connection" "Upgrade"
-            , Tuple websocketAcceptHeader $ buildWsAcceptHeaderValue
-                websocketKey
-            ]
+        websocketKey <- except $ headerLookup websocketKeyHeader requestHeaders
+        Debug.traceM $ { websocketKey }
 
         socket <- liftEffect $ NodeIM.socket request
 
-        liftEffect $ ServerResponse.setStatusCode
-          httpStatusCodes.switchingProtocols
-          response
+        liftEffect $ switchingProtocols_ websocketKey response
 
-        let
-          outMsg = ServerResponse.toOutgoingMessage response
-
-        for_ responseHeaders \(Tuple key value) ->
-          liftEffect $ OutgoingMessage.appendHeader key value outMsg
-
-      case result of
+      case Debug.spy "result" result of
         Left _e ->
           badRequest_ response
         Right _ ->
