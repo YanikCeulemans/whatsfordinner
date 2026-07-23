@@ -3,46 +3,31 @@ module Api.Main where
 import HTTPurple
 import Prelude hiding ((/))
 
-import Api.Crypto as Crypto
-import Control.Monad.Except (except, runExceptT)
 import Data.Array as Array
 import Data.Either (Either(..))
-import Data.Either as Either
-import Data.Map (Map)
-import Data.Map as Map
 import Data.Maybe (Maybe(..))
 import Data.String as String
-import Data.String.CaseInsensitive (CaseInsensitiveString(..))
-import Data.Traversable (for_)
 import Data.Tuple (Tuple(..))
-import Data.Tuple as Tuple
 import Debug as Debug
 import Effect (Effect)
 import Effect.Aff (makeAff, nonCanceler)
 import Effect.Aff.Compat (mkEffectFn3, runEffectFn1)
-import Effect.Class (liftEffect)
 import Effect.Exception (Error)
-import Effect.Exception.Unsafe (unsafeThrow)
-import Effect.Unsafe (unsafePerformEffect)
-import Foreign.Object as Object
 import HTTPurple.Body (class Body)
 import HTTPurple.Headers (mkRequestHeaders)
-import Literals.Undefined (undefined)
-import Node.Buffer as Buffer
+import Node.Buffer (Buffer)
 import Node.Encoding as Encoding
-import Node.HTTP.IncomingMessage as IncomingMessage
-import Node.HTTP.IncomingMessage as NodeIM
 import Node.HTTP.OutgoingMessage as OutgoingMessage
 import Node.HTTP.ServerResponse as ServerResponse
 import Node.HTTP.Types (IMServer, IncomingMessage, ServerResponse)
+import Node.Net.Types (Socket, TCP)
 import Node.Stream (end')
 import Node.Stream as Writable
-import Untagged.Union (UndefinedOr, asOneOf)
+import Untagged.Union (UndefinedOr)
 
 data Route
   = Root
   | Api String
-  | WS
 
 derive instance Generic Route _
 
@@ -50,18 +35,7 @@ route :: RouteDuplex' Route
 route = mkRoute
   { "Root": noArgs
   , "Api": "api" / segment
-  , "WS": "ws" / noArgs
   }
-
-handleWS :: RequestHeaders -> ResponseM
-handleWS reqHeaders =
-  case lookup reqHeaders wsKeyKey of
-    Nothing -> badRequest $ "missing websocket key header: " <> wsKeyKey
-    Just wsKey ->
-      switchingProtocols' $ headers
-        { "Sec-WebSocket-Accept": wsKey }
-  where
-  wsKeyKey = "Sec-WebSocket-Key"
 
 type PursMiddleware =
   (IncomingMessage IMServer)
@@ -79,107 +53,16 @@ pursMiddleware middleware = NodeMiddleware $ mkEffectFn3 help
     middleware request response $ next' next
     pure $ pure unit
 
-parseUrlParts :: String -> Array String
-parseUrlParts =
-  String.split (String.Pattern "/")
-    >>> Array.filter (not <<< String.null)
-
-websocketKeyHeader :: String
-websocketKeyHeader = "Sec-WebSocket-Key"
-
-websocketAcceptHeader :: String
-websocketAcceptHeader = "Sec-WebSocket-Accept"
-
-switchingProtocols_ :: String -> ServerResponse -> Effect Unit
-switchingProtocols_ websocketKey serverResponse = do
-  ServerResponse.setStatusCode
-    httpStatusCodes.switchingProtocols
-    serverResponse
-
-  Debug.traceM "set statuscode"
-  let
-    responseHeaders =
-      [ Tuple "Upgrade" "websocket"
-      , Tuple "Connection" "Upgrade"
-      , Tuple websocketAcceptHeader
-          $ buildWsAcceptHeaderValue websocketKey
-      ]
-
-  let
-    outMsg = ServerResponse.toOutgoingMessage serverResponse
-
-  for_ responseHeaders \(Tuple key value) ->
-    OutgoingMessage.appendHeader key value outMsg
-
-  Writable.end $ OutgoingMessage.toWriteable outMsg
-
-badRequest_ :: ServerResponse -> Effect Unit
-badRequest_ serverResponse = do
-  void $ unsafeThrow "TODO"
-  ServerResponse.setStatusCode httpStatusCodes.badRequest serverResponse
-
-buildWsAcceptHeaderValue :: String -> String
-buildWsAcceptHeaderValue key =
-  Crypto.sha1 Encoding.Base64 $ key <> magicString
-  where
-  magicString = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
-
+httpStatusCodes
+  :: { badRequest :: Int
+     , ok :: Int
+     , switchingProtocols :: Int
+     }
 httpStatusCodes =
   { switchingProtocols: 101
   , ok: 200
   , badRequest: 400
   }
-
-headerLookup
-  :: forall messageType
-   . String
-  -> Map CaseInsensitiveString String
-  -> Either String String
-headerLookup key requestHeaders =
-  Map.lookup (CaseInsensitiveString key) requestHeaders
-    # Either.note ("missing header: " <> key)
-
-myMiddleware :: PursMiddleware
-myMiddleware request response next = do
-  let
-    method = NodeIM.method request
-    url = NodeIM.url request
-    urlParts = parseUrlParts url
-  Debug.traceM { method, url, urlParts }
-  case method, urlParts of
-    "GET", [ "ws" ] -> do
-      Debug.traceM "GET /ws"
-      result <- runExceptT do
-        let
-          requestHeaders =
-            IncomingMessage.headers request
-              # (Object.toUnfoldable :: _ -> Array _)
-              # map
-                  ( \(Tuple key value) ->
-                      Tuple (CaseInsensitiveString key) value
-                  )
-              # Map.fromFoldable
-
-        websocketKey <- except $ headerLookup websocketKeyHeader requestHeaders
-        Debug.traceM $ { websocketKey }
-
-        socket <- liftEffect $ NodeIM.socket request
-
-        liftEffect $ switchingProtocols_ websocketKey response
-
-      case Debug.spy "result" result of
-        Left _e ->
-          badRequest_ response
-        Right _ ->
-          pure unit
-    _, _ ->
-      next $ asOneOf undefined
-
-nodeMiddleware :: NodeMiddlewareStack () ()
-nodeMiddleware =
-  NodeMiddlewareStack
-    $ usingMiddleware
-    $ pursMiddleware myMiddleware
 
 data HTML
   = Node String (Array String) (Array HTML)
@@ -280,12 +163,16 @@ rootView =
         ]
     ]
 
+onUpgrade :: IncomingMessage IMServer -> Socket TCP -> Buffer -> Effect Unit
+onUpgrade request socket headBuffer = do
+  Debug.traceM { request, socket, headBuffer }
+  pure unit
+
 main :: ServerM
 main = do
-  serveNodeMiddleware { port: 8080 } { route, router, nodeMiddleware }
+  serve { port: 8080, onUpgrade: Just onUpgrade } { route, router }
   where
   router = case _ of
     { route: Root } -> ok rootView
     { route: Api rest } -> ok $ "api route " <> rest
-    { route: WS, headers } -> handleWS headers
 

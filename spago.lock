@@ -656,7 +656,11 @@
         "zipperarray": "2.0.0"
       }
     },
-    "extra_packages": {}
+    "extra_packages": {
+      "httpurple": {
+        "path": "../purescript-httpurple"
+      }
+    }
   },
   "packages": {
     "aff": {
@@ -1328,9 +1332,8 @@
       ]
     },
     "httpurple": {
-      "type": "registry",
-      "version": "4.0.0",
-      "integrity": "sha256-N5ItjWiQFit0Cj3Ia1jvEDjwC6fIBcgvOmcoCyrMl/Q=",
+      "type": "local",
+      "path": "../purescript-httpurple",
       "dependencies": [
         "aff",
         "arrays",

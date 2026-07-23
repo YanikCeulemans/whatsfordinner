@@ -1,0 +1,6 @@
+{
+  "name": "api",
+  "dependencies": {
+    "ws": "^8.21.1"
+  }
+}
