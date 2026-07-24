@@ -10,6 +10,7 @@ module Api.WS
   , handleUpgrade
   , errorH
   , messageH
+  , send
   ) where
 
 import Prelude
@@ -18,11 +19,13 @@ import Data.ArrayBuffer.Types (ArrayBuffer)
 import Effect (Effect)
 import Effect.Uncurried
   ( EffectFn1
+  , EffectFn2
   , EffectFn3
   , EffectFn5
   , mkEffectFn1
   , mkEffectFn2
   , runEffectFn1
+  , runEffectFn2
   , runEffectFn3
   , runEffectFn5
   )
@@ -32,7 +35,6 @@ import Node.EventEmitter.UtilTypes (EventHandle1, EventHandle2)
 import Node.HTTP.Types (IMServer, IncomingMessage)
 import Node.Net.Types (Socket, TCP)
 import Untagged.Union (type (|+|))
-import Web.File.Blob (Blob)
 
 data Error
 
@@ -79,8 +81,13 @@ handleUpgrade request socket buffer cb wss =
 errorH :: EventHandle1 WebSocket Error
 errorH = EventHandle "error" mkEffectFn1
 
-type MessageData = ArrayBuffer |+| Blob |+| Buffer |+| Array Buffer
+type MessageData = ArrayBuffer |+| Buffer |+| Array Buffer
 
 messageH :: EventHandle2 WebSocket MessageData Boolean
 messageH = EventHandle "message" mkEffectFn2
+
+foreign import _sendImpl :: EffectFn2 String WebSocket Unit
+
+send :: String -> WebSocket -> Effect Unit
+send = runEffectFn2 _sendImpl
 

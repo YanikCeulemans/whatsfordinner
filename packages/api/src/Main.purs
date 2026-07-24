@@ -3,6 +3,8 @@ module Api.Main where
 import HTTPurple
 import Prelude hiding ((/))
 
+import Api.WS (WebSocketServer)
+import Api.WS as WS
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
@@ -10,13 +12,16 @@ import Data.String as String
 import Data.Tuple (Tuple(..))
 import Debug as Debug
 import Effect (Effect)
-import Effect.Aff (makeAff, nonCanceler)
+import Effect.Aff (Milliseconds(..), launchAff_, makeAff, nonCanceler)
+import Effect.Aff as Aff
 import Effect.Aff.Compat (mkEffectFn3, runEffectFn1)
+import Effect.Class (liftEffect)
 import Effect.Exception (Error)
 import HTTPurple.Body (class Body)
 import HTTPurple.Headers (mkRequestHeaders)
 import Node.Buffer (Buffer)
 import Node.Encoding as Encoding
+import Node.EventEmitter as EventEmitter
 import Node.HTTP.OutgoingMessage as OutgoingMessage
 import Node.HTTP.ServerResponse as ServerResponse
 import Node.HTTP.Types (IMServer, IncomingMessage, ServerResponse)
@@ -163,14 +168,32 @@ rootView =
         ]
     ]
 
-onUpgrade :: IncomingMessage IMServer -> Socket TCP -> Buffer -> Effect Unit
-onUpgrade request socket headBuffer = do
-  Debug.traceM { request, socket, headBuffer }
+onUpgrade
+  :: WebSocketServer
+  -> IncomingMessage IMServer
+  -> Socket TCP
+  -> Buffer
+  -> Effect Unit
+onUpgrade wss request socket headBuffer = do
+  WS.handleUpgrade request socket headBuffer
+    ( \ws ->
+        WS.emitConnection ws request wss
+    )
+    wss
   pure unit
 
 main :: ServerM
 main = do
-  serve { port: 8080, onUpgrade: Just onUpgrade } { route, router }
+  wss <- WS.mkWebSocketServer { noServer: true }
+  wss # EventEmitter.on_ WS.connectionH \ws -> do
+    ws # EventEmitter.on_ WS.messageH \data' isBinary -> do
+      Debug.traceM { data', isBinary }
+      pure unit
+
+    launchAff_ do
+      Aff.delay $ Milliseconds 2500.0
+      liftEffect $ WS.send "hello, world" ws
+  serve { port: 8080, onUpgrade: Just $ onUpgrade wss } { route, router }
   where
   router = case _ of
     { route: Root } -> ok rootView

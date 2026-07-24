@@ -1,5 +1,5 @@
 {
-  "name": "api",
+  "name": "whatsfordinner",
   "dependencies": {
     "ws": "^8.21.1"
   }
