@@ -3,10 +3,15 @@ module Api.Main where
 import HTTPurple
 import Prelude hiding ((/))
 
-import Api.WS (WebSocketServer)
+import Api.WS (WebSocket, WebSocketServer)
 import Api.WS as WS
+import Common.GroceryListId (GroceryListId)
+import Common.Id (Id)
+import Common.Id as Id
 import Data.Array as Array
 import Data.Either (Either(..))
+import Data.Map (Map)
+import Data.Map as Map
 import Data.Maybe (Maybe(..))
 import Data.String as String
 import Data.Tuple (Tuple(..))
@@ -17,17 +22,25 @@ import Effect.Aff as Aff
 import Effect.Aff.Compat (mkEffectFn3, runEffectFn1)
 import Effect.Class (liftEffect)
 import Effect.Exception (Error)
+import Effect.Exception.Unsafe (unsafeThrow)
+import Effect.Ref (Ref)
+import Effect.Ref as Ref
 import HTTPurple.Body (class Body)
 import HTTPurple.Headers (mkRequestHeaders)
 import Node.Buffer (Buffer)
 import Node.Encoding as Encoding
 import Node.EventEmitter as EventEmitter
+import Node.HTTP.IncomingMessage as IncomingMessage
 import Node.HTTP.OutgoingMessage as OutgoingMessage
 import Node.HTTP.ServerResponse as ServerResponse
 import Node.HTTP.Types (IMServer, IncomingMessage, ServerResponse)
+import Node.Net.Socket as Socket
 import Node.Net.Types (Socket, TCP)
 import Node.Stream (end')
+import Node.Stream as Stream
 import Node.Stream as Writable
+import Simple.ULID as ULID
+import Simple.ULID.Node as ULIDNode
 import Untagged.Union (UndefinedOr)
 
 data Route
@@ -94,8 +107,6 @@ renderHTML html' = "<!DOCTYPE html>" <> help html'
       Content text' -> text'
 
 instance Body HTML where
-  -- TODO: This implementation renders the body twice, can we reduce it?
-  -- - We could create a new type containing the rendered html that has an instance for Body
   defaultHeaders html' =
     pure $ mkRequestHeaders
       [ Tuple "Content-Type" "text/html"
@@ -146,7 +157,7 @@ rootView =
                 let ws = null;
                 const connect = () => {
                   if (ws) return;
-                  ws = new WebSocket('/ws');
+                  ws = new WebSocket('/ws/01KYFT2TNZQ356N53Z1HV7JK7D');
                   ws.addEventListener('message', evt => {
                     console.log('message received', evt);
                   });
@@ -168,32 +179,61 @@ rootView =
         ]
     ]
 
+groceryListIdDuplex :: RouteDuplex' String -> RouteDuplex' GroceryListId
+groceryListIdDuplex = as Id.print Id.parse
+
+data WSRoute = WS GroceryListId
+
+derive instance Generic WSRoute _
+
+wsRoute :: RouteDuplex' WSRoute
+wsRoute = mkRoute { "WS": "ws" / groceryListIdDuplex segment }
+
 onUpgrade
-  :: WebSocketServer
+  :: Ref (Map GroceryListId (Map (Id WebSocket) WebSocket))
+  -> WebSocketServer
   -> IncomingMessage IMServer
   -> Socket TCP
   -> Buffer
   -> Effect Unit
-onUpgrade wss request socket headBuffer = do
-  WS.handleUpgrade request socket headBuffer
-    ( \ws ->
-        WS.emitConnection ws request wss
-    )
-    wss
-  pure unit
+onUpgrade websockets wss request socket headBuffer = do
+  case parse wsRoute $ IncomingMessage.url request of
+    Right (WS groceryListId) ->
+      wss # WS.handleUpgrade request socket headBuffer
+        \ws -> do
+          socketId <- Id.MkId <$> ULID.genULID ULIDNode.prng
+          Ref.modify_ (Map.alter (insert socketId ws) groceryListId) websockets
+
+          ws #
+            ( EventEmitter.on_ WS.closeH $
+                Ref.modify_
+                  (Map.alter (remove socketId) groceryListId)
+                  websockets
+            )
+
+          WS.emitConnection ws request wss
+      where
+      insert socketId ws = case _ of
+        Nothing -> Just $ Map.singleton socketId ws
+        Just others -> Just $ Map.insert socketId ws others
+      remove socketId = case _ of
+        Nothing -> Nothing
+        Just sockets -> Just $ Map.delete socketId sockets
+
+    Left _ ->
+      Socket.toDuplex socket
+        # Stream.destroy
 
 main :: ServerM
 main = do
+  websockets <- Ref.new Map.empty
   wss <- WS.mkWebSocketServer { noServer: true }
   wss # EventEmitter.on_ WS.connectionH \ws -> do
-    ws # EventEmitter.on_ WS.messageH \data' isBinary -> do
-      Debug.traceM { data', isBinary }
-      pure unit
-
     launchAff_ do
       Aff.delay $ Milliseconds 2500.0
       liftEffect $ WS.send "hello, world" ws
-  serve { port: 8080, onUpgrade: Just $ onUpgrade wss } { route, router }
+  serve { port: 8080, onUpgrade: Just $ onUpgrade websockets wss }
+    { route, router }
   where
   router = case _ of
     { route: Root } -> ok rootView

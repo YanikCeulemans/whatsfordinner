@@ -5,11 +5,13 @@
         "path": "packages/api",
         "core": {
           "dependencies": [
+            "common",
             "console",
             "debug",
             "effect",
             "httpurple",
-            "prelude"
+            "prelude",
+            "simple-ulid"
           ]
         },
         "test": {

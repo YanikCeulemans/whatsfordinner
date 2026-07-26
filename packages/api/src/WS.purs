@@ -9,6 +9,7 @@ module Api.WS
   , emitConnection
   , handleUpgrade
   , errorH
+  , closeH
   , messageH
   , send
   ) where
@@ -31,7 +32,7 @@ import Effect.Uncurried
   )
 import Node.Buffer (Buffer)
 import Node.EventEmitter (EventHandle(..))
-import Node.EventEmitter.UtilTypes (EventHandle1, EventHandle2)
+import Node.EventEmitter.UtilTypes (EventHandle0, EventHandle1, EventHandle2)
 import Node.HTTP.Types (IMServer, IncomingMessage)
 import Node.Net.Types (Socket, TCP)
 import Untagged.Union (type (|+|))
@@ -80,6 +81,9 @@ handleUpgrade request socket buffer cb wss =
 
 errorH :: EventHandle1 WebSocket Error
 errorH = EventHandle "error" mkEffectFn1
+
+closeH :: EventHandle0 WebSocket
+closeH = EventHandle "close" identity
 
 type MessageData = ArrayBuffer |+| Buffer |+| Array Buffer
 

@@ -6,6 +6,8 @@ package:
     - effect
     - httpurple
     - prelude
+    - simple-ulid
+    - common
   test:
     main: Api.Test.Main
     dependencies: []
