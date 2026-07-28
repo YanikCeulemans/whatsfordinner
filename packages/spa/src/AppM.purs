@@ -96,7 +96,6 @@ localStorageUpsertGroceryList id = do
 
 localStorageUpsertGrocery :: GroceryListId -> GroceryEntry -> AppM Unit
 localStorageUpsertGrocery groceryListId grocery = do
-  liftAff $ Aff.delay $ Milliseconds 300.0
   MonadState.modify_ upsert
   where
   entryDescription = GroceryList.entryDescription grocery
@@ -133,7 +132,6 @@ localStorageDeleteGroceries id groceriesToDelete = do
 
 localStorageSuggestGroceries :: String -> AppM (Array SortedGrocery)
 localStorageSuggestGroceries suggestionBase = do
-  liftAff $ Aff.delay $ Milliseconds 500.0
   state <- MonadState.gets _.groceries
   state
     # Map.filterKeys (unwrap >>> textMatchesSuggestion)
@@ -281,7 +279,6 @@ instance ManageSpaces AppM where
     ]
 
   loadSpace id = do
-    liftAff $ Aff.delay $ convertDuration $ Seconds 3.0
     pure $ case Id.print id of
       "01KNW48VB0PNCFC0KZ8SW289ZA" ->
         Just
@@ -296,5 +293,4 @@ instance ManageSpaces AppM where
 instance ManageMealSchedule AppM where
   -- TODO: Implement
   loadMealSchedule _id = do
-    liftAff $ Aff.delay $ convertDuration $ Seconds 2.0
     pure $ Just Data.mealSchedule
