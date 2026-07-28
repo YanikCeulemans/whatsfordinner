@@ -5,11 +5,13 @@
         "path": "packages/api",
         "core": {
           "dependencies": [
+            "avar",
             "common",
             "console",
             "debug",
             "effect",
             "httpurple",
+            "media-types",
             "prelude",
             "simple-ulid"
           ]

@@ -1,13 +1,15 @@
 package:
   name: api
   dependencies:
+    - avar
+    - common
     - console
     - debug
     - effect
     - httpurple
+    - media-types
     - prelude
     - simple-ulid
-    - common
   test:
     main: Api.Test.Main
     dependencies: []

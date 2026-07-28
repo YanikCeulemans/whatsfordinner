@@ -3,12 +3,21 @@ module Api.Main where
 import HTTPurple
 import Prelude hiding ((/))
 
+import Api.AppM (runAppM)
+import Api.JsonBody as JsonBody
+import Api.ManageSpaces (class ManageSpaces, loadSpace)
 import Api.WS (WebSocket, WebSocketServer)
 import Api.WS as WS
 import Common.GroceryListId (GroceryListId)
 import Common.Id (Id)
 import Common.Id as Id
+import Common.Space (Space)
+import Common.Space as Space
+import Common.SpaceId (SpaceId)
+import Data.Argonaut (Json)
 import Data.Array as Array
+import Data.Codec.Argonaut (Codec)
+import Data.Codec.Argonaut as Json
 import Data.Either (Either(..))
 import Data.Map (Map)
 import Data.Map as Map
@@ -17,8 +26,10 @@ import Data.String as String
 import Data.Tuple (Tuple(..))
 import Debug as Debug
 import Effect (Effect)
-import Effect.Aff (Milliseconds(..), launchAff_, makeAff, nonCanceler)
+import Effect.Aff (Aff, Milliseconds(..), launchAff_, makeAff, nonCanceler)
 import Effect.Aff as Aff
+import Effect.Aff.AVar as AVar
+import Effect.Aff.Class (class MonadAff)
 import Effect.Aff.Compat (mkEffectFn3, runEffectFn1)
 import Effect.Class (liftEffect)
 import Effect.Exception (Error)
@@ -46,13 +57,18 @@ import Untagged.Union (UndefinedOr)
 data Route
   = Root
   | Api String
+  | Spaces SpaceId
 
 derive instance Generic Route _
+
+spaceId' :: RouteDuplex' String -> RouteDuplex' SpaceId
+spaceId' = as Id.print Id.parse
 
 route :: RouteDuplex' Route
 route = mkRoute
   { "Root": noArgs
   , "Api": "api" / segment
+  , "Spaces": "spaces" / spaceId' segment
   }
 
 type PursMiddleware =
@@ -224,18 +240,38 @@ onUpgrade websockets wss request socket headBuffer = do
       Socket.toDuplex socket
         # Stream.destroy
 
-main :: ServerM
-main = do
-  websockets <- Ref.new Map.empty
-  wss <- WS.mkWebSocketServer { noServer: true }
-  wss # EventEmitter.on_ WS.connectionH \ws -> do
-    launchAff_ do
-      Aff.delay $ Milliseconds 2500.0
-      liftEffect $ WS.send "hello, world" ws
-  serve { port: 8080, onUpgrade: Just $ onUpgrade websockets wss }
-    { route, router }
+findSpaceHandler
+  :: forall m. MonadAff m => ManageSpaces m => SpaceId -> m Response
+findSpaceHandler spaceId = do
+  foundSpace <- loadSpace spaceId
+  Debug.traceM { foundSpace }
+  case foundSpace of
+    Nothing -> noContent
+    Just space -> ok $ JsonBody.create Space.spaceCodec space
+
+main :: Effect Unit
+main = launchAff_ do
+  appState <- createAppState
+  Aff.makeAff \_done -> do
+    websockets <- Ref.new Map.empty
+    wss <- WS.mkWebSocketServer { noServer: true }
+    wss # EventEmitter.on_ WS.connectionH \ws -> do
+      launchAff_ do
+        Aff.delay $ Milliseconds 2500.0
+        liftEffect $ WS.send "hello, world" ws
+    void $ serve
+      { port: 8080
+      , onUpgrade: Just $ onUpgrade websockets wss
+      }
+      { route, router: router appState }
+    pure Aff.nonCanceler
   where
-  router = case _ of
+  createAppState = do
+    spaces <- AVar.new $ Map.empty
+    pure { spaces }
+  router appState = case _ of
     { route: Root } -> ok rootView
     { route: Api rest } -> ok $ "api route " <> rest
+    { route: Spaces spaceId } -> do
+      runAppM appState $ findSpaceHandler spaceId
 
