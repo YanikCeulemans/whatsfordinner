@@ -1,7 +1,9 @@
-module Api.JsonBody (JsonBody, create) where
+module Api.JsonBody (JsonBody, create, create') where
 
 import Prelude
 
+import Data.Argonaut (class EncodeJson)
+import Data.Argonaut as Argonaut
 import Data.Argonaut.Core (Json)
 import Data.Argonaut.Core as Json
 import Data.Array.NonEmpty (fold1)
@@ -28,3 +30,6 @@ instance Body JsonBody where
 
 create :: forall m a c d. Codec m a Json c d → c → JsonBody
 create codec = JsonCodec.encode codec >>> Json.stringify >>> MkJsonBody
+
+create' :: forall a. EncodeJson a => a -> JsonBody
+create' = Argonaut.encodeJson >>> Json.stringify >>> MkJsonBody

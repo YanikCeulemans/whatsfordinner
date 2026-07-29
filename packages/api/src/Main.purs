@@ -5,19 +5,20 @@ import Prelude hiding ((/))
 
 import Api.AppM (runAppM)
 import Api.JsonBody as JsonBody
-import Api.ManageSpaces (class ManageSpaces, loadSpace)
+import Api.ManageSpaces (class ManageSpaces, loadSpace, upsertSpace)
 import Api.WS (WebSocket, WebSocketServer)
 import Api.WS as WS
 import Common.GroceryListId (GroceryListId)
 import Common.Id (Id)
 import Common.Id as Id
-import Common.Space (Space)
 import Common.Space as Space
 import Common.SpaceId (SpaceId)
-import Data.Argonaut (Json)
+import Data.Argonaut (parseJson)
+import Data.Argonaut as Argonaut
 import Data.Array as Array
-import Data.Codec.Argonaut (Codec)
-import Data.Codec.Argonaut as Json
+import Data.Bifunctor (lmap)
+import Data.Codec.Argonaut (JsonCodec)
+import Data.Codec.Argonaut as JsonCodec
 import Data.Either (Either(..))
 import Data.Map (Map)
 import Data.Map as Map
@@ -26,7 +27,7 @@ import Data.String as String
 import Data.Tuple (Tuple(..))
 import Debug as Debug
 import Effect (Effect)
-import Effect.Aff (Aff, Milliseconds(..), launchAff_, makeAff, nonCanceler)
+import Effect.Aff (Milliseconds(..), launchAff_, makeAff, nonCanceler)
 import Effect.Aff as Aff
 import Effect.Aff.AVar as AVar
 import Effect.Aff.Class (class MonadAff)
@@ -36,7 +37,8 @@ import Effect.Exception (Error)
 import Effect.Exception.Unsafe (unsafeThrow)
 import Effect.Ref (Ref)
 import Effect.Ref as Ref
-import HTTPurple.Body (class Body)
+import HTTPurple.Body (class Body, RequestBody)
+import HTTPurple.Body as RequestBody
 import HTTPurple.Headers (mkRequestHeaders)
 import Node.Buffer (Buffer)
 import Node.Encoding as Encoding
@@ -244,14 +246,41 @@ findSpaceHandler
   :: forall m. MonadAff m => ManageSpaces m => SpaceId -> m Response
 findSpaceHandler spaceId = do
   foundSpace <- loadSpace spaceId
-  Debug.traceM { foundSpace }
   case foundSpace of
     Nothing -> noContent
     Just space -> ok $ JsonBody.create Space.spaceCodec space
 
+decodeBody
+  :: forall a m
+   . MonadAff m
+  => JsonCodec a
+  -> RequestBody
+  -> m (Either String a)
+decodeBody codec requestBody = do
+  bodyString <- RequestBody.toString requestBody
+  pure do
+    json <- lmap Argonaut.printJsonDecodeError $ parseJson bodyString
+    lmap JsonCodec.printJsonDecodeError $ JsonCodec.decode codec json
+
+upsertSpaceHandler
+  :: forall m
+   . MonadAff m
+  => ManageSpaces m
+  => SpaceId
+  -> RequestBody
+  -> m Response
+upsertSpaceHandler spaceId requestBody = do
+  decodedSpace <- decodeBody Space.spaceCodec requestBody
+  case decodedSpace of
+    Left error -> badRequest $ JsonBody.create'
+      { error: "BadRequest", details: error }
+    Right space -> do
+      upsertSpace spaceId space
+      ok $ JsonBody.create Space.spaceCodec space
+
 main :: Effect Unit
 main = launchAff_ do
-  appState <- createAppState
+  env <- createEnv
   Aff.makeAff \_done -> do
     websockets <- Ref.new Map.empty
     wss <- WS.mkWebSocketServer { noServer: true }
@@ -263,15 +292,18 @@ main = launchAff_ do
       { port: 8080
       , onUpgrade: Just $ onUpgrade websockets wss
       }
-      { route, router: router appState }
+      { route, router: router env }
     pure Aff.nonCanceler
   where
-  createAppState = do
+  createEnv = do
     spaces <- AVar.new $ Map.empty
     pure { spaces }
   router appState = case _ of
     { route: Root } -> ok rootView
     { route: Api rest } -> ok $ "api route " <> rest
-    { route: Spaces spaceId } -> do
+    { route: Spaces spaceId, method: Get } -> do
       runAppM appState $ findSpaceHandler spaceId
+    { route: Spaces spaceId, method: Put, body: requestBody } -> do
+      runAppM appState $ upsertSpaceHandler spaceId requestBody
+    { route: Spaces _ } -> notFound
 
