@@ -15,6 +15,7 @@ import Common.Space as Space
 import Common.SpaceId (SpaceId)
 import Data.Argonaut (parseJson)
 import Data.Argonaut as Argonaut
+import Data.Array ((..))
 import Data.Array as Array
 import Data.Bifunctor (lmap)
 import Data.Codec.Argonaut (JsonCodec)
@@ -24,6 +25,7 @@ import Data.Map (Map)
 import Data.Map as Map
 import Data.Maybe (Maybe(..))
 import Data.String as String
+import Data.Traversable (for)
 import Data.Tuple (Tuple(..))
 import Debug as Debug
 import Effect (Effect)
@@ -52,6 +54,7 @@ import Node.Net.Types (Socket, TCP)
 import Node.Stream (end')
 import Node.Stream as Stream
 import Node.Stream as Writable
+import Simple.ULID (ULID)
 import Simple.ULID as ULID
 import Simple.ULID.Node as ULIDNode
 import Untagged.Union (UndefinedOr)
@@ -165,8 +168,14 @@ text = Content
 script :: Array String -> Array HTML -> HTML
 script = Node "script"
 
-rootView :: HTML
-rootView =
+ul :: Array String -> Array HTML -> HTML
+ul = Node "ul"
+
+li :: Array String -> Array HTML -> HTML
+li = Node "li"
+
+rootView :: Array ULID -> HTML
+rootView ulids =
   html []
     [ head []
         [ script []
@@ -194,6 +203,10 @@ rootView =
     , body []
         [ button [ "onclick='connect()'" ] [ text "connect" ]
         , button [ "onclick='disconnect()'" ] [ text "disconnect" ]
+        , ul []
+            ( ulids
+                <#> ULID.toString >>> text >>> pure >>> li []
+            )
         ]
     ]
 
@@ -299,7 +312,9 @@ main = launchAff_ do
     spaces <- AVar.new $ Map.empty
     pure { spaces }
   router appState = case _ of
-    { route: Root } -> ok rootView
+    { route: Root } -> do
+      ulids <- for (1 .. 5) $ const $ liftEffect $ ULID.genULID ULIDNode.prng
+      ok $ rootView ulids
     { route: Api rest } -> ok $ "api route " <> rest
     { route: Spaces spaceId, method: Get } -> do
       runAppM appState $ findSpaceHandler spaceId
