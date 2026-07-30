@@ -20,6 +20,7 @@ data MealSchedule
 newtype MealScheduleId = MkMealScheduleId (Id MealSchedule)
 
 derive instance Eq MealScheduleId
+derive instance Ord MealScheduleId
 
 codec :: JsonCodec MealScheduleId
 codec =

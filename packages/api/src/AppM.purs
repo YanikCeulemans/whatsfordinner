@@ -2,7 +2,10 @@ module Api.AppM where
 
 import Prelude
 
+import Api.ManageMealSchedule (class ManageMealSchedule)
 import Api.ManageSpaces (class ManageSpaces)
+import Common.MealSchedule (MealSchedule)
+import Common.MealScheduleId (MealScheduleId)
 import Common.Space (Space)
 import Common.SpaceId (SpaceId)
 import Control.Monad.Reader (class MonadAsk, ReaderT, ask, runReaderT)
@@ -16,7 +19,11 @@ import Effect.Aff.Class (class MonadAff, liftAff)
 import Effect.Class (class MonadEffect)
 import Effect.Exception.Unsafe (unsafeThrow)
 
-type Env = ({ spaces :: AVar (Map SpaceId Space) })
+type Env =
+  ( { spaces :: AVar (Map SpaceId Space)
+    , mealSchedules :: AVar (Map MealScheduleId MealSchedule)
+    }
+  )
 
 newtype AppM a = MkAppM (ReaderT Env Aff a)
 
@@ -46,6 +53,15 @@ upsertSpaceFromMemory spaceId space = do
     updatedSpaces = Map.insert spaceId space spaces
   liftAff $ AVar.put updatedSpaces env.spaces
 
+loadMealScheduleFromMemory :: MealScheduleId -> AppM (Maybe MealSchedule)
+loadMealScheduleFromMemory mealScheduleId = do
+  env <- ask
+  mealSchedules <- liftAff $ AVar.read env.mealSchedules
+  pure $ Map.lookup mealScheduleId mealSchedules
+
 instance ManageSpaces AppM where
   loadSpace = loadSpaceFromMemory
   upsertSpace = upsertSpaceFromMemory
+
+instance ManageMealSchedule AppM where
+  loadMealSchedule = loadMealScheduleFromMemory

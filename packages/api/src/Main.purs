@@ -7,12 +7,16 @@ import Api.AppM (runAppM)
 import Api.HTML (HTML)
 import Api.HTML as AH
 import Api.JsonBody as JsonBody
+import Api.ManageMealSchedule (class ManageMealSchedule, loadMealSchedule)
 import Api.ManageSpaces (class ManageSpaces, loadSpace, upsertSpace)
 import Api.WS (WebSocket, WebSocketServer)
 import Api.WS as WS
 import Common.GroceryListId (GroceryListId)
 import Common.Id (Id)
 import Common.Id as Id
+import Common.MealSchedule as MealSchedule
+import Common.MealScheduleId (MealScheduleId)
+import Common.MealScheduleId as MealScheduleId
 import Common.Space as Space
 import Common.SpaceId (SpaceId)
 import Data.Argonaut (parseJson)
@@ -56,17 +60,22 @@ data Route
   = Root
   | Api String
   | Spaces SpaceId
+  | MealSchedule MealScheduleId
 
 derive instance Generic Route _
 
 spaceId' :: RouteDuplex' String -> RouteDuplex' SpaceId
 spaceId' = as Id.print Id.parse
 
+mealScheduleId' :: RouteDuplex' String -> RouteDuplex' MealScheduleId
+mealScheduleId' = as MealScheduleId.print MealScheduleId.parse
+
 route :: RouteDuplex' Route
 route = mkRoute
   { "Root": noArgs
   , "Api": "api" / segment
   , "Spaces": "spaces" / spaceId' segment
+  , "MealSchedule": "meal-schedules" / mealScheduleId' segment
   }
 
 type PursMiddleware =
@@ -185,6 +194,18 @@ findSpaceHandler spaceId = do
     Nothing -> noContent
     Just space -> ok $ JsonBody.create Space.spaceCodec space
 
+findMealScheduleHandler
+  :: forall m
+   . MonadAff m
+  => ManageMealSchedule m
+  => MealScheduleId
+  -> m Response
+findMealScheduleHandler mealScheduleId = do
+  foundMealSchedule <- loadMealSchedule mealScheduleId
+  case foundMealSchedule of
+    Nothing -> noContent
+    Just mealSchedule -> ok $ JsonBody.create MealSchedule.codec mealSchedule
+
 decodeBody
   :: forall a m
    . MonadAff m
@@ -232,15 +253,21 @@ main = launchAff_ do
   where
   createEnv = do
     spaces <- AVar.new $ Map.empty
-    pure { spaces }
+    mealSchedules <- AVar.new $ Map.empty
+    pure { spaces, mealSchedules }
   router appState = case _ of
     { route: Root } -> do
       ulids <- for (1 .. 5) $ const $ liftEffect $ ULID.genULID ULIDNode.prng
       ok $ rootView ulids
+
     { route: Api rest } -> ok $ "api route " <> rest
+
     { route: Spaces spaceId, method: Get } -> do
       runAppM appState $ findSpaceHandler spaceId
     { route: Spaces spaceId, method: Put, body: requestBody } -> do
       runAppM appState $ upsertSpaceHandler spaceId requestBody
     { route: Spaces _ } -> notFound
 
+    { route: MealSchedule mealScheduleId, method: Get } ->
+      runAppM appState $ findMealScheduleHandler mealScheduleId
+    { route: MealSchedule _ } -> notFound
