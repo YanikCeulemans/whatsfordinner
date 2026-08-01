@@ -9,13 +9,16 @@ import Api.HTML as AH
 import Api.JsonBody as JsonBody
 import Api.ManageGroceryList
   ( class ManageGroceryList
+  , UpsertGroceryEntryError(..)
   , loadGroceryList
+  , upsertGroceryEntry
   , upsertGroceryList
   )
 import Api.ManageMealSchedule (class ManageMealSchedule, loadMealSchedule)
 import Api.ManageSpaces (class ManageSpaces, loadSpace, upsertSpace)
 import Api.WS (WebSocket, WebSocketServer)
 import Api.WS as WS
+import Common.GroceryEntryId (GroceryEntryId)
 import Common.GroceryList as GroceryList
 import Common.GroceryListId (GroceryListId)
 import Common.Id (Id)
@@ -59,12 +62,26 @@ import Simple.ULID (ULID)
 import Simple.ULID as ULID
 import Simple.ULID.Node as ULIDNode
 
+data GroceryListsRoute
+  = GroceryLists'
+  | GroceryListEntries
+
+derive instance Generic GroceryListsRoute _
+
+groceryEntryId' :: RouteDuplex' String -> RouteDuplex' GroceryEntryId
+groceryEntryId' = as Id.print Id.parse
+
+groceryListsRoute :: RouteDuplex' GroceryListsRoute
+groceryListsRoute = sum
+  { "GroceryLists'": noArgs
+  , "GroceryListEntries": "entry" / noArgs
+  }
+
 data Route
   = Root
-  | Api String
   | Spaces SpaceId
   | MealSchedules MealScheduleId
-  | GroceryLists GroceryListId
+  | GroceryLists GroceryListId GroceryListsRoute
 
 derive instance Generic Route _
 
@@ -80,10 +97,10 @@ groceryListId' = as Id.print Id.parse
 route :: RouteDuplex' Route
 route = mkRoute
   { "Root": noArgs
-  , "Api": "api" / segment
   , "Spaces": "spaces" / spaceId' segment
   , "MealSchedules": "meal-schedules" / mealScheduleId' segment
-  , "GroceryLists": "grocery-lists" / groceryListId' segment
+  , "GroceryLists": "grocery-lists" / groceryListId' segment / groceryListsRoute
+  , "CatchAll": catchAll
   }
 
 rootView :: Array ULID -> HTML
@@ -243,6 +260,29 @@ upsertGroceryListHanlder groceryListId requestBody = do
       upsertGroceryList groceryListId groceryList
       created
 
+upsertGroceryListEntryHanlder
+  :: forall m
+   . MonadAff m
+  => ManageGroceryList m
+  => GroceryListId
+  -> String
+  -> RequestBody
+  -> m Response
+upsertGroceryListEntryHanlder groceryListId _groceryEntryId requestBody = do
+  decodedGroceryEntry <- decodeBody GroceryList.entryCodec requestBody
+  case decodedGroceryEntry of
+    Left error -> badRequest $ JsonBody.create'
+      { error: "BadRequest", details: error }
+    Right groceryListEntry -> do
+      upsertResult <- upsertGroceryEntry groceryListId groceryListEntry
+      case upsertResult of
+        Left (NoSuchGroceryList _) -> badRequest $ JsonBody.create'
+          { error: "BadRequest"
+          , details: "No grocerylist was found for id: " <> Id.print
+              groceryListId
+          }
+        Right _ -> created
+
 main :: Effect Unit
 main = launchAff_ do
   env <- createEnv
@@ -270,8 +310,6 @@ main = launchAff_ do
       ulids <- for (1 .. 5) $ const $ liftEffect $ ULID.genULID ULIDNode.prng
       ok $ rootView ulids
 
-    { route: Api rest } -> ok $ "api route " <> rest
-
     { route: Spaces spaceId, method: Get } -> do
       runAppM appState $ findSpaceHandler spaceId
     { route: Spaces spaceId, method: Put, body: requestBody } -> do
@@ -280,9 +318,21 @@ main = launchAff_ do
     { route: MealSchedules mealScheduleId, method: Get } ->
       runAppM appState $ findMealScheduleHandler mealScheduleId
 
-    { route: GroceryLists groceryListId, method: Get } ->
+    { route: GroceryLists groceryListId GroceryLists', method: Get } ->
       runAppM appState $ findGroceryListHandler groceryListId
-    { route: GroceryLists groceryListId, method: Put, body: requestBody } ->
+    { route: GroceryLists groceryListId GroceryLists'
+    , method: Put
+    , body: requestBody
+    } ->
       runAppM appState $ upsertGroceryListHanlder groceryListId requestBody
+    { route: GroceryLists groceryListId (GroceryListEntries)
+    , method: Put
+    , body: requestBody
+    } ->
+      runAppM appState
+        $ upsertGroceryListEntryHanlder groceryListId "" requestBody
 
-    _ -> notFound
+    { route } -> do
+      Debug.traceM { route }
+      notFound
+

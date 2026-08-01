@@ -2,20 +2,27 @@ module Api.AppM where
 
 import Prelude
 
-import Api.ManageGroceryList (class ManageGroceryList)
+import Api.ManageGroceryList
+  ( class ManageGroceryList
+  , UpsertGroceryEntryError(..)
+  )
 import Api.ManageMealSchedule (class ManageMealSchedule)
 import Api.ManageSpaces (class ManageSpaces)
-import Common.GroceryList (GroceryList)
+import Common.GroceryList (GroceryEntry, GroceryList)
 import Common.GroceryListId (GroceryListId)
 import Common.MealSchedule (MealSchedule)
 import Common.MealScheduleId (MealScheduleId)
 import Common.Space (Space)
 import Common.SpaceId (SpaceId)
+import Control.Monad.Except (except, runExceptT)
 import Control.Monad.Reader (class MonadAsk, ReaderT, ask, runReaderT)
+import Data.Array as Array
+import Data.Either (Either(..))
+import Data.Either as Either
 import Data.Map (Map)
 import Data.Map as Map
-import Data.Maybe (Maybe)
-import Effect.Aff (Aff)
+import Data.Maybe (Maybe(..))
+import Effect.Aff (Aff, bracket, try)
 import Effect.Aff.AVar (AVar)
 import Effect.Aff.AVar as AVar
 import Effect.Aff.Class (class MonadAff, liftAff)
@@ -77,6 +84,25 @@ upsertGroceryListFromMemory groceryListId groceryList = do
     updatedGroceryLists = Map.insert groceryListId groceryList groceryLists
   liftAff $ AVar.put updatedGroceryLists env.groceryLists
 
+upsertGroceryEntryFromMemory
+  :: GroceryListId -> GroceryEntry -> AppM (Either UpsertGroceryEntryError Unit)
+upsertGroceryEntryFromMemory groceryListId groceryEntry = do
+  env <- ask
+  groceryLists <- liftAff $ AVar.take env.groceryLists
+  case Map.lookup groceryListId groceryLists of
+    Nothing -> liftAff do
+      AVar.put groceryLists env.groceryLists
+      pure $ Left $ NoSuchGroceryList groceryListId
+
+    Just groceryList -> liftAff do
+      let
+        updatedGroceryLists =
+          groceryList
+            # Array.filter (not <<< eq groceryEntry)
+            # Array.cons groceryEntry
+            # \x -> Map.insert groceryListId x groceryLists
+      Right <$> AVar.put updatedGroceryLists env.groceryLists
+
 instance ManageSpaces AppM where
   loadSpace = loadSpaceFromMemory
   upsertSpace = upsertSpaceFromMemory
@@ -87,3 +113,4 @@ instance ManageMealSchedule AppM where
 instance ManageGroceryList AppM where
   loadGroceryList = loadGroceryListFromMemory
   upsertGroceryList = upsertGroceryListFromMemory
+  upsertGroceryEntry = upsertGroceryEntryFromMemory
