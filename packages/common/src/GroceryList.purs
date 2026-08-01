@@ -1,24 +1,58 @@
-module Common.GroceryList where
+module Common.GroceryList
+  ( GroceryEntry
+  , GroceryList
+  , upsertEntry
+  , codec
+  , entryCodec
+  , deleteGroceries
+  , entryDescription
+  , entrySortIndex
+  , updateEntries
+  , createEmpty
+  , toggleEntryChecked
+  , set
+  , entryChecked
+  , clearCompleted
+  , uncheckEntry
+  , entryId
+  , partitionGroceriesOnChecked
+  , setEntrySortIndex
+  , upsertGrocery
+  , upsertGrocery'
+  , entryAmount
+  , updateGroceries'
+  , groceries
+  , isEmpty
+  , lookup
+  ) where
 
 import Prelude
 
 import Common.Amount (Amount)
 import Common.Amount as Amount
 import Common.GroceryEntryId (GroceryEntryId)
+import Common.GroceryListId (GroceryListId)
 import Common.Id as Id
-import Control.Alt ((<|>))
-import Data.Array ((:))
 import Data.Array as Array
 import Data.Codec.Argonaut (JsonCodec)
 import Data.Codec.Argonaut as CA
+import Data.Codec.Argonaut.Common as CAC
 import Data.Codec.Argonaut.Record as CAR
-import Data.Foldable (foldr, maximum)
+import Data.Foldable (maximum)
+import Data.Foldable as Foldable
+import Data.Lens (Lens')
+import Data.Lens as Lens
+import Data.Lens.Record as LensRecord
+import Data.List as List
+import Data.Map (Map)
+import Data.Map as Map
 import Data.Maybe (Maybe(..))
 import Data.Maybe as Maybe
 import Data.Profunctor (dimap)
 import Data.String.CaseInsensitive (CaseInsensitiveString(..))
-import Data.Tuple (Tuple(..))
+import Data.Tuple (Tuple(..), snd)
 import Data.Tuple.Nested ((/\))
+import Type.Prelude (Proxy(..))
 
 newtype GroceryEntry = MkGroceryEntry
   { id :: GroceryEntryId
@@ -74,11 +108,50 @@ setEntrySortIndex :: Int -> GroceryEntry -> GroceryEntry
 setEntrySortIndex sortIndex (MkGroceryEntry entry) =
   MkGroceryEntry $ entry { sortIndex = sortIndex }
 
-type GroceryList = Array GroceryEntry
+type GroceryListProduct =
+  { id :: GroceryListId
+  , data :: Map GroceryEntryId GroceryEntry
+  }
+
+newtype GroceryList = MkGroceryList GroceryListProduct
+
+createEmpty :: GroceryListId -> GroceryList
+createEmpty id = MkGroceryList { id, data: Map.empty }
+
+_groceryList :: Lens' GroceryList GroceryListProduct
+_groceryList = Lens.iso getter setter
+  where
+  getter (MkGroceryList x) = x
+  setter = MkGroceryList
+
+_data :: Lens' GroceryList (Map GroceryEntryId GroceryEntry)
+_data = _groceryList <<< LensRecord.prop (Proxy @"data")
+
+groceries :: GroceryList -> Array GroceryEntry
+groceries = Lens.view _data >>> Map.values >>> Array.fromFoldable
+
+isEmpty :: GroceryList -> Boolean
+isEmpty = Lens.view _data >>> Map.isEmpty
+
+lookup :: GroceryEntryId -> GroceryList -> Maybe GroceryEntry
+lookup k = Lens.view _data >>> Map.lookup k
+
+updateEntries :: (GroceryEntry -> GroceryEntry) -> GroceryList -> GroceryList
+updateEntries f = Lens.over _data (map f)
 
 codec :: CA.JsonCodec GroceryList
-codec = CA.array entryCodec
+codec =
+  dimap unwrap wrap
+    $ CAR.object "GroceryList"
+        { id: Id.codec
+        , data: CAC.map Id.codec entryCodec
+        }
+  where
+  unwrap (MkGroceryList x) = x
+  wrap = MkGroceryList
 
+-- | See `upsertEntry` but then given a sort index an entry id, description 
+-- | and amount separately
 upsertGrocery'
   :: Maybe Int
   -> GroceryEntryId
@@ -87,34 +160,26 @@ upsertGrocery'
   -> GroceryList
   -> Tuple GroceryEntry GroceryList
 upsertGrocery' sortIndex id description amount groceryList =
-  (Array.findIndex hasId groceryList >>= update)
-    # Maybe.fromMaybe' consGroceryList
-    # Tuple newGrocery
+  entry /\ upserted
   where
-  hasId x = entryId x == id
-  upsert (MkGroceryEntry grocery) =
-    pure $ MkGroceryEntry $ grocery
-      { description = description
-      , amount = amount
-      , sortIndex = sortIndex # Maybe.fromMaybe grocery.sortIndex
-      }
-  update i = Array.alterAt i upsert groceryList
-  newEntrySortIndex _ =
-    groceryList
-      # map entrySortIndex
-      # maximum
-      # map (_ + 1)
-      # Maybe.fromMaybe 0
-  newGrocery =
+  upserted = upsertEntry entry groceryList
+  entry =
     MkGroceryEntry
       { id
       , description
       , amount
       , checked: false
-      , sortIndex: sortIndex # Maybe.fromMaybe' newEntrySortIndex
+      , sortIndex: Maybe.fromMaybe maxSortIndex $ sortIndex
       }
-  consGroceryList _ = Array.cons newGrocery groceryList
+  maxSortIndex =
+    Lens.view _data groceryList
+      # map entrySortIndex
+      # maximum
+      # map (_ + 1)
+      # Maybe.fromMaybe 0
 
+-- | See `upsertEntry` but then given an entry id, description and amount
+-- | separately
 upsertGrocery
   :: GroceryEntryId
   -> String
@@ -123,79 +188,77 @@ upsertGrocery
   -> Tuple GroceryEntry GroceryList
 upsertGrocery = upsertGrocery' Nothing
 
-updateBy :: forall a. (a -> Boolean) -> (a -> a) -> Array a -> Maybe (Array a)
-updateBy pred updater xs =
-  Array.findIndex pred xs >>= update
-  where
-  help = updater >>> Just
-  update i = Array.alterAt i help xs
-
-upsertEntry :: GroceryEntry -> GroceryList -> GroceryList
-upsertEntry entry groceryList =
-  updateBy (eq entry) update groceryList
-    <|> updateBy descriptionMatches updateAmount groceryList
-    # Maybe.fromMaybe' insert
-  where
-  updateAmount ge@(MkGroceryEntry g) =
-    case Amount.append (entryAmount ge) (entryAmount entry) of
-      Just newAmount -> MkGroceryEntry $ g { amount = newAmount }
-      Nothing -> ge
-  descriptionMatches g = (CaseInsensitiveString $ entryDescription g) ==
-    (CaseInsensitiveString $ entryDescription entry)
-  update _ = entry
-  insert _ = Array.cons entry groceryList
-
-toggleGrocery :: GroceryEntryId -> GroceryList -> GroceryList
-toggleGrocery id groceryList =
-  groceryList <#> toggle
-  where
-  toggle grocery
-    | entryId grocery == id = toggleEntryChecked grocery
-    | otherwise = grocery
-
-deleteGroceries :: Array GroceryEntry -> GroceryList -> GroceryList
-deleteGroceries groceries groceryList =
-  Array.difference groceryList groceries
-
-updateGroceries :: (GroceryEntry -> GroceryEntry) -> GroceryList -> GroceryList
-updateGroceries f groceryList =
-  map f groceryList
-
 updateGroceries'
   :: (GroceryEntry -> Tuple Boolean GroceryEntry)
   -> GroceryList
-  -> Tuple (Array GroceryEntry) GroceryList
-updateGroceries' f =
-  foldr go ([] /\ [])
+  -> Tuple (Map GroceryEntryId GroceryEntry) GroceryList
+updateGroceries' f groceryList = modifiedGroceries /\ modifiedGroceryList
   where
-  go curr (modified /\ groceryList) =
-    case f curr of
-      true /\ updated -> (updated : modified) /\ updated : groceryList
-      false /\ _ -> modified /\ curr : groceryList
+  groceries =
+    Lens.view _data groceryList
+      # map f
+  keepModified (wasModified /\ x)
+    | wasModified = Just x
+    | otherwise = Nothing
+  modifiedGroceries = Map.mapMaybe keepModified groceries
+  allGroceries = snd <$> groceries
+  modifiedGroceryList = Lens.set _data allGroceries groceryList
+
+-- | Sets the given grocery entry in the grocery list, overwriting any existing
+-- | grocery entry with the same entry id
+set :: GroceryEntry -> GroceryList -> GroceryList
+set groceryEntry@(MkGroceryEntry grocery) groceryList =
+  Lens.over _data set' groceryList
+  where
+  set' = Map.insert grocery.id groceryEntry
+
+-- | Inserts the given `GroceryEntry` unless it already exists by id or 
+-- | description. If it already exists, the amount is updated with the given
+-- | entry's amount if possible.
+upsertEntry :: GroceryEntry -> GroceryList -> GroceryList
+upsertEntry groceryEntry groceryList =
+  Lens.over _data upsertEntry' groceryList
+  where
+  upsertEntry' groceries =
+    Map.alter (alter groceries) (entryId groceryEntry) groceries
+  alter groceries existingEntry =
+    Foldable.oneOf
+      [ map updateAmount existingEntry
+      , Map.values groceries
+          # List.find descriptionMatches
+          # map updateAmount
+      , Just groceryEntry
+      ]
+  updateAmount ge@(MkGroceryEntry g) =
+    case Amount.append (entryAmount ge) (entryAmount groceryEntry) of
+      Just newAmount -> MkGroceryEntry $ g { amount = newAmount }
+      Nothing -> ge
+  descriptionMatches g = (CaseInsensitiveString $ entryDescription g) ==
+    (CaseInsensitiveString $ entryDescription groceryEntry)
+
+deleteGroceries :: Array GroceryEntry -> GroceryList -> GroceryList
+deleteGroceries groceriesToDelete groceryList =
+  Lens.over _data deleteGroceriesHelp groceryList
+  where
+  deleteGroceriesHelp groceries = Map.difference groceries groceriesToDeleteMap
+  groceriesToDeleteMap =
+    groceriesToDelete
+      # map group
+      # Map.fromFoldable
+  group entry = Tuple (entryId entry) entry
 
 partitionGroceriesOnChecked
-  :: GroceryList -> { checked :: GroceryList, unchecked :: GroceryList }
-partitionGroceriesOnChecked gs =
+  :: GroceryList
+  -> { checked :: Array GroceryEntry, unchecked :: Array GroceryEntry }
+partitionGroceriesOnChecked groceryList =
   { checked: partitioned.yes
   , unchecked: partitioned.no
   }
   where
-  partitioned = Array.partition entryChecked gs
-
-set :: GroceryEntry -> GroceryList -> GroceryList
-set grocery list = help <$> list
-  where
-  help g
-    | g == grocery = grocery
-    | otherwise = g
-
-delete :: GroceryEntry -> GroceryList -> GroceryList
-delete grocery list = Array.delete grocery list
-
-insertAt :: Int -> GroceryEntry -> GroceryList -> GroceryList
-insertAt index grocery list =
-  Array.insertAt index grocery list
-    # Maybe.fromMaybe list
+  partitioned =
+    Lens.view _data groceryList
+      # Array.fromFoldable
+      # Array.partition entryChecked
 
 clearCompleted :: GroceryList -> GroceryList
-clearCompleted = Array.filter (not <<< entryChecked)
+clearCompleted = Lens.over _data $ Map.filter (not <<< entryChecked)

@@ -3,6 +3,7 @@ module Spa.App.Groceries where
 import Prelude
 
 import Common.Amount (Amount(..))
+import Common.GroceryEntryId (GroceryEntryId)
 import Common.GroceryList (GroceryEntry, GroceryList)
 import Common.GroceryList as GroceryList
 import Common.GroceryListId (GroceryListId)
@@ -16,6 +17,8 @@ import Data.Lens (Lens', _Just)
 import Data.Lens as Lens
 import Data.Lens.AffineTraversal (AffineTraversal')
 import Data.Lens.Record as LensRecord
+import Data.Map (Map)
+import Data.Map as Map
 import Data.Maybe (Maybe(..))
 import Data.Maybe as Maybe
 import Data.Time.Duration (Seconds(..), convertDuration)
@@ -192,11 +195,13 @@ shiftEntry dos@{ source, target } entry =
   sourceIndex = GroceryList.entrySortIndex source.item
   targetIndex = GroceryList.entrySortIndex target.item
 
-endDrag :: GroceryListState -> Tuple (Array GroceryEntry) GroceryListState
+endDrag
+  :: GroceryListState
+  -> Tuple (Map GroceryEntryId GroceryEntry) GroceryListState
 endDrag state =
   case state.dragState of
-    NotDragging -> [] /\ state
-    DraggingOverNonTarget _ -> [] /\ state { dragState = NotDragging }
+    NotDragging -> Map.empty /\ state
+    DraggingOverNonTarget _ -> Map.empty /\ state { dragState = NotDragging }
     DraggingOverTarget dos ->
       modifiedGroceries /\ state
         { dragState = NotDragging
@@ -365,6 +370,7 @@ groceriesView state =
   where
   { no: uncheckedGroceries, yes: checkedGroceries } =
     state.groceryList
+      # GroceryList.groceries
       # Array.sortBy (compare `on` GroceryList.entrySortIndex)
       # mapWithIndex Tuple
       # Array.partition (Tuple.snd >>> GroceryList.entryChecked)
@@ -516,7 +522,8 @@ component =
         void $ updateGroceries groceryListId $ syncWith modifiedGroceries
       where
       syncWith modifiedGroceries grocery =
-        Array.find (eq (grocery :: GroceryEntry)) modifiedGroceries
+        Map.lookup (GroceryList.entryId grocery) modifiedGroceries
+          -- Array.find (eq (grocery :: GroceryEntry)) modifiedGroceries
           # Maybe.fromMaybe grocery
 
     ToggleGrocery grocery mouseEvent -> do
@@ -535,7 +542,8 @@ component =
       sequence_ (deleteGroceries <$> groceryListId <*> completed)
 
     UncheckCompleted -> do
-      Lens.modifying _groceryListS $ map GroceryList.uncheckEntry
+      Lens.modifying _groceryListS
+        $ GroceryList.updateEntries GroceryList.uncheckEntry
       groceryListId <- H.gets $ Lens.preview _groceryListIdS
       sequence_
         (updateGroceries <$> groceryListId <*> pure GroceryList.uncheckEntry)
@@ -573,7 +581,7 @@ component =
             NotRequested -> HH.text "Loading"
             Loading -> HH.text "Loading"
             Error e -> HH.text e
-            Success { groceryList: [] } -> HH.text
+            Success { groceryList } | GroceryList.isEmpty groceryList -> HH.text
               "No groceries have been added yet"
             Success groceryListState -> groceriesView groceryListState
         ]

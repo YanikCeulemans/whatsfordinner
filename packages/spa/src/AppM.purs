@@ -44,6 +44,8 @@ import Effect.Aff.Class (class MonadAff, liftAff)
 import Effect.Class (class MonadEffect, liftEffect)
 import Effect.Class.Console as Console
 import Partial.Unsafe (unsafeCrashWith)
+import Simple.ULID as ULID
+import Simple.ULID.Window as ULIDW
 import Spa.App.Data as Data
 import Spa.Capabilities.Navigation (class Navigation)
 import Spa.Capabilities.Resource.ManageGroceryList
@@ -87,12 +89,14 @@ getOrInsert key createValue map =
 localStorageUpsertGroceryList :: GroceryListId -> AppM GroceryList
 localStorageUpsertGroceryList id = do
   state <- MonadState.get
+  groceryListId <- liftEffect $ Id.MkId <$> ULID.genULID ULIDW.prng
   let
-    list /\ newState = getOrInsert id createValue state.groceryLists
+    list /\ newState =
+      getOrInsert id (createValue groceryListId) state.groceryLists
   MonadState.put $ state { groceryLists = newState }
   pure list
   where
-  createValue _ = mempty
+  createValue groceryListId _ = GroceryList.createEmpty groceryListId
 
 localStorageUpsertGrocery :: GroceryListId -> GroceryEntry -> AppM Unit
 localStorageUpsertGrocery groceryListId grocery = do
@@ -153,7 +157,7 @@ localStorageUpdateGroceries
 localStorageUpdateGroceries id f = do
   list <- localStorageUpsertGroceryList id
   let
-    updatedList = map f list
+    updatedList = GroceryList.updateEntries f list
   MonadState.modify_ $ modify updatedList
   pure updatedList
   where

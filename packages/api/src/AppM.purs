@@ -9,31 +9,28 @@ import Api.ManageGroceryList
 import Api.ManageMealSchedule (class ManageMealSchedule)
 import Api.ManageSpaces (class ManageSpaces)
 import Api.WS (WebSocket)
-import Api.WS as WS
 import Common.DevEx as DevEx
 import Common.GroceryList (GroceryEntry, GroceryList)
+import Common.GroceryList as GroceryList
 import Common.GroceryListId (GroceryListId)
 import Common.Id (Id)
 import Common.MealSchedule (MealSchedule)
 import Common.MealScheduleId (MealScheduleId)
 import Common.Space (Space)
 import Common.SpaceId (SpaceId)
-import Control.Monad.Except (except, runExceptT)
 import Control.Monad.Reader (class MonadAsk, ReaderT, ask, runReaderT)
 import Data.Array as Array
 import Data.Either (Either(..))
-import Data.Either as Either
 import Data.Map (Map)
 import Data.Map as Map
 import Data.Maybe (Maybe(..))
 import Data.Maybe as Maybe
 import Data.Traversable (for_)
-import Effect.Aff (Aff, bracket, try)
+import Effect.Aff (Aff)
 import Effect.Aff.AVar (AVar)
 import Effect.Aff.AVar as AVar
 import Effect.Aff.Class (class MonadAff, liftAff)
 import Effect.Class (class MonadEffect, liftEffect)
-import Effect.Exception.Unsafe (unsafeThrow)
 import Effect.Ref (Ref)
 import Effect.Ref as Ref
 
@@ -123,9 +120,7 @@ upsertGroceryEntryFromMemory groceryListId groceryEntry = do
     Just groceryList -> liftAff do
       let
         updatedGroceryLists =
-          groceryList
-            # Array.filter (not <<< eq groceryEntry)
-            # Array.cons groceryEntry
+          GroceryList.upsertEntry groceryEntry groceryList
             # \x -> Map.insert groceryListId x groceryLists
 
       AVar.put updatedGroceryLists env.groceryLists

@@ -5,8 +5,9 @@ import Prelude
 import Common.Amount as Amount
 import Common.Extensions.ULID as ULIDExt
 import Common.GroceryEntryId (GroceryEntryId)
-import Common.GroceryList (GroceryEntry)
+import Common.GroceryList (GroceryEntry, GroceryList)
 import Common.GroceryList as GroceryList
+import Common.GroceryListId (GroceryListId)
 import Common.Id as Id
 import Data.Argonaut as J
 import Data.Array (fold)
@@ -21,10 +22,20 @@ import Test.Spec.Assertions (shouldContain)
 rawGroceryId :: String
 rawGroceryId = "01KNEQ7KMSBM0Q4XP56C6YP3NG"
 
+rawGroceryListId :: String
+rawGroceryListId = "01KYT1C1V8PFXTV7NH74VKSF4K"
+
 groceryId :: GroceryEntryId
 groceryId = Id.MkId
   $ Either.fromRight' crash
   $ ULIDExt.parse rawGroceryId
+  where
+  crash _ = unsafeCrashWith "invalid hardcoded ulid"
+
+groceryListId :: GroceryListId
+groceryListId = Id.MkId
+  $ Either.fromRight' crash
+  $ ULIDExt.parse rawGroceryListId
   where
   crash _ = unsafeCrashWith "invalid hardcoded ulid"
 
@@ -39,9 +50,16 @@ parseJson = J.parseJson >>> Either.fromRight' crash
   where
   crash _ = unsafeCrashWith "invalid hardcoded json"
 
+emptyGroceryList :: GroceryList
+emptyGroceryList = GroceryList.createEmpty groceryListId
+
 grocery :: GroceryEntry
 grocery =
-  GroceryList.upsertGrocery groceryId "Tomatoes" (Amount.unitless 1.0) mempty
+  GroceryList.upsertGrocery
+    groceryId
+    "Tomatoes"
+    (Amount.unitless 1.0)
+    emptyGroceryList
     # fst
 
 codecSpec :: Spec Unit
