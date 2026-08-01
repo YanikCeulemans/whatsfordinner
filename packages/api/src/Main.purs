@@ -36,9 +36,7 @@ import Effect.Aff (Milliseconds(..), launchAff_)
 import Effect.Aff as Aff
 import Effect.Aff.AVar as AVar
 import Effect.Aff.Class (class MonadAff)
-import Effect.Aff.Compat (mkEffectFn3, runEffectFn1)
 import Effect.Class (liftEffect)
-import Effect.Exception (Error)
 import Effect.Exception.Unsafe (unsafeThrow)
 import Effect.Ref (Ref)
 import Effect.Ref as Ref
@@ -47,14 +45,13 @@ import HTTPurple.Body as RequestBody
 import Node.Buffer (Buffer)
 import Node.EventEmitter as EventEmitter
 import Node.HTTP.IncomingMessage as IncomingMessage
-import Node.HTTP.Types (IMServer, IncomingMessage, ServerResponse)
+import Node.HTTP.Types (IMServer, IncomingMessage)
 import Node.Net.Socket as Socket
 import Node.Net.Types (Socket, TCP)
 import Node.Stream as Stream
 import Simple.ULID (ULID)
 import Simple.ULID as ULID
 import Simple.ULID.Node as ULIDNode
-import Untagged.Union (UndefinedOr)
 
 data Route
   = Root
@@ -76,33 +73,6 @@ route = mkRoute
   , "Api": "api" / segment
   , "Spaces": "spaces" / spaceId' segment
   , "MealSchedule": "meal-schedules" / mealScheduleId' segment
-  }
-
-type PursMiddleware =
-  (IncomingMessage IMServer)
-  -> ServerResponse
-  -> (UndefinedOr Error -> Effect Unit)
-  -> Effect Unit
-
-pursMiddleware
-  :: PursMiddleware
-  -> NodeMiddleware ()
-pursMiddleware middleware = NodeMiddleware $ mkEffectFn3 help
-  where
-  next' n = runEffectFn1 n
-  help request response next = do
-    middleware request response $ next' next
-    pure $ pure unit
-
-httpStatusCodes
-  :: { badRequest :: Int
-     , ok :: Int
-     , switchingProtocols :: Int
-     }
-httpStatusCodes =
-  { switchingProtocols: 101
-  , ok: 200
-  , badRequest: 400
   }
 
 rootView :: Array ULID -> HTML
@@ -266,8 +236,8 @@ main = launchAff_ do
       runAppM appState $ findSpaceHandler spaceId
     { route: Spaces spaceId, method: Put, body: requestBody } -> do
       runAppM appState $ upsertSpaceHandler spaceId requestBody
-    { route: Spaces _ } -> notFound
 
     { route: MealSchedule mealScheduleId, method: Get } ->
       runAppM appState $ findMealScheduleHandler mealScheduleId
-    { route: MealSchedule _ } -> notFound
+
+    _ -> notFound
