@@ -7,10 +7,12 @@ import Api.AppM (runAppM)
 import Api.HTML (HTML)
 import Api.HTML as AH
 import Api.JsonBody as JsonBody
+import Api.ManageGroceryList (class ManageGroceryList, loadGroceryList)
 import Api.ManageMealSchedule (class ManageMealSchedule, loadMealSchedule)
 import Api.ManageSpaces (class ManageSpaces, loadSpace, upsertSpace)
 import Api.WS (WebSocket, WebSocketServer)
 import Api.WS as WS
+import Common.GroceryList as GroceryList
 import Common.GroceryListId (GroceryListId)
 import Common.Id (Id)
 import Common.Id as Id
@@ -57,7 +59,8 @@ data Route
   = Root
   | Api String
   | Spaces SpaceId
-  | MealSchedule MealScheduleId
+  | MealSchedules MealScheduleId
+  | GroceryLists GroceryListId
 
 derive instance Generic Route _
 
@@ -67,12 +70,16 @@ spaceId' = as Id.print Id.parse
 mealScheduleId' :: RouteDuplex' String -> RouteDuplex' MealScheduleId
 mealScheduleId' = as MealScheduleId.print MealScheduleId.parse
 
+groceryListId' :: RouteDuplex' String -> RouteDuplex' GroceryListId
+groceryListId' = as Id.print Id.parse
+
 route :: RouteDuplex' Route
 route = mkRoute
   { "Root": noArgs
   , "Api": "api" / segment
   , "Spaces": "spaces" / spaceId' segment
-  , "MealSchedule": "meal-schedules" / mealScheduleId' segment
+  , "MealSchedules": "meal-schedules" / mealScheduleId' segment
+  , "GroceryLists": "grocery-lists" / groceryListId' segment
   }
 
 rootView :: Array ULID -> HTML
@@ -176,6 +183,18 @@ findMealScheduleHandler mealScheduleId = do
     Nothing -> noContent
     Just mealSchedule -> ok $ JsonBody.create MealSchedule.codec mealSchedule
 
+findGroceryListHandler
+  :: forall m
+   . MonadAff m
+  => ManageGroceryList m
+  => GroceryListId
+  -> m Response
+findGroceryListHandler groceryListId = do
+  foundGroceryList <- loadGroceryList groceryListId
+  case foundGroceryList of
+    Nothing -> noContent
+    Just groceryList -> ok $ JsonBody.create GroceryList.codec groceryList
+
 decodeBody
   :: forall a m
    . MonadAff m
@@ -224,7 +243,8 @@ main = launchAff_ do
   createEnv = do
     spaces <- AVar.new $ Map.empty
     mealSchedules <- AVar.new $ Map.empty
-    pure { spaces, mealSchedules }
+    groceryLists <- AVar.new $ Map.empty
+    pure { spaces, mealSchedules, groceryLists }
   router appState = case _ of
     { route: Root } -> do
       ulids <- for (1 .. 5) $ const $ liftEffect $ ULID.genULID ULIDNode.prng
@@ -237,7 +257,10 @@ main = launchAff_ do
     { route: Spaces spaceId, method: Put, body: requestBody } -> do
       runAppM appState $ upsertSpaceHandler spaceId requestBody
 
-    { route: MealSchedule mealScheduleId, method: Get } ->
+    { route: MealSchedules mealScheduleId, method: Get } ->
       runAppM appState $ findMealScheduleHandler mealScheduleId
+
+    { route: GroceryLists groceryListId, method: Get } ->
+      runAppM appState $ findGroceryListHandler groceryListId
 
     _ -> notFound

@@ -2,8 +2,11 @@ module Api.AppM where
 
 import Prelude
 
+import Api.ManageGroceryList (class ManageGroceryList)
 import Api.ManageMealSchedule (class ManageMealSchedule)
 import Api.ManageSpaces (class ManageSpaces)
+import Common.GroceryList (GroceryList)
+import Common.GroceryListId (GroceryListId)
 import Common.MealSchedule (MealSchedule)
 import Common.MealScheduleId (MealScheduleId)
 import Common.Space (Space)
@@ -22,6 +25,7 @@ import Effect.Exception.Unsafe (unsafeThrow)
 type Env =
   ( { spaces :: AVar (Map SpaceId Space)
     , mealSchedules :: AVar (Map MealScheduleId MealSchedule)
+    , groceryLists :: AVar (Map GroceryListId GroceryList)
     }
   )
 
@@ -59,9 +63,18 @@ loadMealScheduleFromMemory mealScheduleId = do
   mealSchedules <- liftAff $ AVar.read env.mealSchedules
   pure $ Map.lookup mealScheduleId mealSchedules
 
+loadGroceryListFromMemory :: GroceryListId -> AppM (Maybe GroceryList)
+loadGroceryListFromMemory groceryListId = do
+  env <- ask
+  groceryLists <- liftAff $ AVar.read env.groceryLists
+  pure $ Map.lookup groceryListId groceryLists
+
 instance ManageSpaces AppM where
   loadSpace = loadSpaceFromMemory
   upsertSpace = upsertSpaceFromMemory
 
 instance ManageMealSchedule AppM where
   loadMealSchedule = loadMealScheduleFromMemory
+
+instance ManageGroceryList AppM where
+  loadGroceryList = loadGroceryListFromMemory
