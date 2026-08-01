@@ -8,8 +8,12 @@ import Api.ManageGroceryList
   )
 import Api.ManageMealSchedule (class ManageMealSchedule)
 import Api.ManageSpaces (class ManageSpaces)
+import Api.WS (WebSocket)
+import Api.WS as WS
+import Common.DevEx as DevEx
 import Common.GroceryList (GroceryEntry, GroceryList)
 import Common.GroceryListId (GroceryListId)
+import Common.Id (Id)
 import Common.MealSchedule (MealSchedule)
 import Common.MealScheduleId (MealScheduleId)
 import Common.Space (Space)
@@ -22,17 +26,24 @@ import Data.Either as Either
 import Data.Map (Map)
 import Data.Map as Map
 import Data.Maybe (Maybe(..))
+import Data.Maybe as Maybe
+import Data.Traversable (for_)
 import Effect.Aff (Aff, bracket, try)
 import Effect.Aff.AVar (AVar)
 import Effect.Aff.AVar as AVar
 import Effect.Aff.Class (class MonadAff, liftAff)
-import Effect.Class (class MonadEffect)
+import Effect.Class (class MonadEffect, liftEffect)
 import Effect.Exception.Unsafe (unsafeThrow)
+import Effect.Ref (Ref)
+import Effect.Ref as Ref
+
+type WebsocketMapRef = Ref (Map GroceryListId (Map (Id WebSocket) WebSocket))
 
 type Env =
   ( { spaces :: AVar (Map SpaceId Space)
     , mealSchedules :: AVar (Map MealScheduleId MealSchedule)
     , groceryLists :: AVar (Map GroceryListId GroceryList)
+    , websockets :: Ref (Map GroceryListId (Map (Id WebSocket) WebSocket))
     }
   )
 
@@ -84,6 +95,21 @@ upsertGroceryListFromMemory groceryListId groceryList = do
     updatedGroceryLists = Map.insert groceryListId groceryList groceryLists
   liftAff $ AVar.put updatedGroceryLists env.groceryLists
 
+refRead :: forall m a. MonadEffect m => Ref a -> m a
+refRead = liftEffect <<< Ref.read
+
+readGroceryListWebsocketsOrEmpty
+  :: forall m
+   . MonadEffect m
+  => GroceryListId
+  -> WebsocketMapRef
+  -> m (Array WebSocket)
+readGroceryListWebsocketsOrEmpty groceryListId ref = map help $ refRead ref
+  where
+  help = Map.lookup groceryListId
+    >>> Maybe.fromMaybe Map.empty
+    >>> Array.fromFoldable
+
 upsertGroceryEntryFromMemory
   :: GroceryListId -> GroceryEntry -> AppM (Either UpsertGroceryEntryError Unit)
 upsertGroceryEntryFromMemory groceryListId groceryEntry = do
@@ -101,7 +127,15 @@ upsertGroceryEntryFromMemory groceryListId groceryEntry = do
             # Array.filter (not <<< eq groceryEntry)
             # Array.cons groceryEntry
             # \x -> Map.insert groceryListId x groceryLists
-      Right <$> AVar.put updatedGroceryLists env.groceryLists
+
+      AVar.put updatedGroceryLists env.groceryLists
+
+      groceryListWebsockets <- readGroceryListWebsocketsOrEmpty groceryListId
+        env.websockets
+      for_ groceryListWebsockets \websocket -> do
+        pure $ DevEx.todo "send event over websocket"
+
+      pure $ Right unit
 
 instance ManageSpaces AppM where
   loadSpace = loadSpaceFromMemory

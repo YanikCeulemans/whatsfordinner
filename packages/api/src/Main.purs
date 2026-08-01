@@ -287,7 +287,6 @@ main :: Effect Unit
 main = launchAff_ do
   env <- createEnv
   Aff.makeAff \_done -> do
-    websockets <- Ref.new Map.empty
     wss <- WS.mkWebSocketServer { noServer: true }
     wss # EventEmitter.on_ WS.connectionH \ws -> do
       launchAff_ do
@@ -295,16 +294,17 @@ main = launchAff_ do
         liftEffect $ WS.send "hello, world" ws
     void $ serve
       { port: 8080
-      , onUpgrade: Just $ onUpgrade websockets wss
+      , onUpgrade: Just $ onUpgrade env.websockets wss
       }
       { route, router: router env }
     pure Aff.nonCanceler
   where
   createEnv = do
-    spaces <- AVar.new $ Map.empty
-    mealSchedules <- AVar.new $ Map.empty
-    groceryLists <- AVar.new $ Map.empty
-    pure { spaces, mealSchedules, groceryLists }
+    websockets <- liftEffect $ Ref.new Map.empty
+    spaces <- AVar.new Map.empty
+    mealSchedules <- AVar.new Map.empty
+    groceryLists <- AVar.new Map.empty
+    pure { spaces, mealSchedules, groceryLists, websockets }
   router appState = case _ of
     { route: Root } -> do
       ulids <- for (1 .. 5) $ const $ liftEffect $ ULID.genULID ULIDNode.prng
@@ -332,7 +332,5 @@ main = launchAff_ do
       runAppM appState
         $ upsertGroceryListEntryHanlder groceryListId "" requestBody
 
-    { route } -> do
-      Debug.traceM { route }
-      notFound
+    { route } -> notFound
 
