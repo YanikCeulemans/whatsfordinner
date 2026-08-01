@@ -69,6 +69,14 @@ loadGroceryListFromMemory groceryListId = do
   groceryLists <- liftAff $ AVar.read env.groceryLists
   pure $ Map.lookup groceryListId groceryLists
 
+upsertGroceryListFromMemory :: GroceryListId -> GroceryList -> AppM Unit
+upsertGroceryListFromMemory groceryListId groceryList = do
+  env <- ask
+  groceryLists <- liftAff $ AVar.take env.groceryLists
+  let
+    updatedGroceryLists = Map.insert groceryListId groceryList groceryLists
+  liftAff $ AVar.put updatedGroceryLists env.groceryLists
+
 instance ManageSpaces AppM where
   loadSpace = loadSpaceFromMemory
   upsertSpace = upsertSpaceFromMemory
@@ -78,3 +86,4 @@ instance ManageMealSchedule AppM where
 
 instance ManageGroceryList AppM where
   loadGroceryList = loadGroceryListFromMemory
+  upsertGroceryList = upsertGroceryListFromMemory

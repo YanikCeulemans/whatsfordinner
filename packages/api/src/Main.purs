@@ -7,7 +7,11 @@ import Api.AppM (runAppM)
 import Api.HTML (HTML)
 import Api.HTML as AH
 import Api.JsonBody as JsonBody
-import Api.ManageGroceryList (class ManageGroceryList, loadGroceryList)
+import Api.ManageGroceryList
+  ( class ManageGroceryList
+  , loadGroceryList
+  , upsertGroceryList
+  )
 import Api.ManageMealSchedule (class ManageMealSchedule, loadMealSchedule)
 import Api.ManageSpaces (class ManageSpaces, loadSpace, upsertSpace)
 import Api.WS (WebSocket, WebSocketServer)
@@ -221,7 +225,23 @@ upsertSpaceHandler spaceId requestBody = do
       { error: "BadRequest", details: error }
     Right space -> do
       upsertSpace spaceId space
-      ok $ JsonBody.create Space.spaceCodec space
+      created
+
+upsertGroceryListHanlder
+  :: forall m
+   . MonadAff m
+  => ManageGroceryList m
+  => GroceryListId
+  -> RequestBody
+  -> m Response
+upsertGroceryListHanlder groceryListId requestBody = do
+  decodedGroceryList <- decodeBody GroceryList.codec requestBody
+  case decodedGroceryList of
+    Left error -> badRequest $ JsonBody.create'
+      { error: "BadRequest", details: error }
+    Right groceryList -> do
+      upsertGroceryList groceryListId groceryList
+      created
 
 main :: Effect Unit
 main = launchAff_ do
@@ -262,5 +282,7 @@ main = launchAff_ do
 
     { route: GroceryLists groceryListId, method: Get } ->
       runAppM appState $ findGroceryListHandler groceryListId
+    { route: GroceryLists groceryListId, method: Put, body: requestBody } ->
+      runAppM appState $ upsertGroceryListHanlder groceryListId requestBody
 
     _ -> notFound

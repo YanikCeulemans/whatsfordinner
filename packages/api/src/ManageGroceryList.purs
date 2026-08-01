@@ -8,4 +8,5 @@ import Data.Maybe (Maybe)
 
 class Monad m <= ManageGroceryList m where
   loadGroceryList :: GroceryListId -> m (Maybe GroceryList)
+  upsertGroceryList :: GroceryListId -> GroceryList -> m Unit
 
