@@ -194,14 +194,14 @@ updateGroceries'
   -> Tuple (Map GroceryEntryId GroceryEntry) GroceryList
 updateGroceries' f groceryList = modifiedGroceries /\ modifiedGroceryList
   where
-  groceries =
+  groceries' =
     Lens.view _data groceryList
       # map f
   keepModified (wasModified /\ x)
     | wasModified = Just x
     | otherwise = Nothing
-  modifiedGroceries = Map.mapMaybe keepModified groceries
-  allGroceries = snd <$> groceries
+  modifiedGroceries = Map.mapMaybe keepModified groceries'
+  allGroceries = snd <$> groceries'
   modifiedGroceryList = Lens.set _data allGroceries groceryList
 
 -- | Sets the given grocery entry in the grocery list, overwriting any existing
@@ -219,12 +219,12 @@ upsertEntry :: GroceryEntry -> GroceryList -> GroceryList
 upsertEntry groceryEntry groceryList =
   Lens.over _data upsertEntry' groceryList
   where
-  upsertEntry' groceries =
-    Map.alter (alter groceries) (entryId groceryEntry) groceries
-  alter groceries existingEntry =
+  upsertEntry' groceries' =
+    Map.alter (alter groceries') (entryId groceryEntry) groceries'
+  alter groceries' existingEntry =
     Foldable.oneOf
       [ map updateAmount existingEntry
-      , Map.values groceries
+      , Map.values groceries'
           # List.find descriptionMatches
           # map updateAmount
       , Just groceryEntry
@@ -240,7 +240,8 @@ deleteGroceries :: Array GroceryEntry -> GroceryList -> GroceryList
 deleteGroceries groceriesToDelete groceryList =
   Lens.over _data deleteGroceriesHelp groceryList
   where
-  deleteGroceriesHelp groceries = Map.difference groceries groceriesToDeleteMap
+  deleteGroceriesHelp groceries' = Map.difference groceries'
+    groceriesToDeleteMap
   groceriesToDeleteMap =
     groceriesToDelete
       # map group
