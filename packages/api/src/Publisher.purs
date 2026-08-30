@@ -3,10 +3,16 @@ module Api.Publisher where
 import Prelude
 
 import Data.Argonaut (class EncodeJson, Json, encodeJson)
+import Data.Codec.Argonaut (JsonCodec)
+import Data.Codec.Argonaut as Codec
 
-class Monad m <= Publisher m where
-  publish :: forall a. EncodeJson a => a -> m Unit
-  publishJson :: Json -> m Unit
+class Monad m <= Publisher id m where
+  publishJson :: id -> Json -> m Unit
 
-defaultPublish :: forall m a. Publisher m => EncodeJson a => a -> m Unit
-defaultPublish = encodeJson >>> publishJson
+publishEncode
+  :: forall m a id. Publisher id m => EncodeJson a => id -> a -> m Unit
+publishEncode id = encodeJson >>> publishJson id
+
+publishCodec
+  :: forall m a id. Publisher id m => id -> JsonCodec a -> a -> m Unit
+publishCodec id codec = Codec.encode codec >>> publishJson id
