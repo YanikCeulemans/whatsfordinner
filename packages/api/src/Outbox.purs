@@ -2,7 +2,7 @@ module Api.Outbox where
 
 import Prelude
 
-import Api.Publisher (class Publisher, publishCodec, publishEncode)
+import Api.Publisher (class Publisher, publishEncode)
 import Api.WS (WebSocket)
 import Api.WS as WS
 import Common.DevEx (todo)
@@ -21,24 +21,21 @@ import Control.Monad.Fork.Class
   , never
   , uninterruptible
   )
-import Control.Monad.Reader
-  ( class MonadAsk
-  , ReaderT(..)
-  , asks
-  , lift
-  , runReaderT
-  )
+import Control.Monad.Reader (class MonadAsk, ReaderT, lift, runReaderT)
 import Control.Monad.Reader.Class (ask)
 import Control.Monad.Rec.Class (forever)
 import Data.Argonaut (stringify)
 import Data.Lens as Lens
 import Data.Lens.Record as LensRecord
-import Data.List (List)
+import Data.List (List, (:))
+import Data.List as List
 import Data.Map (Map)
 import Data.Map as Map
+import Data.Maybe (Maybe)
 import Data.Maybe as Maybe
-import Data.Traversable (for_)
-import Effect.Aff (Aff, Fiber)
+import Data.Traversable (for, for_, traverse_)
+import Effect.Aff (Aff, Fiber, Milliseconds(..))
+import Effect.Aff as Aff
 import Effect.Aff.AVar (AVar)
 import Effect.Aff.AVar as AVar
 import Effect.Aff.Class (liftAff)
@@ -48,8 +45,11 @@ import Effect.Ref (Ref)
 import Effect.Ref as Ref
 import Type.Prelude (Proxy(..))
 
+class Monad m <= Delay m where
+  delay :: Milliseconds -> m Unit
+
 class Monad m <= ManageMessages m where
-  readMessage :: m Message
+  readMessage :: m (Maybe Message)
   ackMessage :: Message -> m Unit
   nackMessage :: Message -> m Unit
 
@@ -113,24 +113,29 @@ instance MonadBracket Error Fiber OutboxApp where
 
 instance ManageMessages OutboxApp where
   readMessage = OutboxApp do
-    env <- ask
-    Lens.view _outbox env
-      # AVar.take
-    todo "read from db"
-  ackMessage =
-    todo "ack message"
-  nackMessage =
-    todo "nack message"
+    outboxVar <- Lens.view _outbox <$> ask
+    outbox <- liftAff $ AVar.take outboxVar
+    for (List.uncons outbox) \{ head, tail } -> liftAff do
+      AVar.put tail outboxVar
+      pure head
+  ackMessage _message = pure unit
+  nackMessage message = OutboxApp do
+    outboxVar <- Lens.view _outbox <$> ask
+    outbox <- liftAff $ AVar.take outboxVar
+    liftAff $ AVar.put (message : outbox) outboxVar
 
 instance Publisher GroceryListId OutboxApp where
   publishJson id json = OutboxApp do
     env <- ask
     sockets <- liftAff $ lookupSockets env id
     for_ sockets \socket -> do
-      -- TODO: we probably want at least once delivery here
+      -- TODO: we want at least once delivery here
       liftEffect $ WS.send payload socket
     where
     payload = stringify json
+
+instance Delay OutboxApp where
+  delay = OutboxApp <<< liftAff <<< Aff.delay
 
 handleMessage :: Message -> OutboxApp Unit
 handleMessage message =
@@ -138,14 +143,15 @@ handleMessage message =
   where
   groceryListId = Message.groceryListId message
 
-cleanupMessage :: BracketCondition Error Unit -> Message -> OutboxApp Unit
+cleanupMessage :: BracketCondition Error Unit -> Maybe Message -> OutboxApp Unit
 cleanupMessage condition message =
   case condition of
-    Completed _ -> ackMessage message
-    Failed _e -> nackMessage message
-    Killed _e -> nackMessage message
+    Completed _ -> traverse_ ackMessage message
+    Failed _e -> traverse_ nackMessage message
+    Killed _e -> traverse_ nackMessage message
 
 run :: OutboxEnv -> Aff Unit
 run env =
   forever $ runOutboxApp env do
-    bracket readMessage cleanupMessage handleMessage
+    bracket readMessage cleanupMessage $ traverse_ handleMessage
+    delay $ Milliseconds 5_000.0
