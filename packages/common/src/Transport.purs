@@ -1,14 +1,22 @@
-module Common.Transport where
+module Common.Transport
+  ( class Transport
+  , send
+  , receive
+  , registeredSend
+  ) where
 
+import Effect.Class.Console
 import Prelude
 
 import Common.DevEx as DevEx
 import Common.Id (Id)
 import Common.Id as Id
+import Control.Alt ((<|>))
 import Data.Argonaut (Json)
 import Data.Codec.Argonaut (JsonCodec)
 import Data.Codec.Argonaut as CA
 import Data.Codec.Argonaut.Record as CAR
+import Data.Either as Either
 import Effect.Aff (Aff)
 import Effect.Aff as Aff
 import Effect.Class (liftEffect)
@@ -38,11 +46,6 @@ envelopeCodec payloadCodec =
         , payload: payloadCodec
         }
 
-wrapInEnvelope :: forall a. Id.GenEnv -> a -> Aff (Envelope a)
-wrapInEnvelope genEnv payload = do
-  id <- genId genEnv
-  pure { id, payload }
-
 registeredSend
   :: forall a
    . Transport a
@@ -50,20 +53,30 @@ registeredSend
   -> Json
   -> a
   -> Aff Unit
-registeredSend genEnv payload transport = do
+registeredSend genEnv payload transport =
+  Aff.sequential $
+    Aff.parallel (registeredSendHelp genEnv payload transport)
+      <|> Aff.parallel (Aff.delay $ Aff.Milliseconds 500.0)
+
+registeredSendHelp
+  :: forall a
+   . Transport a
+  => Id.GenEnv
+  -> Json
+  -> a
+  -> Aff Unit
+registeredSendHelp genEnv payload transport = do
   id <- genId genEnv
   let
     envelope = { id, payload }
     envelopePayload = CA.encode codec envelope
-  Aff.makeAff \cb -> do
-    Aff.runAff_ (handleReceive cb) $ receive transport resolve
-    mempty
+  receiveFiber <- Aff.forkAff $ receive transport $ matchesEnvelopeId id
   send envelopePayload transport
+  void $ Aff.joinFiber receiveFiber
   where
-  resolve _ = DevEx.todo ""
   codec = envelopeCodec CA.json
-  handleReceive cb _ = do
-    let
-      _ = DevEx.todo ""
-    liftEffect $ cb $ pure unit
-    pure unit
+
+  matchesEnvelopeId id received =
+    CA.decode codec received
+      <#> _.id >>> eq id
+      # Either.fromRight false
