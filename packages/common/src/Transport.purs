@@ -5,10 +5,8 @@ module Common.Transport
   , registeredSend
   ) where
 
-import Effect.Class.Console
 import Prelude
 
-import Common.DevEx as DevEx
 import Common.Id (Id)
 import Common.Id as Id
 import Control.Alt ((<|>))
@@ -17,10 +15,7 @@ import Data.Codec.Argonaut (JsonCodec)
 import Data.Codec.Argonaut as CA
 import Data.Codec.Argonaut.Record as CAR
 import Data.Either as Either
-import Data.Foldable (class Foldable, foldl)
-import Data.Maybe (Maybe(..))
-import Data.Maybe as Maybe
-import Effect.Aff (Aff, ParAff)
+import Effect.Aff (Aff)
 import Effect.Aff as Aff
 import Effect.Class (liftEffect)
 
@@ -48,18 +43,6 @@ envelopeCodec payloadCodec =
         { id: Id.codec
         , payload: payloadCodec
         }
-
-race :: forall a f. Foldable f => f (Aff a) -> Maybe (Aff a)
-race =
-  map Aff.parallel
-    >>> foldl help Nothing
-    >>> map Aff.sequential
-  where
-  help :: Maybe (ParAff a) -> ParAff a -> Maybe (ParAff a)
-  help acc curr =
-    case acc of
-      Nothing -> Just curr
-      Just x -> Just $ x <|> curr
 
 registeredSend
   :: forall a
