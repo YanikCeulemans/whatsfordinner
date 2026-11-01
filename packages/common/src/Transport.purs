@@ -7,10 +7,11 @@ module Common.Transport
 
 import Prelude
 
+import Common.Extensions.Aff as AffE
 import Common.Id (Id)
 import Common.Id as Id
-import Control.Alt ((<|>))
 import Data.Argonaut (Json)
+import Data.Array.NonEmpty.Internal (NonEmptyArray(..))
 import Data.Codec.Argonaut (JsonCodec)
 import Data.Codec.Argonaut as CA
 import Data.Codec.Argonaut.Record as CAR
@@ -52,9 +53,11 @@ registeredSend
   -> a
   -> Aff Unit
 registeredSend genEnv payload transport =
-  Aff.sequential $
-    Aff.parallel (registeredSendHelp genEnv payload transport)
-      <|> Aff.parallel (Aff.delay $ Aff.Milliseconds 500.0)
+  NonEmptyArray
+    [ registeredSendHelp genEnv payload transport
+    , Aff.delay $ Aff.Milliseconds 500.0
+    ]
+    # AffE.race
 
 registeredSendHelp
   :: forall a
