@@ -13,6 +13,7 @@ import Common.Range as Range
 import Common.RingList (RingList)
 import Common.RingList as RingList
 import Common.Test.Amount as Amount
+import Common.Test.Extensions.Aff as AffE
 import Common.Test.Grocery as Grocery
 import Common.Test.GroceryId as GroceryId
 import Data.Date as Date
@@ -195,6 +196,7 @@ spec = do
   GroceryId.spec
   Amount.spec
   Grocery.spec
+  AffE.spec
 
 main :: Effect Unit
 main = runSpecAndExitProcess [ consoleReporter ] spec
