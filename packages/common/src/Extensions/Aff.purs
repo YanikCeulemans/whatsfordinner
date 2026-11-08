@@ -2,10 +2,9 @@ module Common.Extensions.Aff (race, timeout) where
 
 import Prelude
 
-import Control.Alt (alt)
 import Control.Monad.Error.Class (throwError)
+import Data.Foldable (oneOf)
 import Data.NonEmpty (NonEmpty, (:|))
-import Data.NonEmpty as NonEmpty
 import Data.Time.Duration (class Duration)
 import Data.Time.Duration as Duration
 import Effect.Aff (Aff)
@@ -16,7 +15,7 @@ race :: forall a. NonEmpty Array (Aff a) -> Aff a
 race affs =
   affs
     # map Aff.parallel
-    # NonEmpty.foldl1 alt
+    # oneOf
     # Aff.sequential
 
 data TimeoutResult a

@@ -11,7 +11,6 @@ import Common.Extensions.Aff as AffE
 import Common.Id (Id)
 import Common.Id as Id
 import Data.Argonaut (Json)
-import Data.Array.NonEmpty.Internal (NonEmptyArray(..))
 import Data.Codec.Argonaut (JsonCodec)
 import Data.Codec.Argonaut as CA
 import Data.Codec.Argonaut.Record as CAR
@@ -53,11 +52,9 @@ registeredSend
   -> a
   -> Aff Unit
 registeredSend genEnv payload transport =
-  NonEmptyArray
-    [ registeredSendHelp genEnv payload transport
-    , Aff.delay $ Aff.Milliseconds 500.0
-    ]
-    # AffE.race
+  AffE.timeout deadline $ registeredSendHelp genEnv payload transport
+  where
+  deadline = Aff.Milliseconds 500.0
 
 registeredSendHelp
   :: forall a
