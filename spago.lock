@@ -33,6 +33,7 @@
         },
         "test": {
           "dependencies": [
+            "debug",
             "effect",
             "spec",
             "spec-node"

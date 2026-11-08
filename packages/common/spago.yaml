@@ -12,3 +12,4 @@ package:
       - effect
       - spec
       - spec-node
+      - debug
