@@ -16,6 +16,7 @@ import Common.Test.Amount as Amount
 import Common.Test.Extensions.Aff as AffE
 import Common.Test.Grocery as Grocery
 import Common.Test.GroceryId as GroceryId
+import Common.Test.Transport as Transport
 import Data.Date as Date
 import Data.Date.Component (Month(..))
 import Data.Either (Either(..))
@@ -197,6 +198,7 @@ spec = do
   Amount.spec
   Grocery.spec
   AffE.spec
+  Transport.spec
 
 main :: Effect Unit
 main = runSpecAndExitProcess [ consoleReporter ] spec
