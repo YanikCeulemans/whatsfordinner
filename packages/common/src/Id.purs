@@ -1,4 +1,4 @@
-module Common.Id (Id(..), GenEnv, codec, print, parse, gen) where
+module Common.Id (Id(..), GenEnv(..), codec, print, parse, gen) where
 
 import Prelude
 

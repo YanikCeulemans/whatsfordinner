@@ -2,19 +2,27 @@ module Common.Test.Transport where
 
 import Prelude
 
-import Common.Transport (class Transport, receive)
-import Data.Argonaut (Json)
+import Common.Id as Id
+import Common.Transport (class Transport, receive, registeredSend, send)
+import Data.Argonaut (Json, jsonNull)
 import Data.Array as Array
 import Data.Array.NonEmpty as NonEmptyArray
 import Data.Array.NonEmpty.Internal (NonEmptyArray)
 import Data.Maybe (Maybe(..))
+import Data.Maybe as Maybe
+import Debug as Debug
+import Effect.Aff (Aff)
 import Effect.Aff as Aff
 import Effect.Aff.AVar (AVar)
+import Effect.Aff.AVar as AVar
 import Effect.Aff.AVar as Avar
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (shouldEqual)
 
 newtype TestTransport = MkTestTransport (AVar (NonEmptyArray Json))
+
+createEmptyTransport :: Aff TestTransport
+createEmptyTransport = MkTestTransport <$> AVar.empty
 
 type Plucked a = { plucked :: a, rest :: Array a }
 
@@ -36,9 +44,13 @@ pluck predicate nonEmpty =
 
 instance Transport TestTransport where
   send payload (MkTestTransport var) = do
-    queue <- Avar.take var
+    queue <- Avar.tryTake var
     let
-      updatedQueue = NonEmptyArray.snoc queue payload
+      updatedQueue =
+        queue
+          # map (\q -> NonEmptyArray.snoc q payload)
+          # Maybe.fromMaybe' (\_ -> NonEmptyArray.cons' payload [])
+
     Avar.put updatedQueue var
 
   receive transport@(MkTestTransport var) predicate = do
@@ -62,7 +74,13 @@ registeredSendSpec :: Spec Unit
 registeredSendSpec = do
   describe "registeredSend" do
     it "should work" do
-      true `shouldEqual` false
+      transport <- createEmptyTransport
+      forked <- Aff.forkAff do
+        payload <- receive transport (const true)
+        send payload transport
+      actual <- registeredSend Id.Node jsonNull transport
+      Aff.joinFiber forked
+      actual `shouldEqual` unit
 
 spec :: Spec Unit
 spec = do
