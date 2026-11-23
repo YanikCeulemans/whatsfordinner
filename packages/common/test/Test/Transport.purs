@@ -6,16 +6,14 @@ import Common.Id as Id
 import Common.Transport (class Transport, receive, registeredSend, send)
 import Data.Argonaut (Json, jsonNull)
 import Data.Array as Array
+import Data.Array.NonEmpty (NonEmptyArray)
 import Data.Array.NonEmpty as NonEmptyArray
-import Data.Array.NonEmpty.Internal (NonEmptyArray)
 import Data.Maybe (Maybe(..))
 import Data.Maybe as Maybe
-import Debug as Debug
 import Effect.Aff (Aff)
 import Effect.Aff as Aff
 import Effect.Aff.AVar (AVar)
 import Effect.Aff.AVar as AVar
-import Effect.Aff.AVar as Avar
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (shouldEqual)
 
@@ -31,42 +29,37 @@ pluck
    . (a -> Boolean)
   -> NonEmptyArray a
   -> Maybe (Plucked a)
-pluck predicate nonEmpty =
-  help [] nonEmpty
-  where
-  help nonMatching xs =
-    case NonEmptyArray.uncons xs of
-      { head, tail } | predicate head ->
-        Just { plucked: head, rest: nonMatching <> tail }
-      { head, tail } -> do
-        nonEmptyTail <- NonEmptyArray.fromArray tail
-        help (Array.snoc nonMatching head) nonEmptyTail
+pluck predicate nonEmpty = do
+  let
+    { init, rest } = NonEmptyArray.span (not <<< predicate) nonEmpty
+  { head, tail } <- Array.uncons rest
+  pure { plucked: head, rest: init <> tail }
 
 instance Transport TestTransport where
   send payload (MkTestTransport var) = do
-    queue <- Avar.tryTake var
+    queue <- AVar.tryTake var
     let
       updatedQueue =
         queue
           # map (\q -> NonEmptyArray.snoc q payload)
           # Maybe.fromMaybe' (\_ -> NonEmptyArray.cons' payload [])
 
-    Avar.put updatedQueue var
+    AVar.put updatedQueue var
 
   receive transport@(MkTestTransport var) predicate = do
-    queue <- Avar.take var
+    queue <- AVar.take var
 
     case pluck predicate queue of
       Just { plucked, rest } -> do
         case NonEmptyArray.fromArray rest of
-          Just updatedQueue -> Avar.put updatedQueue var
+          Just updatedQueue -> AVar.put updatedQueue var
           Nothing -> pure unit
         pure plucked
       Nothing -> tryAgain queue
 
     where
     tryAgain queue = do
-      Avar.put queue var
+      AVar.put queue var
       Aff.delay $ Aff.Milliseconds 50.0
       receive transport predicate
 
