@@ -10,6 +10,7 @@ import Common.GroceryListId (GroceryListId)
 import Common.Id as Id
 import Common.MealScheduleId (MealScheduleId)
 import Common.SpaceId (SpaceId)
+import Control.Monad.Rec.Class (forever)
 import Data.Array (fold, mapWithIndex)
 import Data.Array as Array
 import Data.Function (on)
@@ -35,6 +36,7 @@ import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Query.Event as HQE
+import Halogen.Subscription as HS
 import Spa.App.Layout as Layout
 import Spa.App.RemoteData (RemoteData(..))
 import Spa.App.RemoteData as RemoteData
@@ -236,6 +238,7 @@ data Action
   | MessageReceived MessageEvent
   | WebSocketOpened
   | WebSocketClosed GroceryListId CloseEvent
+  | Tick
 
 printAmount :: Amount -> String
 printAmount = case _ of
@@ -417,6 +420,14 @@ buildMainLayoutConfig state =
     , groceryListId: Lens.preview _groceryListIdS state
     }
 
+timer :: forall a m. MonadAff m => a -> m (HS.Emitter a)
+timer action = do
+  { emitter, listener } <- H.liftEffect HS.create
+  void $ H.liftAff $ forever do
+    Aff.delay $ Aff.Milliseconds 1000.0
+    H.liftEffect $ HS.notify listener action
+  pure emitter
+
 component
   :: forall query output m
    . MonadAff m
@@ -448,6 +459,7 @@ component =
     -> H.HalogenM State Action childSlots output m Unit
   handleAction = case _ of
     Initialize -> do
+      void $ H.subscribe =<< timer Tick
       H.modify_ _ { groceryListState = Loading }
       foundSpace <- loadSpace =<< H.gets _.spaceId
       for_ foundSpace \{ groceryListId, mealScheduleId } -> do
@@ -553,6 +565,9 @@ component =
 
     MessageReceived event ->
       Console.log $ fold [ "msg received: ", event.data ]
+
+    Tick ->
+      Console.log "tick"
 
   render :: State -> H.ComponentHTML Action () m
   render state =

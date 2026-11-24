@@ -27,8 +27,8 @@ class Transport a where
 data Envelope_
 type EnvelopeId = Id Envelope_
 
-genId :: Id.GenEnv -> Aff EnvelopeId
-genId = Id.gen >>> liftEffect
+genId :: Aff EnvelopeId
+genId = liftEffect Id.gen
 
 -- | A wrapper type for payloads with an id attached
 type Envelope a =
@@ -48,24 +48,22 @@ envelopeCodec payloadCodec =
 registeredSend
   :: forall a
    . Transport a
-  => Id.GenEnv
-  -> Json
+  => Json
   -> a
   -> Aff Unit
-registeredSend genEnv payload transport =
-  AffE.timeout deadline $ registeredSendHelp genEnv payload transport
+registeredSend payload transport =
+  AffE.timeout deadline $ registeredSendHelp payload transport
   where
   deadline = Aff.Milliseconds 500.0
 
 registeredSendHelp
   :: forall a
    . Transport a
-  => Id.GenEnv
-  -> Json
+  => Json
   -> a
   -> Aff Unit
-registeredSendHelp genEnv payload transport = do
-  id <- genId genEnv
+registeredSendHelp payload transport = do
+  id <- genId
   let
     envelope = { id, payload }
     envelopePayload = CA.encode codec envelope

@@ -1,7 +1,8 @@
-module Common.Id (Id(..), GenEnv(..), codec, print, parse, gen) where
+module Common.Id (Id(..), codec, print, parse, gen) where
 
 import Prelude
 
+import Common.Extensions.ULID (prng)
 import Common.Extensions.ULID as ULIDExt
 import Data.Argonaut as J
 import Data.Bifunctor (bimap)
@@ -12,8 +13,6 @@ import Data.Either as Either
 import Effect (Effect)
 import Simple.ULID (ULID)
 import Simple.ULID as ULID
-import Simple.ULID.Node as ULIDN
-import Simple.ULID.Window as ULIDB
 
 newtype Id :: Type -> Type
 newtype Id a = MkId ULID
@@ -42,15 +41,6 @@ parse candidate =
   ULIDExt.parse candidate
     <#> MkId
 
-data GenEnv
-  = Browser
-  | Node
-
-gen :: forall a. GenEnv -> Effect (Id a)
-gen genEnv =
+gen :: forall a. Effect (Id a)
+gen =
   ULID.genULID prng <#> MkId
-  where
-  prng =
-    case genEnv of
-      Browser -> ULIDB.prng
-      Node -> ULIDN.prng

@@ -1,4 +1,4 @@
-module Common.Extensions.ULID (parse) where
+module Common.Extensions.ULID (parse, prng) where
 
 import Prelude
 
@@ -8,6 +8,7 @@ import Data.Either (Either(..))
 import Data.String as String
 import Data.String.CodeUnits as CodeUnits
 import Simple.ULID (ULID)
+import Simple.ULID.PRNG (PRNG)
 import Unsafe.Coerce (unsafeCoerce)
 
 encoding :: String
@@ -24,3 +25,5 @@ parse candidate
       where
       candidateChars = CodeUnits.toCharArray candidate
       encodingChars = CodeUnits.toCharArray encoding
+
+foreign import prng :: PRNG
