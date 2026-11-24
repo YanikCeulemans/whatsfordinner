@@ -1,9 +1,9 @@
 <!doctype html>
 <html>
   <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="color-scheme" content="light dark">
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
     <title>Whats for dinner</title>
     <script
       src="https://cdn.jsdelivr.net/npm/@dragdroptouch/drag-drop-touch@latest/dist/drag-drop-touch.esm.min.js?autoload"
@@ -13,11 +13,11 @@
     <link
       rel="stylesheet"
       href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css"
-    >
+    />
     <link
       rel="stylesheet"
       href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.colors.min.css"
-    >
+    />
 
     <!--
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/themes/light.css" />
@@ -25,23 +25,55 @@
     -->
 
     <style>
-      .flex { display: flex; }
-      .flex-1 { flex: 1; }
-      .column { flex-direction: column; }
-      .spaced { gap: 15px; }
-      .padded { padding: 10px; }
-      .justify-center { justify-content: center; }
-      .items-center { align-items: center; }
-      .items-baseline { align-items: baseline; }
-      .no-list-style { list-style-type: none; }
-      .no-padding { padding: 0; }
-      .no-margin { margin: 0; }
-      .justify-space-between { justify-content: space-between; }
-      .checked { text-decoration: line-through; }
-      .user-select-none { user-select: none; }
-      .white-space-pre-wrap { white-space: pre-wrap; }
+      .flex {
+        display: flex;
+      }
+      .flex-1 {
+        flex: 1;
+      }
+      .column {
+        flex-direction: column;
+      }
+      .spaced {
+        gap: 15px;
+      }
+      .padded {
+        padding: 10px;
+      }
+      .justify-center {
+        justify-content: center;
+      }
+      .items-center {
+        align-items: center;
+      }
+      .items-baseline {
+        align-items: baseline;
+      }
+      .no-list-style {
+        list-style-type: none;
+      }
+      .no-padding {
+        padding: 0;
+      }
+      .no-margin {
+        margin: 0;
+      }
+      .justify-space-between {
+        justify-content: space-between;
+      }
+      .checked {
+        text-decoration: line-through;
+      }
+      .user-select-none {
+        user-select: none;
+      }
+      .white-space-pre-wrap {
+        white-space: pre-wrap;
+      }
       body > div {
-        header, main, footer {
+        header,
+        main,
+        footer {
           padding-block: var(--pico-block-spacing-vertical);
         }
       }
@@ -51,10 +83,16 @@
         background-color: var(--pico-background-color);
       }
 
-      .transparent-border { border: 2px solid transparent; }
-      .add-above-border { border-top: 2px solid green; }
-      .add-below-border { border-bottom: 2px solid green; }
-      .fab { 
+      .transparent-border {
+        border: 2px solid transparent;
+      }
+      .add-above-border {
+        border-top: 2px solid green;
+      }
+      .add-below-border {
+        border-bottom: 2px solid green;
+      }
+      .fab {
         --pico-border-radius: 50%;
         position: sticky;
         bottom: 80px;
@@ -75,7 +113,8 @@
         align-self: stretch;
         display: flex;
         align-items: center;
-        padding: var(--pico-block-spacing-vertical) var(--pico-block-spacing-horizontal);
+        padding: var(--pico-block-spacing-vertical)
+          var(--pico-block-spacing-horizontal);
       }
       .grocery-controls {
         flex: 0;
@@ -105,7 +144,8 @@
           color: var(--pico-dropdown-color);
           background-color: var(--pico-dropdown-background-color);
           box-shadow: var(--pico-dropdown-box-shadow);
-          border: var(--pico-border-width) solid var(--pico-dropdown-border-color);
+          border: var(--pico-border-width) solid
+            var(--pico-dropdown-border-color);
           border-radius: var(--pico-border-radius);
           margin-top: var(--pico-outline-width);
           margin-bottom: 0;
@@ -114,7 +154,8 @@
           li {
             list-style-type: none;
             margin: 0;
-            padding: var(--pico-block-spacing-horizontal) var(--pico-block-spacing-vertical);
+            padding: var(--pico-block-spacing-horizontal)
+              var(--pico-block-spacing-vertical);
             cursor: pointer;
 
             &:hover {
@@ -123,14 +164,7 @@
           }
         }
       }
-
-      .live-status {
-        width: 20px;
-        height: 20px;
-        border-radius: 50%;
-      }
     </style>
   </head>
-  <body id="app">
-  </body>
+  <body id="app"></body>
 </html>

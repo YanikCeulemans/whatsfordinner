@@ -14,7 +14,7 @@ import Control.Monad.Rec.Class (forever)
 import Data.Array (fold, mapWithIndex)
 import Data.Array as Array
 import Data.Function (on)
-import Data.Lens (Lens', _Just)
+import Data.Lens (Lens')
 import Data.Lens as Lens
 import Data.Lens.AffineTraversal (AffineTraversal')
 import Data.Lens.Record as LensRecord
@@ -22,20 +22,17 @@ import Data.Map (Map)
 import Data.Map as Map
 import Data.Maybe (Maybe(..))
 import Data.Maybe as Maybe
-import Data.Time.Duration (Seconds(..), convertDuration)
 import Data.Traversable (for_, sequence_)
 import Data.Tuple (Tuple(..))
 import Data.Tuple as Tuple
 import Data.Tuple.Nested ((/\))
 import Effect.Aff as Aff
 import Effect.Aff.Class (class MonadAff)
-import Effect.Class (class MonadEffect)
 import Effect.Class.Console as Console
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
-import Halogen.Query.Event as HQE
 import Halogen.Subscription as HS
 import Spa.App.Layout as Layout
 import Spa.App.RemoteData (RemoteData(..))
@@ -51,12 +48,6 @@ import Spa.Capabilities.Resource.ManageGroceryList
   )
 import Spa.Capabilities.Resource.ManageSpaces (class ManageSpaces, loadSpace)
 import Spa.Data.Route (GroceriesRoute(..), Route(..), SpaceRoute(..))
-import Spa.FFI.WebSocket (WebSocket)
-import Spa.FFI.WebSocket as WS
-import Spa.FFI.WebSocket.Types.CloseEvent (CloseEvent)
-import Spa.FFI.WebSocket.Types.CloseEvent as WSTC
-import Spa.FFI.WebSocket.Types.MessageEvent (MessageEvent)
-import Spa.FFI.WebSocket.Types.ReadyState (ReadyState(..))
 import Type.Prelude (Proxy(..))
 import Web.HTML.Event.DragEvent (DragEvent)
 import Web.UIEvent.MouseEvent (MouseEvent)
@@ -81,16 +72,10 @@ type DragEntry =
   , item :: GroceryEntry
   }
 
-type WebSocketState =
-  { webSocket :: WebSocket
-  , readyState :: ReadyState
-  }
-
 type GroceryListState =
   { groceryList :: GroceryList
   , groceryListId :: GroceryListId
   , dragState :: DragState DragEntry
-  , webSocketState :: Maybe WebSocketState
   , mealScheduleId :: MealScheduleId
   }
 
@@ -111,35 +96,6 @@ _groceryListState = LensRecord.prop (Proxy :: Proxy "groceryListState")
 
 _groceryListStateS :: AffineTraversal' State GroceryListState
 _groceryListStateS = _groceryListState <<< RemoteData._Success
-
-_webSocketState :: Lens' GroceryListState (Maybe WebSocketState)
-_webSocketState = LensRecord.prop (Proxy :: Proxy "webSocketState")
-
-_webSocketStateS :: AffineTraversal' State (Maybe WebSocketState)
-_webSocketStateS = _groceryListStateS <<< _webSocketState
-
-_webSocket :: Lens' WebSocketState WebSocket
-_webSocket = LensRecord.prop (Proxy :: Proxy "webSocket")
-
-_webSocketS :: AffineTraversal' State WebSocket
-_webSocketS =
-  _groceryListState
-    <<< RemoteData._Success
-    <<< _webSocketState
-    <<< _Just
-    <<< _webSocket
-
-_readyState :: Lens' WebSocketState ReadyState
-_readyState = LensRecord.prop (Proxy :: Proxy "readyState")
-
-_readyStateS :: AffineTraversal' State ReadyState
-_readyStateS =
-  _groceryListState
-    <<< RemoteData._Success
-    <<< _webSocketState
-    <<< _Just
-    <<<
-      _readyState
 
 _dragState :: Lens' GroceryListState (DragState DragEntry)
 _dragState = LensRecord.prop (Proxy :: Proxy "dragState")
@@ -228,7 +184,6 @@ clearCompleted state = state
 data Action
   = Initialize
   | Finalize
-  | ConnectWebSocket GroceryListId
   | ToggleGrocery GroceryEntry MouseEvent
   | StartDrag DragEntry DragEvent
   | OverDrag DragEntry DragEvent
@@ -236,9 +191,6 @@ data Action
   | ClearCompleted
   | UncheckCompleted
   | HandleMouseDownOnGroceryEntry DragEntry
-  | MessageReceived MessageEvent
-  | WebSocketOpened
-  | WebSocketClosed GroceryListId CloseEvent
   | Tick
 
 printAmount :: Amount -> String
@@ -379,39 +331,6 @@ groceriesView state =
       # mapWithIndex Tuple
       # Array.partition (Tuple.snd >>> GroceryList.entryChecked)
 
-isNoLongerInterested :: CloseEvent -> Boolean
-isNoLongerInterested closeEvent =
-  WSTC.codeMatches WSTC.NoLongerInterested closeEvent
-
--- TODO: What happens when there is no internet?
-connectWebSocket :: forall m. MonadEffect m => GroceryListId -> m WebSocket
-connectWebSocket groceryListId = H.liftEffect
-  $ WS.mk
-  $ fold [ "ws://localhost:5000/ws/", Id.print groceryListId ]
-
-subscribeToWebSocketEvent
-  :: forall event state action slots output m
-   . WS.EventConfig event
-  -> (event -> Maybe action)
-  -> WebSocket
-  -> H.HalogenM state action slots output m Unit
-subscribeToWebSocketEvent eventConfig buildAction ws =
-  void $ H.subscribe $ HQE.eventListener wsEventType wsEventTarget handleEvent
-  where
-  wsEventType = eventConfig.eventType
-  wsEventTarget = WS.toEventTarget ws
-  handleEvent event = eventConfig.fromEvent event >>= buildAction
-
-updateReadyState
-  :: forall childSlots output m
-   . MonadEffect m
-  => H.HalogenM State Action childSlots output m Unit
-updateReadyState = do
-  webSocket <- H.gets $ Lens.preview _webSocketS
-  for_ webSocket \ws -> do
-    readyState <- H.liftEffect $ WS.readyState ws
-    Lens.assign _readyStateS readyState
-
 buildMainLayoutConfig :: State -> Layout.MainConfig
 buildMainLayoutConfig state =
   (Layout.defaultMainConfig { routing = Just routing })
@@ -479,56 +398,13 @@ component =
               , groceryListId
               , mealScheduleId
               , dragState: NotDragging
-              , webSocketState: Nothing
               }
           }
-        handleAction $ ConnectWebSocket groceryListId
 
     Finalize -> do
-      state <- H.get
-      let
-        groceryListState = state.groceryListState
-        webSocket =
-          groceryListState
-            # map _.webSocketState
-            # RemoteData.toMaybe
-            # join
-            # map _.webSocket
-      H.liftEffect $ for_ webSocket $ WS.close WSTC.NoLongerInterested
-      H.liftAff $ for_ state.fibersToCleanup $ Aff.killFiber $ Aff.error
+      fibersToCleanup <- H.gets _.fibersToCleanup
+      H.liftAff $ for_ fibersToCleanup $ Aff.killFiber $ Aff.error
         "groceries component that was subscribed to this fiber was unmounted"
-
-    -- TODO: WebSocket to capability?
-    ConnectWebSocket groceryListId -> do
-      -- TODO: handle socket error event, try to reconnect?
-      ws <- connectWebSocket groceryListId
-      subscribeToWebSocketEvent
-        WS.eventConfigs.open
-        (const WebSocketOpened >>> Just)
-        ws
-      subscribeToWebSocketEvent
-        WS.eventConfigs.message
-        (MessageReceived >>> Just)
-        ws
-      subscribeToWebSocketEvent
-        WS.eventConfigs.close
-        (WebSocketClosed groceryListId >>> Just)
-        ws
-
-      readyState <- H.liftEffect $ WS.readyState ws
-      Lens.assignJust _webSocketStateS { webSocket: ws, readyState }
-
-    WebSocketOpened -> do
-      Console.log "web socket opened"
-      updateReadyState
-
-    WebSocketClosed groceryListId closeEvent -> do
-      Console.logShow { msg: "web socket closed", closeEvent }
-      updateReadyState
-      unless (isNoLongerInterested closeEvent) do
-        Console.log "retrying web socket connection"
-        H.liftAff $ Aff.delay $ convertDuration $ Seconds 5.0
-        handleAction $ ConnectWebSocket groceryListId
 
     StartDrag dragEntry _dragEvent ->
       Lens.assign _dragStateS $ DraggingOverNonTarget dragEntry
@@ -575,9 +451,6 @@ component =
     HandleMouseDownOnGroceryEntry dragEntry -> do
       Lens.assign _dragStateS $ DraggingOverNonTarget dragEntry
 
-    MessageReceived event ->
-      Console.log $ fold [ "msg received: ", event.data ]
-
     Tick ->
       Console.log "tick"
 
@@ -592,14 +465,6 @@ component =
                 [ HP.class_ $ H.ClassName "flex row spaced items-baseline" ]
                 [ HH.h1 [ HP.class_ $ H.ClassName "no-margin" ]
                     [ HH.text "Groceries" ]
-                , HH.div
-                    [ S.classes'
-                        { "live-status": true
-                        , "pico-background-lime-100": isLive
-                        , "pico-background-pink-450": not isLive
-                        }
-                    ]
-                    []
                 ]
             , HH.div [ HP.class_ $ H.ClassName "flex spaced" ] $ groceryLinks
                 (Lens.preview _groceryListStateS state)
@@ -626,9 +491,3 @@ component =
             )
             [ HH.text "Add" ]
         ]
-    isLive =
-      Lens.preview _readyStateS state
-        <#> case _ of
-          Open -> true
-          _ -> false
-        # Maybe.fromMaybe false
