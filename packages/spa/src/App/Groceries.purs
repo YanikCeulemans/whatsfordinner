@@ -103,6 +103,7 @@ type State =
   { groceryListState :: RemoteData String GroceryListState
   , spaceId :: SpaceId
   , groceryListId :: GroceryListId
+  , fibersToCleanup :: Array (Aff.Fiber Unit)
   }
 
 _groceryListState :: Lens' State (RemoteData String GroceryListState)
@@ -420,13 +421,14 @@ buildMainLayoutConfig state =
     , groceryListId: Lens.preview _groceryListIdS state
     }
 
-timer :: forall a m. MonadAff m => a -> m (HS.Emitter a)
+timer
+  :: forall a m. MonadAff m => a -> m (Tuple (Aff.Fiber Unit) (HS.Emitter a))
 timer action = do
   { emitter, listener } <- H.liftEffect HS.create
-  void $ H.liftAff $ forever do
+  fiber <- H.liftAff $ Aff.forkAff $ forever do
     Aff.delay $ Aff.Milliseconds 1000.0
     H.liftEffect $ HS.notify listener action
-  pure emitter
+  pure (Tuple fiber emitter)
 
 component
   :: forall query output m
@@ -451,6 +453,7 @@ component =
     { groceryListState: NotRequested
     , spaceId
     , groceryListId
+    , fibersToCleanup: []
     }
 
   handleAction
@@ -459,8 +462,14 @@ component =
     -> H.HalogenM State Action childSlots output m Unit
   handleAction = case _ of
     Initialize -> do
-      void $ H.subscribe =<< timer Tick
-      H.modify_ _ { groceryListState = Loading }
+      Tuple timerFiber timerEmitter <- timer Tick
+      void $ H.subscribe timerEmitter
+      H.modify_
+        ( \s -> s
+            { groceryListState = Loading
+            , fibersToCleanup = Array.cons timerFiber s.fibersToCleanup
+            }
+        )
       foundSpace <- loadSpace =<< H.gets _.spaceId
       for_ foundSpace \{ groceryListId, mealScheduleId } -> do
         groceryList <- upsertGroceryList groceryListId
@@ -476,8 +485,9 @@ component =
         handleAction $ ConnectWebSocket groceryListId
 
     Finalize -> do
-      groceryListState <- H.gets _.groceryListState
+      state <- H.get
       let
+        groceryListState = state.groceryListState
         webSocket =
           groceryListState
             # map _.webSocketState
@@ -485,6 +495,8 @@ component =
             # join
             # map _.webSocket
       H.liftEffect $ for_ webSocket $ WS.close WSTC.NoLongerInterested
+      H.liftAff $ for_ state.fibersToCleanup $ Aff.killFiber $ Aff.error
+        "groceries component that was subscribed to this fiber was unmounted"
 
     -- TODO: WebSocket to capability?
     ConnectWebSocket groceryListId -> do

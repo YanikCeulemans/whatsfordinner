@@ -1,6 +1,9 @@
 [tasks.dev]
 run = 'watchexec -e .purs,.js -i output spago bundle -p spa --platform browser --bundle-type app --module Spa.Main'
 
+[tasks.bundle-spa]
+run = 'spago bundle -p spa --platform browser --bundle-type app --module Spa.Main'
+
 [tasks.build]
 run = 'spago build'
 
