@@ -1,7 +1,3 @@
-[daemons.parcel]
-run = "mise exec -- parcel index.html"
-dir = "packages/spa"
-
 [daemons.docs]
 run = "python3 -m http.server $PORT"
 port = 8000
