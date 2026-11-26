@@ -27,17 +27,14 @@ run = 'spago bundle --platform browser --bundle-type app --minify -p spa --modul
 
 [tasks.docs]
 description = 'Generate the docs and serve them'
-depends = ['docs-build', 'docs-serve']
-
-[tasks.docs-build]
-description = 'Generate the html docs into generated-docs/html'
 run = 'spago docs'
+depends_post = ['docs-serve']
 
 [tasks.docs-serve]
 description = 'Serve the generated html docs on http://localhost:8000'
-# only waits when docs-build runs in the same invocation (e.g. via docs); standalone it serves what is already there
-wait_for = ['docs-build']
-run = 'python3 -m http.server 8000 -d generated-docs/html'
+shell = "nu -c"
+run = "if ('generated-docs/html' | path exists) { python3 -m http.server 8000 -d generated-docs/html } else { print 'No docs were generated, run task \"docs\" first.' }"
+# run = 'python3 -m http.server 8000 -d generated-docs/html'
 
 [tasks.clean]
 run = 'rm -rf output index.js'
