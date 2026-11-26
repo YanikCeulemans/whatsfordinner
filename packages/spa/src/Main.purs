@@ -29,9 +29,11 @@ pathAndSearch = do
   pure $ fold [ pathname, search ]
 
 onNavigate :: (Maybe Route -> Aff Unit) -> Event -> Effect Unit
-onNavigate f event = do
-  Navigation.intercept opts navigationEvent
-  pure unit
+onNavigate f event =
+  -- Let reloads (e.g. location.reload() from parcel's HMR runtime) and
+  -- non-interceptable navigations go through to the browser.
+  when (navigationEvent.canIntercept && navigationEvent.navigationType /= "reload") do
+    Navigation.intercept opts navigationEvent
   where
   navigationEvent = Navigation.fromEvent event
   opts =

@@ -18,7 +18,12 @@ toEventTarget = unsafeCoerce
 
 foreign import navigation :: Effect Navigation
 
-type NavigateEvent = { destination :: { url :: String } }
+type NavigateEvent =
+  { destination :: { url :: String }
+  , canIntercept :: Boolean
+  -- "push" | "replace" | "reload" | "traverse"
+  , navigationType :: String
+  }
 
 fromEvent :: Event -> NavigateEvent
 fromEvent = unsafeCoerce
