@@ -26,7 +26,18 @@ run = 'spago build'
 run = 'spago bundle --platform browser --bundle-type app --minify -p spa --module Spa.Main'
 
 [tasks.docs]
+description = 'Generate the docs and serve them'
+depends = ['docs-build', 'docs-serve']
+
+[tasks.docs-build]
+description = 'Generate the html docs into generated-docs/html'
 run = 'spago docs'
+
+[tasks.docs-serve]
+description = 'Serve the generated html docs on http://localhost:8000'
+# only waits when docs-build runs in the same invocation (e.g. via docs); standalone it serves what is already there
+wait_for = ['docs-build']
+run = 'python3 -m http.server 8000 -d generated-docs/html'
 
 [tasks.clean]
 run = 'rm -rf output index.js'
@@ -39,7 +50,6 @@ _.path = './node_modules/.bin'
 
 [tools]
 node = "24.18"
-pitchfork = "latest"
 "npm:spago" = "latest"
 purescript = "latest"
 "npm:esbuild" = { version = "latest", allow_builds = ["esbuild"] }

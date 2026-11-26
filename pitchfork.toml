@@ -1,5 +1,0 @@
-[daemons.docs]
-run = "python3 -m http.server $PORT"
-port = 8000
-dir = "generated-docs/html"
-
