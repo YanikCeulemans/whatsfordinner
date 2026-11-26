@@ -11,6 +11,7 @@ import Common.Id as Id
 import Common.MealScheduleId (MealScheduleId)
 import Common.Space (Space)
 import Common.SpaceId (SpaceId)
+import Control.Monad.Except (class MonadError)
 import Control.Monad.Rec.Class (forever)
 import Control.Monad.State (class MonadState)
 import Data.Array (fold, mapWithIndex)
@@ -28,6 +29,7 @@ import Data.Traversable (for_, sequence_)
 import Data.Tuple (Tuple(..))
 import Data.Tuple as Tuple
 import Data.Tuple.Nested ((/\))
+import Debug as Debug
 import Effect.Aff as Aff
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class.Console as Console
@@ -37,8 +39,8 @@ import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Subscription as HS
 import Spa.App.Layout as Layout
-import Spa.App.RemoteData (RemoteData(..))
-import Spa.App.RemoteData as RemoteData
+import Spa.App.RemoteRefreshData (RemoteRefreshData(..))
+import Spa.App.RemoteRefreshData as RemoteRefreshData
 import Spa.App.Shared (preventDefault)
 import Spa.App.Shared as S
 import Spa.Capabilities.Resource.ManageGroceryList
@@ -96,38 +98,41 @@ stateSpaceId = case _ of
   StateSpace { id } -> id
 
 type State =
-  { groceryListState :: RemoteData String GroceryListState
+  { groceryListState :: RemoteRefreshData String GroceryListState
   , stateSpace :: StateSpace
   , groceryListId :: GroceryListId
   , fibersToCleanup :: Array (Aff.Fiber Unit)
   }
 
-_groceryListState :: Lens' State (RemoteData String GroceryListState)
+_groceryListState :: Lens' State (RemoteRefreshData String GroceryListState)
 _groceryListState = LensRecord.prop (Proxy :: Proxy "groceryListState")
 
 _groceryListStateS :: AffineTraversal' State GroceryListState
-_groceryListStateS = _groceryListState <<< RemoteData._Success
+_groceryListStateS = _groceryListState <<< RemoteRefreshData._Success
 
 _dragState :: Lens' GroceryListState (DragState DragEntry)
 _dragState = LensRecord.prop (Proxy :: Proxy "dragState")
 
 _dragStateS :: AffineTraversal' State (DragState DragEntry)
 _dragStateS =
-  _groceryListState <<< RemoteData._Success <<< _dragState
+  _groceryListState <<< RemoteRefreshData._Success <<< _dragState
 
 _groceryList :: Lens' GroceryListState GroceryList
 _groceryList = LensRecord.prop (Proxy :: Proxy "groceryList")
 
 _groceryListS :: AffineTraversal' State GroceryList
 _groceryListS =
-  _groceryListState <<< RemoteData._Success <<< _groceryList
+  _groceryListState <<< RemoteRefreshData._Success <<< _groceryList
 
 _groceryListId :: Lens' GroceryListState GroceryListId
 _groceryListId = LensRecord.prop (Proxy :: Proxy "groceryListId")
 
 _groceryListIdS :: AffineTraversal' State GroceryListId
 _groceryListIdS =
-  _groceryListState <<< RemoteData._Success <<< _groceryListId
+  _groceryListState <<< RemoteRefreshData._Success <<< _groceryListId
+
+_fibersToCleanup :: Lens' State (Array (Aff.Fiber Unit))
+_fibersToCleanup = LensRecord.prop (Proxy :: Proxy "fibersToCleanup")
 
 {--
 direction == nothing: untouched
@@ -349,40 +354,43 @@ loadGroceriesSpace
   => MonadState State m
   => m Unit
 loadGroceriesSpace = do
-  stateSpace <- H.gets _.stateSpace
+  state <- H.get
+  let
+    stateSpace = state.stateSpace
+    groceryListState = state.groceryListState
+    updatedGroceryListState =
+      case groceryListState of
+        Success x -> Refreshing x
+        _ -> Loading
+
+  H.modify_ _ { groceryListState = updatedGroceryListState }
+
   case stateSpace of
     StateSpaceId spaceId -> do
       foundSpace <- loadSpace spaceId
+
       case foundSpace of
         Nothing ->
           H.modify_ _
             { groceryListState = Error $ "No space was found for id: " <> show
                 spaceId
             }
-        Just space ->
-          ?h
 
--- TODO
+        Just space -> upsertGroceryListState space
 
--- space <- getOrLoadSpace
--- Tuple stateSpace groceryListState <-
---   case space of
---     Nothing -> pure $ Tuple (stateSpaceId ) $ Error "No such space"
---     Just { groceryListId, mealScheduleId } -> do
---       groceryList <- upsertGroceryList groceryListId
---       pure $ Success
---         { groceryList
---         , groceryListId
---         , mealScheduleId
---         , dragState: NotDragging
---         }
--- H.modify_ _ { groceryListState = groceryListState }
--- where
--- getOrLoadSpace = do
---   stateSpace <- H.gets _.stateSpace
---   case stateSpace of
---     StateSpaceId spaceId -> loadSpace spaceId
---     StateSpace space -> pure $ Just space
+    StateSpace space -> upsertGroceryListState space
+  where
+  upsertGroceryListState space@{ groceryListId, mealScheduleId } = do
+    groceryList <- upsertGroceryList groceryListId
+    H.modify_ _
+      { groceryListState = Success
+          { groceryList
+          , groceryListId
+          , mealScheduleId
+          , dragState: NotDragging
+          }
+      , stateSpace = StateSpace space
+      }
 
 buildMainLayoutConfig :: State -> Layout.MainConfig
 buildMainLayoutConfig state =
@@ -396,9 +404,11 @@ buildMainLayoutConfig state =
 timer
   :: forall a m. MonadAff m => a -> m (Tuple (Aff.Fiber Unit) (HS.Emitter a))
 timer action = do
+  -- TODO: Can we use makeEmitter to cleanup the fiber on unsubscribe?
+  -- HS.makeEmitter
   { emitter, listener } <- H.liftEffect HS.create
   fiber <- H.liftAff $ Aff.forkAff $ forever do
-    Aff.delay $ Aff.Milliseconds 1000.0
+    Aff.delay $ Aff.Milliseconds 5000.0
     H.liftEffect $ HS.notify listener action
   pure (Tuple fiber emitter)
 
@@ -436,12 +446,7 @@ component =
     Initialize -> do
       Tuple timerFiber timerEmitter <- timer Tick
       void $ H.subscribe timerEmitter
-      H.modify_
-        ( \s -> s
-            { groceryListState = Loading
-            , fibersToCleanup = Array.cons timerFiber s.fibersToCleanup
-            }
-        )
+      Lens.modifying _fibersToCleanup $ Array.cons timerFiber
       loadGroceriesSpace
 
     Finalize -> do
@@ -495,7 +500,7 @@ component =
       Lens.assign _dragStateS $ DraggingOverNonTarget dragEntry
 
     Tick ->
-      Console.log "tick tock"
+      loadGroceriesSpace
 
   render :: State -> H.ComponentHTML Action () m
   render state =
@@ -516,9 +521,22 @@ component =
             NotRequested -> HH.text "Loading"
             Loading -> HH.text "Loading"
             Error e -> HH.text e
-            Success { groceryList } | GroceryList.isEmpty groceryList -> HH.text
-              "No groceries have been added yet"
-            Success groceryListState -> groceriesView groceryListState
+            Success { groceryList } | GroceryList.isEmpty groceryList ->
+              HH.text "No groceries have been added yet"
+            Success groceryListState ->
+              HH.div []
+                [ groceriesView groceryListState
+                ]
+            Refreshing groceryListState ->
+              HH.div []
+                [ HH.text "Refreshing"
+                , groceriesView groceryListState
+                ]
+            RefreshFailed _e groceryListState ->
+              HH.div []
+                [ HH.text "Refresh failed, stale data is shown"
+                , groceriesView groceryListState
+                ]
         ]
     where
     groceryLinks = case _ of
