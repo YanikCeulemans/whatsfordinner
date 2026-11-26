@@ -9,8 +9,10 @@ import Common.GroceryList as GroceryList
 import Common.GroceryListId (GroceryListId)
 import Common.Id as Id
 import Common.MealScheduleId (MealScheduleId)
+import Common.Space (Space)
 import Common.SpaceId (SpaceId)
 import Control.Monad.Rec.Class (forever)
+import Control.Monad.State (class MonadState)
 import Data.Array (fold, mapWithIndex)
 import Data.Array as Array
 import Data.Function (on)
@@ -84,9 +86,18 @@ type Input =
   , groceryListId :: GroceryListId
   }
 
+data StateSpace
+  = StateSpaceId SpaceId
+  | StateSpace Space
+
+stateSpaceId :: StateSpace -> SpaceId
+stateSpaceId = case _ of
+  StateSpaceId id -> id
+  StateSpace { id } -> id
+
 type State =
   { groceryListState :: RemoteData String GroceryListState
-  , spaceId :: SpaceId
+  , stateSpace :: StateSpace
   , groceryListId :: GroceryListId
   , fibersToCleanup :: Array (Aff.Fiber Unit)
   }
@@ -331,12 +342,54 @@ groceriesView state =
       # mapWithIndex Tuple
       # Array.partition (Tuple.snd >>> GroceryList.entryChecked)
 
+loadGroceriesSpace
+  :: forall m
+   . ManageGroceryList m
+  => ManageSpaces m
+  => MonadState State m
+  => m Unit
+loadGroceriesSpace = do
+  stateSpace <- H.gets _.stateSpace
+  case stateSpace of
+    StateSpaceId spaceId -> do
+      foundSpace <- loadSpace spaceId
+      case foundSpace of
+        Nothing ->
+          H.modify_ _
+            { groceryListState = Error $ "No space was found for id: " <> show
+                spaceId
+            }
+        Just space ->
+          ?h
+
+-- TODO
+
+-- space <- getOrLoadSpace
+-- Tuple stateSpace groceryListState <-
+--   case space of
+--     Nothing -> pure $ Tuple (stateSpaceId ) $ Error "No such space"
+--     Just { groceryListId, mealScheduleId } -> do
+--       groceryList <- upsertGroceryList groceryListId
+--       pure $ Success
+--         { groceryList
+--         , groceryListId
+--         , mealScheduleId
+--         , dragState: NotDragging
+--         }
+-- H.modify_ _ { groceryListState = groceryListState }
+-- where
+-- getOrLoadSpace = do
+--   stateSpace <- H.gets _.stateSpace
+--   case stateSpace of
+--     StateSpaceId spaceId -> loadSpace spaceId
+--     StateSpace space -> pure $ Just space
+
 buildMainLayoutConfig :: State -> Layout.MainConfig
 buildMainLayoutConfig state =
   (Layout.defaultMainConfig { routing = Just routing })
   where
   routing =
-    { spaceId: state.spaceId
+    { spaceId: stateSpaceId state.stateSpace
     , groceryListId: Lens.preview _groceryListIdS state
     }
 
@@ -370,7 +423,7 @@ component =
   initialState :: Input -> State
   initialState { spaceId, groceryListId } =
     { groceryListState: NotRequested
-    , spaceId
+    , stateSpace: StateSpaceId spaceId
     , groceryListId
     , fibersToCleanup: []
     }
@@ -389,17 +442,7 @@ component =
             , fibersToCleanup = Array.cons timerFiber s.fibersToCleanup
             }
         )
-      foundSpace <- loadSpace =<< H.gets _.spaceId
-      for_ foundSpace \{ groceryListId, mealScheduleId } -> do
-        groceryList <- upsertGroceryList groceryListId
-        H.modify_ _
-          { groceryListState = Success
-              { groceryList
-              , groceryListId
-              , mealScheduleId
-              , dragState: NotDragging
-              }
-          }
+      loadGroceriesSpace
 
     Finalize -> do
       fibersToCleanup <- H.gets _.fibersToCleanup
@@ -452,7 +495,7 @@ component =
       Lens.assign _dragStateS $ DraggingOverNonTarget dragEntry
 
     Tick ->
-      Console.log "tick"
+      Console.log "tick tock"
 
   render :: State -> H.ComponentHTML Action () m
   render state =
@@ -482,12 +525,15 @@ component =
       Nothing -> []
       Just { groceryListId, mealScheduleId } ->
         [ S.link
-            ( SpaceRoute state.spaceId $ GroceriesRoute groceryListId
+            ( SpaceRoute (stateSpaceId state.stateSpace)
+                $ GroceriesRoute groceryListId
                 $ GroceriesGenerate mealScheduleId
             )
             [ HH.text "Generate" ]
         , S.link
-            ( SpaceRoute state.spaceId $ GroceriesRoute groceryListId AddGrocery
+            ( SpaceRoute (stateSpaceId state.stateSpace) $ GroceriesRoute
+                groceryListId
+                AddGrocery
             )
             [ HH.text "Add" ]
         ]
