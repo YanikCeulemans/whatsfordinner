@@ -2,7 +2,6 @@ module Common.Test.Transport where
 
 import Prelude
 
-import Common.Id as Id
 import Common.Transport (class Transport, receive, registeredSend, send)
 import Data.Argonaut (Json, jsonNull)
 import Data.Array as Array
@@ -71,7 +70,7 @@ registeredSendSpec = do
       forked <- Aff.forkAff do
         payload <- receive transport (const true)
         send payload transport
-      actual <- registeredSend Id.Node jsonNull transport
+      actual <- registeredSend jsonNull transport
       Aff.joinFiber forked
       actual `shouldEqual` unit
 
