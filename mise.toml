@@ -4,13 +4,11 @@ depends = ['dev-watch', 'dev-serve']
 
 [tasks.dev-watch]
 description = 'Re-bundle the spa when purs/js sources change'
-depends = ['bundle-spa']
-# --postpone: the initial bundle is already produced by the bundle-spa dependency
-run = 'watchexec --postpone -e purs,js -w packages -i output mise run bundle-spa'
+run = 'watchexec -e purs,js -w packages -i output mise run bundle-spa'
+output = 'interleave'
 
 [tasks.dev-serve]
 description = 'Serve the spa through parcel; reloads the browser when the bundle changes'
-depends = ['bundle-spa']
 # mise pipes task output (for the [dev-serve] prefix), so parcel can't read the terminal size from stdout.
 # Without COLUMNS/LINES its term-size dependency falls back to `resize`, which hangs on a real tty.
 env = { COLUMNS = '120', LINES = '40' }
@@ -18,6 +16,7 @@ run = 'parcel serve packages/spa/index.html'
 
 [tasks.bundle-spa]
 run = 'spago bundle -p spa --platform browser --bundle-type app --module Spa.Main'
+output = 'interleave'
 
 [tasks.build]
 run = 'spago build'
