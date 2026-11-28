@@ -34,13 +34,11 @@ import Data.String.CaseInsensitive (CaseInsensitiveString)
 import Data.String.NonEmpty.Internal (NonEmptyString(..))
 import Data.String.Regex as StrRegex
 import Data.String.Regex.Flags as Flags
-import Data.Time.Duration (Seconds(..), convertDuration)
 import Data.Traversable (for_)
 import Data.Tuple (Tuple)
 import Data.Tuple.Nested ((/\))
-import Effect.Aff (Aff, Milliseconds(..))
-import Effect.Aff as Aff
-import Effect.Aff.Class (class MonadAff, liftAff)
+import Effect.Aff (Aff)
+import Effect.Aff.Class (class MonadAff)
 import Effect.Class (class MonadEffect, liftEffect)
 import Effect.Class.Console as Console
 import Partial.Unsafe (unsafeCrashWith)

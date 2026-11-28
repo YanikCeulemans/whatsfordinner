@@ -114,3 +114,8 @@ toMaybe = case _ of
 
 _Success :: forall e a. Prism' (RemoteRefreshData e a) a
 _Success = Prism.prism' Success toMaybe
+
+_Refreshing :: forall e a. Prism' (RemoteRefreshData e a) a
+_Refreshing = Prism.prism' Refreshing $ case _ of
+  Refreshing a -> Just a
+  _ -> Nothing

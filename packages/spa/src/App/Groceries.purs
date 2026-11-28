@@ -11,7 +11,6 @@ import Common.Id as Id
 import Common.MealScheduleId (MealScheduleId)
 import Common.Space (Space)
 import Common.SpaceId (SpaceId)
-import Control.Monad.Except (class MonadError)
 import Control.Monad.Rec.Class (forever)
 import Control.Monad.State (class MonadState)
 import Data.Array (fold, mapWithIndex)
@@ -25,14 +24,14 @@ import Data.Map (Map)
 import Data.Map as Map
 import Data.Maybe (Maybe(..))
 import Data.Maybe as Maybe
+import Data.Time.Duration (class Duration, Seconds(..), convertDuration)
 import Data.Traversable (for_, sequence_)
 import Data.Tuple (Tuple(..))
 import Data.Tuple as Tuple
 import Data.Tuple.Nested ((/\))
-import Debug as Debug
 import Effect.Aff as Aff
 import Effect.Aff.Class (class MonadAff)
-import Effect.Class.Console as Console
+import Effect.Class (liftEffect)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -101,7 +100,6 @@ type State =
   { groceryListState :: RemoteRefreshData String GroceryListState
   , stateSpace :: StateSpace
   , groceryListId :: GroceryListId
-  , fibersToCleanup :: Array (Aff.Fiber Unit)
   }
 
 _groceryListState :: Lens' State (RemoteRefreshData String GroceryListState)
@@ -114,25 +112,19 @@ _dragState :: Lens' GroceryListState (DragState DragEntry)
 _dragState = LensRecord.prop (Proxy :: Proxy "dragState")
 
 _dragStateS :: AffineTraversal' State (DragState DragEntry)
-_dragStateS =
-  _groceryListState <<< RemoteRefreshData._Success <<< _dragState
+_dragStateS = _groceryListStateS <<< _dragState
 
 _groceryList :: Lens' GroceryListState GroceryList
 _groceryList = LensRecord.prop (Proxy :: Proxy "groceryList")
 
 _groceryListS :: AffineTraversal' State GroceryList
-_groceryListS =
-  _groceryListState <<< RemoteRefreshData._Success <<< _groceryList
+_groceryListS = _groceryListStateS <<< _groceryList
 
 _groceryListId :: Lens' GroceryListState GroceryListId
 _groceryListId = LensRecord.prop (Proxy :: Proxy "groceryListId")
 
 _groceryListIdS :: AffineTraversal' State GroceryListId
-_groceryListIdS =
-  _groceryListState <<< RemoteRefreshData._Success <<< _groceryListId
-
-_fibersToCleanup :: Lens' State (Array (Aff.Fiber Unit))
-_fibersToCleanup = LensRecord.prop (Proxy :: Proxy "fibersToCleanup")
+_groceryListIdS = _groceryListStateS <<< _groceryListId
 
 {--
 direction == nothing: untouched
@@ -199,7 +191,6 @@ clearCompleted state = state
 
 data Action
   = Initialize
-  | Finalize
   | ToggleGrocery GroceryEntry MouseEvent
   | StartDrag DragEntry DragEvent
   | OverDrag DragEntry DragEvent
@@ -347,6 +338,26 @@ groceriesView state =
       # mapWithIndex Tuple
       # Array.partition (Tuple.snd >>> GroceryList.entryChecked)
 
+layout
+  :: forall p i. Boolean -> Array (HH.HTML p i) -> HH.HTML p i -> HH.HTML p i
+layout isRefreshing links content =
+  HH.div [ HP.class_ $ H.ClassName "flex column spaced" ]
+    [ HH.div
+        [ HP.class_ $ H.ClassName "flex justify-space-between items-center"
+        ]
+        [ HH.div
+            [ HP.class_ $ H.ClassName "flex row spaced items-end" ]
+            [ HH.h1 [ HP.class_ $ H.ClassName "no-margin" ]
+                [ HH.text "Groceries"
+                ]
+            , if isRefreshing then HH.text "Refreshing..."
+              else HH.text " "
+            ]
+        , HH.div [ HP.class_ $ H.ClassName "flex spaced" ] $ links
+        ]
+    , content
+    ]
+
 loadGroceriesSpace
   :: forall m
    . ManageGroceryList m
@@ -361,6 +372,7 @@ loadGroceriesSpace = do
     updatedGroceryListState =
       case groceryListState of
         Success x -> Refreshing x
+        RefreshFailed _e x -> Refreshing x
         _ -> Loading
 
   H.modify_ _ { groceryListState = updatedGroceryListState }
@@ -402,15 +414,16 @@ buildMainLayoutConfig state =
     }
 
 timer
-  :: forall a m. MonadAff m => a -> m (Tuple (Aff.Fiber Unit) (HS.Emitter a))
-timer action = do
-  -- TODO: Can we use makeEmitter to cleanup the fiber on unsubscribe?
-  -- HS.makeEmitter
-  { emitter, listener } <- H.liftEffect HS.create
-  fiber <- H.liftAff $ Aff.forkAff $ forever do
-    Aff.delay $ Aff.Milliseconds 5000.0
-    H.liftEffect $ HS.notify listener action
-  pure (Tuple fiber emitter)
+  :: forall d a. Duration d => d -> a -> HS.Emitter a
+timer duration action = HS.makeEmitter help
+  where
+  help emit = do
+    fiber <- Aff.launchAff $ forever do
+      Aff.delay $ convertDuration duration
+      liftEffect $ emit action
+    pure
+      $ Aff.launchAff_
+      $ Aff.killFiber (Aff.error "unsubcribe was called") fiber
 
 component
   :: forall query output m
@@ -425,7 +438,6 @@ component =
     , eval: H.mkEval $ H.defaultEval
         { handleAction = handleAction
         , initialize = Just Initialize
-        , finalize = Just Finalize
         }
     }
 
@@ -435,7 +447,6 @@ component =
     { groceryListState: NotRequested
     , stateSpace: StateSpaceId spaceId
     , groceryListId
-    , fibersToCleanup: []
     }
 
   handleAction
@@ -444,15 +455,8 @@ component =
     -> H.HalogenM State Action childSlots output m Unit
   handleAction = case _ of
     Initialize -> do
-      Tuple timerFiber timerEmitter <- timer Tick
-      void $ H.subscribe timerEmitter
-      Lens.modifying _fibersToCleanup $ Array.cons timerFiber
+      void $ H.subscribe $ timer (Seconds 20.0) Tick
       loadGroceriesSpace
-
-    Finalize -> do
-      fibersToCleanup <- H.gets _.fibersToCleanup
-      H.liftAff $ for_ fibersToCleanup $ Aff.killFiber $ Aff.error
-        "groceries component that was subscribed to this fiber was unmounted"
 
     StartDrag dragEntry _dragEvent ->
       Lens.assign _dragStateS $ DraggingOverNonTarget dragEntry
@@ -471,7 +475,6 @@ component =
       where
       syncWith modifiedGroceries grocery =
         Map.lookup (GroceryList.entryId grocery) modifiedGroceries
-          -- Array.find (eq (grocery :: GroceryEntry)) modifiedGroceries
           # Maybe.fromMaybe grocery
 
     ToggleGrocery grocery mouseEvent -> do
@@ -504,42 +507,36 @@ component =
 
   render :: State -> H.ComponentHTML Action () m
   render state =
-    Layout.main' (buildMainLayoutConfig state) $
-      HH.div [ HP.class_ $ H.ClassName "flex column spaced" ]
-        [ HH.div
-            [ HP.class_ $ H.ClassName "flex justify-space-between items-center"
-            ]
-            [ HH.div
-                [ HP.class_ $ H.ClassName "flex row spaced items-baseline" ]
-                [ HH.h1 [ HP.class_ $ H.ClassName "no-margin" ]
-                    [ HH.text "Groceries" ]
-                ]
-            , HH.div [ HP.class_ $ H.ClassName "flex spaced" ] $ groceryLinks
-                (Lens.preview _groceryListStateS state)
-            ]
-        , case state.groceryListState of
-            NotRequested -> HH.text "Loading"
-            Loading -> HH.text "Loading"
-            Error e -> HH.text e
-            Success { groceryList } | GroceryList.isEmpty groceryList ->
-              HH.text "No groceries have been added yet"
-            Success groceryListState ->
-              HH.div []
-                [ groceriesView groceryListState
-                ]
-            Refreshing groceryListState ->
-              HH.div []
-                [ HH.text "Refreshing"
-                , groceriesView groceryListState
-                ]
-            RefreshFailed _e groceryListState ->
-              HH.div []
-                [ HH.text "Refresh failed, stale data is shown"
-                , groceriesView groceryListState
-                ]
-        ]
+    Layout.main' (buildMainLayoutConfig state)
+      $ layout isRefreshing links
+      $ case state.groceryListState of
+          NotRequested -> HH.text "Loading"
+          Loading -> HH.text "Loading"
+          Error e -> HH.text e
+          Success { groceryList } | GroceryList.isEmpty groceryList ->
+            HH.text "No groceries have been added yet"
+          Refreshing { groceryList } | GroceryList.isEmpty groceryList ->
+            HH.text "No groceries have been added yet"
+          RefreshFailed _e { groceryList }
+            | GroceryList.isEmpty groceryList ->
+                HH.div []
+                  [ HH.text "Refresh failed, stale data is shown"
+                  , HH.text "No groceries have been added yet"
+                  ]
+          Success groceryListState ->
+            groceriesView groceryListState
+          Refreshing groceryListState ->
+            groceriesView groceryListState
+          RefreshFailed _e groceryListState ->
+            HH.div []
+              [ HH.text "Refresh failed, stale data is shown"
+              , groceriesView groceryListState
+              ]
     where
-    groceryLinks = case _ of
+    isRefreshing =
+      Lens.preview (_groceryListState <<< RemoteRefreshData._Refreshing) state
+        # Maybe.isJust
+    links = case Lens.preview _groceryListStateS state of
       Nothing -> []
       Just { groceryListId, mealScheduleId } ->
         [ S.link
