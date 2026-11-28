@@ -24,6 +24,7 @@ module Common.GroceryList
   , groceries
   , isEmpty
   , lookup
+  , updateAsArray
   ) where
 
 import Prelude
@@ -263,3 +264,21 @@ partitionGroceriesOnChecked groceryList =
 
 clearCompleted :: GroceryList -> GroceryList
 clearCompleted = Lens.over _data $ Map.filter (not <<< entryChecked)
+
+updateAsArray
+  :: ( Array (Tuple GroceryEntryId GroceryEntry)
+       -> Array (Tuple GroceryEntryId GroceryEntry)
+     )
+  -> GroceryList
+  -> GroceryList
+updateAsArray f = Lens.over _data help
+  where
+  help groceryMap =
+    Map.fromFoldable
+      $ Array.mapWithIndex setIndex
+      $ f
+      $ Array.sortBy sortIndex
+      $ Map.toUnfoldable groceryMap
+  setIndex i pair = map (setEntrySortIndex i) pair
+  sortIndex (Tuple _ a) (Tuple _ b) = compare (entrySortIndex a)
+    (entrySortIndex b)

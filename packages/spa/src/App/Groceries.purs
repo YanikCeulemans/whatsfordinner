@@ -162,6 +162,10 @@ shiftEntry dos@{ source, target } entry =
   sourceIndex = GroceryList.entrySortIndex source.item
   targetIndex = GroceryList.entrySortIndex target.item
 
+-- -- TODO: use update as array?
+-- reorder dos@{ source, target } groceryList = do
+--   GroceryList.updateAsArray
+
 endDrag
   :: GroceryListState
   -> Tuple (Map GroceryEntryId GroceryEntry) GroceryListState
